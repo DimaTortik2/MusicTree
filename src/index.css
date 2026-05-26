@@ -1,2 +1,31 @@
 @import "tailwindcss";
 
+:root {
+  --background: #0F0510;
+  --surface: #1A0B22;
+  --primary: #EC4899;
+  --accent: #8B5CF6;
+  --text: #F3F4F6;
+  --homework: #57430B;
+  --access: #10B981;
+}
+
+.light {
+  --background: #F9F7FA;
+  --surface: #F1EBF5;    
+  --primary: #DB2777;   
+  --accent: #7C3AED;    
+  --text: #1A0B22;   
+  --homework: #FEF08A;
+  --access: #059669; 
+}
+
+@theme {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-primary: var(--primary);
+  --color-accent: var(--accent);
+  --color-text: var(--text);
+  --color-homework: var(--homework);
+  --color-access: var(--access);
+}

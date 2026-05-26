@@ -6,23 +6,24 @@ import './index.css';
 import { LandingPage } from '@/pages/LandingPage';
 import { AppLayout } from '@/pages/layouts/AppLayout';
 import { TreePage } from '@/pages/TreePage';
+import { ThemeProvider } from '@/app/providers/ThemeProvider';
 
 const router = createBrowserRouter([
   {
     path: '/',
-    element: <LandingPage />, // Обычная страница без сайдбара
+    element: <LandingPage />,
   },
   {
     path: '/app',
-    element: <AppLayout />, // Наш лэйаут с сайдбаром
+    element: <AppLayout />,
     children: [
       {
         index: true,
-        element: <Navigate to="tree" replace />, // Перенаправляем с /app на /app/dashboard
+        element: <Navigate to="tree" replace />,
       },
       {
         path: 'tree',
-        element: <TreePage />, // Будет внутри Outlet
+        element: <TreePage />,
       },
     ],
   },
@@ -30,6 +31,8 @@ const router = createBrowserRouter([
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <RouterProvider router={router} />
+    <ThemeProvider>
+      <RouterProvider router={router} />
+    </ThemeProvider>
   </StrictMode>,
 );

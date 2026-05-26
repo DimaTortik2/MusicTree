@@ -5,7 +5,7 @@ interface LandingPageProps {
 export const LandingPage = ({ className }: LandingPageProps) => {
   return (
     <div className={className}>
-      
+      123
     </div>
   );
 };

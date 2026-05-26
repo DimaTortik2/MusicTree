@@ -8,6 +8,7 @@ import { AppLayout } from '@/pages/layouts/AppLayout';
 import { TreePage } from '@/pages/TreePage';
 import { ThemeProvider } from '@/app/providers/ThemeProvider';
 import { CurrentLecturePage } from '@/pages/CurrentLecturePage';
+import SettingsPage from '@/pages/settings/SettingsPage';
 
 const router = createBrowserRouter([
   {
@@ -27,8 +28,12 @@ const router = createBrowserRouter([
         element: <TreePage />,
       },
       {
-        path: 'current/lecture', // Тот самый путь из навигации
+        path: 'current/lecture',
         element: <CurrentLecturePage />,
+      },
+      {
+        path: 'settings',
+        element: <SettingsPage />,
       },
     ],
   },

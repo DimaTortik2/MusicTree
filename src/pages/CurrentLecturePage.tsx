@@ -48,7 +48,7 @@ export const CurrentLecturePage = () => {
 
   return (
     <div className="relative flex min-h-full w-full flex-col bg-background font-sans text-text">
-      <header className="mb-8 border-b-2 border-surface pb-4">
+      <header className="pb-2">
         <h1 className="mb-2 text-3xl font-bold text-text">{lesson.title}</h1>
       </header>
 
@@ -102,7 +102,7 @@ export const CurrentLecturePage = () => {
           <LazyMdxContent />
         </Suspense>
 
-        <div className="mt-12 flex justify-center border-t-2 border-surface pt-8">
+        <div className="mt-12 flex justify-center pt-8">
           <Button variant="outline" onClick={() => setShowSuccessOverlay(true)}>
             Завершить урок
           </Button>

@@ -39,6 +39,8 @@ export interface AppState {
   setCurrentLesson: (id: string) => void;
   passTest: (testId: string, result: TestResult) => void;
   clearTestResult: (testId: string) => void;
+  setActiveTabs: (tabs: string[]) => void;
+  setInactiveTabs: (tabs: string[]) => void;
 }
 
 // Дефолтная раскладка по ТЗ (q2w3... и zsxd...)
@@ -84,9 +86,8 @@ export const useProgressStore = create<AppState>()(
       pianoVolume: 50,
       pianoBindings: DEFAULT_PIANO_BINDINGS,
 
-      // Несгораемые 'tree' и 'lesson' первыми
-      activeTabs: ['tree', 'lesson', 'tests', 'homeworks', 'chains'],
-      inactiveTabs: ['vocal', 'settings', 'debug'],
+      activeTabs: ['tree', 'lesson', 'homeworks', 'vocal', 'piano'],
+      inactiveTabs: ['chains', 'tests', 'exam', 'debug', 'settings', 'customize'],
       audioRecordIds: [],
 
       _hasHydrated: false,
@@ -115,6 +116,8 @@ export const useProgressStore = create<AppState>()(
           delete newTests[testId];
           return { passedTests: newTests };
         }),
+      setActiveTabs: (tabs) => set({ activeTabs: tabs }),
+      setInactiveTabs: (tabs) => set({ inactiveTabs: tabs }),
     }),
     {
       name: 'music-tree-progress',

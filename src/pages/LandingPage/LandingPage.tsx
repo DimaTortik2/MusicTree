@@ -35,7 +35,9 @@ export function LandingPage() {
           </div>
           {/* Кнопка, на которую будет навешано дофига всякого */}
           <NavLink to={'/app'}>
-            <Button className="bg-accent hover:bg-primary">Начать</Button>
+            <Button color="accent" variant="solid" size="lg">
+              Начать
+            </Button>
           </NavLink>
         </div>
       </main>

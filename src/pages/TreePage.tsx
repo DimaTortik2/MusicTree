@@ -1,10 +1,18 @@
 import { useLayoutEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { TreeElement } from '@/shared/TreeElement';
 import type { TreeElementState } from '@/shared/TreeElement';
-import { contentConfig } from '@/contentConfig';
+import { contentConfig, type LessonConfig } from '@/contentConfig';
 import { useProgressStore } from '@/app/store/useProgressStore';
 
 const BASE_WIDTH = 1000;
+const ROW_HEIGHT = 200;
+const ROW_OFFSET = 100;
+const COL_STEP = 150;
+const COL_OFFSET = 200;
+
+const getX = (column: number) => COL_OFFSET + column * COL_STEP;
+const getY = (row: number) => ROW_OFFSET + row * ROW_HEIGHT;
 
 interface Line {
   id: string;
@@ -12,7 +20,8 @@ interface Line {
 }
 
 export const TreePage = () => {
-  const { passedLessons, currentLesson, _hasHydrated } = useProgressStore();
+  const navigate = useNavigate();
+  const { passedLessons, currentLesson, setCurrentLesson, _hasHydrated } = useProgressStore();
   const containerRef = useRef<HTMLDivElement>(null);
   const [lines, setLines] = useState<Line[]>([]);
 
@@ -30,11 +39,11 @@ export const TreePage = () => {
           if (!preReq) return;
 
           // Рассчитываем физические X-координаты на основе текущей ширины экрана
-          const x1 = (preReq.pos.x / BASE_WIDTH) * containerWidth;
-          const y1 = preReq.pos.y;
+          const x1 = (getX(preReq.position.column) / BASE_WIDTH) * containerWidth;
+          const y1 = getY(preReq.position.row);
 
-          const x2 = (lesson.pos.x / BASE_WIDTH) * containerWidth;
-          const y2 = lesson.pos.y;
+          const x2 = (getX(lesson.position.column) / BASE_WIDTH) * containerWidth;
+          const y2 = getY(lesson.position.row);
 
           // Излом линии ровно посередине между Y1 и Y2
           const midY = y1 + (y2 - y1) / 2;
@@ -50,7 +59,7 @@ export const TreePage = () => {
       setLines(newLines);
     };
 
-    // Следим за изменением ширины контейнера (поворот экрана телефона, ресайз окна)
+    // Следим за изменением ширины контейнера
     const ro = new ResizeObserver(updateLines);
     ro.observe(containerRef.current);
     updateLines(); // Первичная отрисовка
@@ -60,19 +69,37 @@ export const TreePage = () => {
 
   if (!_hasHydrated) return null;
 
-  const getLessonState = (id: string): TreeElementState => {
-    if (id === currentLesson) return 'current';
-    if (passedLessons.includes(id)) return 'completed';
-    return 'ordinary';
+  // Логика вычисления 5-ти состояний
+  const getLessonState = (lesson: LessonConfig): TreeElementState => {
+    const isCurrent = lesson.id === currentLesson;
+    const isPassed = passedLessons.includes(lesson.id);
+
+    // Сначала проверяем новое комбинированное состояние по ТЗ
+    if (isCurrent && isPassed) return 'current_completed';
+    if (isCurrent) return 'current';
+    if (isPassed) return 'completed';
+
+    // Проверяем, пройдены ли все предыдущие уроки для открытия
+    const isAvailable = lesson.prerequisites.every((pId) => passedLessons.includes(pId));
+    if (isAvailable) return 'ordinary';
+
+    return 'locked';
   };
+
+  const handleLessonClick = (lessonId: string) => {
+    setCurrentLesson(lessonId); // Обновляем "Текущую лекцию" в Zustand
+    navigate('/app/current/lecture'); // Переходим на лекцию
+  };
+
+  const maxRow = Math.max(0, ...contentConfig.map((l) => l.position.row));
+  const dynamicContainerHeight = getY(maxRow) + ROW_HEIGHT;
 
   return (
     <div className="flex min-h-screen w-full justify-center overflow-x-hidden bg-background py-10">
       <div
         ref={containerRef}
-        // Используем 100% ширину с ограничением в 1000px
         className="relative w-full max-w-250"
-        style={{ height: 1100 }}
+        style={{ height: dynamicContainerHeight }}
       >
         {/* Слой с SVG-линиями */}
         <svg className="pointer-events-none absolute inset-0 h-full w-full">
@@ -89,25 +116,29 @@ export const TreePage = () => {
         </svg>
 
         {/* Узлы (Уроки) */}
-        {contentConfig.map((lesson) => (
-          <div
-            key={lesson.id}
-            // Добавил flex-col и items-center, чтобы текст идеально центрировался под кнопкой
-            className="absolute z-10 flex flex-col items-center"
-            style={{
-              left: `${(lesson.pos.x / BASE_WIDTH) * 100}%`,
-              top: lesson.pos.y,
-              transform: 'translate(-50%, -50%)',
-            }}
-          >
-            <TreeElement state={getLessonState(lesson.id)} />
+        {contentConfig.map((lesson) => {
+          const state = getLessonState(lesson);
 
-            {/* Адаптивная текстовая подпись */}
-            <div className="mt-1 w-17.5 text-center text-[11px] leading-tight font-medium wrap-break-word text-text/80 sm:mt-2 sm:w-30 sm:text-sm">
-              {lesson.title}
+          return (
+            <div
+              key={lesson.id}
+              className="group absolute z-10 flex flex-col items-center"
+              style={{
+                left: `${(getX(lesson.position.column) / BASE_WIDTH) * 100}%`,
+                top: getY(lesson.position.row),
+                transform: 'translate(-50%, -50%)',
+              }}
+            >
+              {/* Передаем функцию клика напрямую в компонент-кнопку */}
+              <TreeElement state={state} onClick={() => handleLessonClick(lesson.id)} />
+
+              {/* Адаптивная текстовая подпись */}
+              <div className="pointer-events-none mt-1 w-17.5 text-center text-[11px] leading-tight font-medium wrap-break-word text-text/80 transition-colors duration-200 group-hover:text-text sm:mt-2 sm:w-30 sm:text-sm">
+                {lesson.title}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

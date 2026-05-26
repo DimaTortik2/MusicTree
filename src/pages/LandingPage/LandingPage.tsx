@@ -25,7 +25,7 @@ export function LandingPage() {
 
       <main className="relative z-10 flex w-full flex-1 flex-col justify-center px-6 pt-20 pb-10 sm:items-center">
         <div className="z-20 flex w-full flex-col items-center justify-center">
-          <p className="mb-2 text-center text-sm font-light sm:mb-4 sm:text-left sm:text-3xl">
+          <p className="mb-2 text-center text-xl font-light sm:mb-4 sm:text-left sm:text-3xl">
             Добро пожаловать на
           </p>
           <Logo className="mb-8 h-auto w-[85%] max-w-[320px] drop-shadow-sm sm:mb-12 sm:w-full sm:max-w-120" />

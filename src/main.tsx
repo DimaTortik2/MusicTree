@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 
 import './index.css';
-import { LandingPage } from '@/pages/LandingPage';
+import { LandingPage } from '@/pages/LandingPage/LandingPage';
 import { AppLayout } from '@/pages/layouts/AppLayout';
 import { TreePage } from '@/pages/TreePage';
 import { ThemeProvider } from '@/app/providers/ThemeProvider';

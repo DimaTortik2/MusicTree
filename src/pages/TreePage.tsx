@@ -26,6 +26,10 @@ export const TreePage = () => {
     useProgressStore();
   const containerRef = useRef<HTMLDivElement>(null);
   const [lines, setLines] = useState<Line[]>([]);
+  
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, []);
 
   // Отрисовка SVG-линий с помощью математики (относительно ширины контейнера)
   useLayoutEffect(() => {

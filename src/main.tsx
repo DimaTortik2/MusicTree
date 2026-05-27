@@ -9,6 +9,7 @@ import { TreePage } from '@/pages/TreePage';
 import { ThemeProvider } from '@/app/providers/ThemeProvider';
 import { CurrentLecturePage } from '@/pages/CurrentLecturePage';
 import SettingsPage from '@/pages/settings/SettingsPage';
+import { HomeworksPage } from '@/pages/HomeworksPage/HomeworksPage';
 
 const router = createBrowserRouter([
   {
@@ -34,6 +35,14 @@ const router = createBrowserRouter([
       {
         path: 'settings',
         element: <SettingsPage />,
+      },
+      {
+        path: 'homeworks',
+        element: <HomeworksPage />,
+      },
+      {
+        path: 'homeworks/:homeworkId?',
+        element: <HomeworksPage />,
       },
     ],
   },

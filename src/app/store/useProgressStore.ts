@@ -42,6 +42,8 @@ export interface AppState {
   clearTestResult: (testId: string) => void;
   setActiveTabs: (tabs: string[]) => void;
   setInactiveTabs: (tabs: string[]) => void;
+  passHomework: (id: string) => void;
+  returnHomeworkFromArchive: (id: string) => void;
 }
 
 // Дефолтная раскладка по ТЗ (q2w3... и zsxd...)
@@ -128,6 +130,15 @@ export const useProgressStore = create<AppState>()(
         }),
       setActiveTabs: (tabs) => set({ activeTabs: tabs }),
       setInactiveTabs: (tabs) => set({ inactiveTabs: tabs }),
+      passHomework: (id) =>
+        set((state) => ({
+          passedHomeworks: [...new Set([...state.passedHomeworks, id])],
+        })),
+
+      returnHomeworkFromArchive: (id) =>
+        set((state) => ({
+          passedHomeworks: state.passedHomeworks.filter((hwId) => hwId !== id),
+        })),
     }),
     {
       name: 'music-tree-progress',

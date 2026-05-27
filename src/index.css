@@ -35,3 +35,13 @@
   --color-homework: var(--homework);
   --color-access: var(--access);
 }
+/* --- Полное скрытие скроллбаров на всём сайте с сохранением скролла --- */
+
+* {
+  scrollbar-width: none; /* Скрываем в Firefox */
+  -ms-overflow-style: none; /* Скрываем в IE и старом Edge */
+}
+
+*::-webkit-scrollbar {
+  display: none; /* Скрываем в Chrome, Edge, Opera и Safari */
+}

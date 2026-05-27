@@ -4,46 +4,44 @@ import { useProgressStore } from '@/app/store/useProgressStore';
 import { contentConfig } from '@/contentConfig';
 import { FireSimple } from '@phosphor-icons/react';
 import { Button } from '@/shared/Button';
+import { MdxSkeleton } from '@/shared/MdxSkeleton';
 
 const mdxLectures = import.meta.glob('/src/content/*.mdx');
 
+const mdxLecturesCache: Record<string, React.LazyExoticComponent<React.ComponentType<any>>> = {};
+for (const path in mdxLectures) {
+  mdxLecturesCache[path] = React.lazy(
+    mdxLectures[path] as () => Promise<{ default: React.ComponentType<any> }>,
+  );
+}
+
 export const CurrentLecturePage = () => {
   const navigate = useNavigate();
-  const { currentLesson, passLesson } = useProgressStore();
+  // 👇 Достаем passedLessons из стора
+  const { currentLesson, passLesson, passedLessons } = useProgressStore();
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
 
-  // Ищем конфиг текущего урока, если в Zustand ничего нет — берем первый по умолчанию
   const lesson = useMemo(() => {
     return contentConfig.find((l) => l.id === currentLesson) || contentConfig[0];
   }, [currentLesson]);
 
-  // Динамически импортируем MDX-компонент на основе пути в конфиге по ТЗ
-  const LazyMdxContent = useMemo(() => {
-    const importFunc = mdxLectures[lesson.mdxPath];
-    if (!importFunc) {
-      return () => (
-        <div className="font-sans text-red-500">
-          Файл лекции по пути {lesson.mdxPath} не найден.
-        </div>
-      );
-    }
-    // Обертываем динамический импорт в React.lazy
-    return React.lazy(importFunc as () => Promise<{ default: React.ComponentType<any> }>);
-  }, [lesson.mdxPath]);
+  // 👇 Проверяем, пройдена ли уже эта лекция
+  const isPassed = useMemo(() => passedLessons.includes(lesson.id), [passedLessons, lesson.id]);
 
-  // Таймер на завершение урока
+  const LazyMdxContent = lesson ? mdxLecturesCache[lesson.mdxPath] : null;
+
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
     if (showSuccessOverlay) {
       timer = setTimeout(() => {
-        // Добавляем урок в пройденные
         passLesson(lesson.id);
         setShowSuccessOverlay(false);
-        // Редирект на Дерево
+        // 👇 Сбрасываем скролл прямо перед переходом, чтобы не было дерганий
+        window.scrollTo(0, 0);
         navigate('/app/tree');
       }, 3000);
     }
-    return () => clearTimeout(timer); // Обязательный cleanup при размонтировании
+    return () => clearTimeout(timer);
   }, [showSuccessOverlay, lesson.id, passLesson, navigate]);
 
   return (
@@ -53,62 +51,38 @@ export const CurrentLecturePage = () => {
       </header>
 
       <main className="prose prose-invert max-w-none flex-1 pb-24">
-        <Suspense
-          fallback={
-            <div className="animate-pulse space-y-8">
-              <div className="space-y-3">
-                <div className="h-4 w-full rounded bg-surface" />
-                <div className="h-4 w-[95%] rounded bg-surface" />
-                <div className="h-4 w-[90%] rounded bg-surface" />
-                <div className="h-4 w-[60%] rounded bg-surface" />
-              </div>
-              <div className="mt-10 h-6 w-1/3 rounded-md bg-surface" />
-              <div className="space-y-3 pt-4">
-                <div className="h-4 w-full rounded bg-surface" />
-                <div className="h-4 w-[85%] rounded bg-surface" />
-                <div className="h-4 w-[40%] rounded bg-surface" />
-              </div>
-              <div className="space-y-3 pt-4">
-                <div className="h-4 w-full rounded bg-surface" />
-                <div className="h-4 w-[85%] rounded bg-surface" />
-                <div className="h-4 w-[40%] rounded bg-surface" />
-              </div>
-              <div className="space-y-3">
-                <div className="h-4 w-full rounded bg-surface" />
-                <div className="h-4 w-[95%] rounded bg-surface" />
-                <div className="h-4 w-[90%] rounded bg-surface" />
-                <div className="h-4 w-[60%] rounded bg-surface" />
-              </div>
-              <div className="mt-10 h-6 w-1/3 rounded-md bg-surface" />
-              <div className="space-y-3">
-                <div className="h-4 w-full rounded bg-surface" />
-                <div className="h-4 w-[95%] rounded bg-surface" />
-                <div className="h-4 w-[90%] rounded bg-surface" />
-                <div className="h-4 w-[60%] rounded bg-surface" />
-              </div>
-              <div className="space-y-3 pt-4">
-                <div className="h-4 w-full rounded bg-surface" />
-                <div className="h-4 w-[85%] rounded bg-surface" />
-                <div className="h-4 w-[40%] rounded bg-surface" />
-              </div>
-              <div className="space-y-3 pt-4">
-                <div className="h-4 w-full rounded bg-surface" />
-                <div className="h-4 w-[85%] rounded bg-surface" />
-                <div className="h-4 w-[40%] rounded bg-surface" />
-              </div>
-            </div>
-          }
-        >
-          <LazyMdxContent />
-        </Suspense>
+        {LazyMdxContent ? (
+          <Suspense fallback={<MdxSkeleton />}>
+            <LazyMdxContent />
+          </Suspense>
+        ) : (
+          <div className="font-sans text-red-500">
+            Файл лекции по пути {lesson.mdxPath} не найден.
+          </div>
+        )}
 
         <div className="mt-12 flex justify-center pt-8">
-          <Button variant="outline" onClick={() => setShowSuccessOverlay(true)}>
-            Завершить урок
-          </Button>
+          {/* 👇 Если не пройдено - кнопка завершения. Если пройдено - заменяем на "Вернуться", 
+                 или вообще можешь убрать весь блок, если кнопка там не нужна */}
+          {!isPassed ? (
+            <Button variant="outline" onClick={() => setShowSuccessOverlay(true)}>
+              Завершить урок
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              onClick={() => {
+                window.scrollTo(0, 0); // Сбрасываем скролл для ручного возврата
+                navigate('/app/tree');
+              }}
+            >
+              Вернуться к дереву
+            </Button>
+          )}
         </div>
       </main>
 
+      {/* Оверлей успеха оставляем без изменений */}
       {showSuccessOverlay && (
         <>
           <style>{`

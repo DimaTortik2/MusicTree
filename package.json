@@ -22,6 +22,7 @@
     "bootstrap": "^5.3.8",
     "canvas-confetti": "^1.9.4",
     "clsx": "^2.1.1",
+    "framer-motion": "^12.40.0",
     "jquery": "^4.0.0",
     "jquery-ui-dist": "^1.13.3",
     "localforage": "^1.10.0",

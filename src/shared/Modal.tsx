@@ -129,15 +129,14 @@ export const Modal: React.FC<ModalProps> = ({
     </div>
   );
 
-  // Если inline, просто отдаем карточку (для встраивания в страницу)
+  // Если inline, просто отдаем карточку
   if (inline) {
     return CardContent;
   }
 
-  // Если это настоящая модалка, рендерим через портал с фоном
   return createPortal(
     <div
-      className="animate-in fade-in fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm duration-200"
+      className="animate-in fade-in fixed inset-0 z-200 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm duration-200"
       onClick={onClose}
     >
       {CardContent}

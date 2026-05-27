@@ -12,6 +12,7 @@ import SettingsPage from '@/pages/settings/SettingsPage';
 import { HomeworksPage } from '@/pages/HomeworksPage/HomeworksPage';
 import { DebugPage } from '@/pages/debug/DebugPage';
 import { ChainsPage } from '@/pages/chains/ChainsPage';
+import { TestsPage } from '@/pages/tests/TestsPage';
 
 const router = createBrowserRouter([
   {
@@ -53,6 +54,14 @@ const router = createBrowserRouter([
       {
         path: 'chains/:chainId?',
         element: <ChainsPage />,
+      },
+      {
+        path: 'tests',
+        element: <TestsPage />,
+      },
+      {
+        path: 'tests/:testId?',
+        element: <TestsPage />,
       },
       {
         path: 'debug',

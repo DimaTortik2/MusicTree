@@ -27,8 +27,8 @@ const sizeStyles: Record<ButtonSize, string> = {
 // Матрица цветов и вариантов
 const colorStyles: Record<ButtonVariant, Record<ButtonColor, string>> = {
   solid: {
-    primary: 'bg-primary border-primary text-white hover:bg-accent hover:border-accent',
-    accent: 'bg-accent border-accent text-white hover:bg-primary hover:border-primary',
+    primary: 'bg-primary border-primary text-white hover:bg-primary hover:border-primary',
+    accent: 'bg-accent border-accent text-white hover:bg-accent hover:border-accent',
     homework: 'bg-homework border-homework text-white hover:bg-homework hover:border-homework',
     access: 'bg-access border-access text-white hover:bg-access hover:border-access',
     text: 'bg-text border-text text-surface hover:bg-text hover:border-text',

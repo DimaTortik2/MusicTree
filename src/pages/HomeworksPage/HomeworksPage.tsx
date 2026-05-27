@@ -138,7 +138,7 @@ export const HomeworksPage = () => {
                 key={hw.id}
                 variant={homeworkId === hw.id ? 'solid' : 'outline'}
                 color="homework"
-                className="h-auto w-full flex-col items-start justify-start gap-1 p-5 shadow-lg scale-90 hover:scale-92"
+                className="h-auto w-full scale-90 flex-col items-start justify-start gap-1 p-5 shadow-lg hover:scale-92"
                 onClick={() => handleSelect(hw.id)}
                 size="md"
               >
@@ -179,7 +179,6 @@ export const HomeworksPage = () => {
         <div key={`archive-${group.lessonId}`} className="mb-2">
           <div className="space-y-4">
             {group.items.map((hw) => {
-              // 👇 Определяем, является ли этот элемент архивированным
               const isArchived = passedHomeworks.includes(hw.id);
               const isSelected = homeworkId === hw.id;
 
@@ -190,8 +189,7 @@ export const HomeworksPage = () => {
                   variant={isSelected ? 'solid' : 'outline'}
                   color="homework"
                   className={cn(
-                    '!h-auto w-full flex-col !items-start !justify-start gap-1 p-5 transition-opacity duration-300',
-                    // 👇 Если элемент в архиве (даже если выбран), добавляем прозрачность
+                    'h-auto w-full flex-col items-start justify-start gap-1 p-5 transition-opacity duration-300 scale-90 hover:scale-92',
                     isArchived && 'opacity-40 hover:opacity-70',
                   )}
                   onClick={() => handleSelect(hw.id)}
@@ -235,11 +233,11 @@ export const HomeworksPage = () => {
 
       <div className="mt-16 flex shrink-0 justify-center">
         {isSelectedArchived ? (
-          <Button variant="outline" color="homework" size="lg" onClick={handleReturnFromArchive}>
+          <Button variant="outline" color="homework" size="md" onClick={handleReturnFromArchive}>
             Вернуть из архива
           </Button>
         ) : (
-          <Button variant="outline" color="homework" size="lg" onClick={handleComplete}>
+          <Button variant="outline" color="homework" size="md" onClick={handleComplete}>
             Выполнить
           </Button>
         )}

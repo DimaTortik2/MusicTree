@@ -11,9 +11,75 @@
       href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap"
       rel="stylesheet"
     />
+    <style>
+			body {
+				margin: 0;
+				padding: 0;
+				background-color: #212121;
+			}
+			.perspective-container {
+				perspective: 800px;
+			}
+			.circle-loader {
+				transform-origin: center;
+				animation: rotate-coin 3s linear infinite;
+				will-change: transform;
+			}
+			@keyframes rotate-coin {
+				0% {
+					transform: rotateX(0deg) rotateY(0deg);
+				}
+				45% {
+					transform: rotateX(70deg) rotateY(50deg);
+				}
+				50%,
+				52% {
+					transform: rotateX(75deg) rotateY(55deg);
+				}
+				100% {
+					transform: rotateX(0deg) rotateY(0deg);
+				}
+			}
+			.full-page-wrapper {
+				width: 100vw;
+				height: 100vh;
+				height: 100dvh;
+				background-color: #0f0510;
+
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+			}
+			.loader-container {
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+			}
+			.loader-container svg {
+				width: calc((1vh + 1vw) * 15);
+				height: calc((1vh + 1vw) * 15);
+				color: #db2777;
+			}
+			
+		</style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="full-page-wrapper perspective-container">
+			<div class="loader-container">
+				<svg viewBox="0 0 200 200" stroke="currentColor">
+					<circle
+						cx="100"
+						cy="100"
+						r="80"
+						fill="none"
+						stroke-width="4"
+						class="circle-loader"
+					/>
+				</svg>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -181,7 +181,7 @@ export const AppLayout = () => {
 
       {/* 3. Мобильный Tab Bar */}
       <div
-        className="pointer-events-none fixed right-0 bottom-0 left-0 z-50 flex flex-col items-center px-4 md:hidden"
+        className="pointer-events-none fixed right-0 bottom-0 left-0 z-101 flex flex-col items-center px-4 md:hidden"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}
       >
         {/* Оверлей меню Троеточия (Рендерит строго inactiveTabs) */}

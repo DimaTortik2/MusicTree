@@ -130,7 +130,7 @@ export function TabBarCustomization({ onClose }: { onClose: () => void }) {
   const dragModifiers = [restrictToVerticalAxis, restrictToParentElement];
 
   return (
-    <div className="fixed inset-0 z-100 flex flex-col overflow-y-auto bg-background px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-[calc(env(safe-area-inset-bottom)+16px)]">
+    <div className="fixed inset-0 z-100 flex flex-col overflow-y-auto bg-background px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-[50vh]">
       <div className="mb-6 flex items-center">
         <button
           onClick={onClose}

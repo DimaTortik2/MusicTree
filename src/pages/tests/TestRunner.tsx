@@ -94,6 +94,13 @@ export const TestRunner: React.FC<TestRunnerProps> = ({ test, onDirtyStateChange
     clearTestResult(test.id);
     setShowClearModal(false);
 
+    // Сбрасываем локальные стейты, чтобы экран результатов пропал
+    setIsFinished(false);
+    setCurrentIndex(0);
+    setSelectedOptions([]);
+    setIsSubmitted(false);
+    setUserAnswers([]);
+
     // Скролл после извлечения из архива
     setTimeout(() => {
       document
@@ -124,7 +131,7 @@ export const TestRunner: React.FC<TestRunnerProps> = ({ test, onDirtyStateChange
     const strokeDasharray = `${percentage} ${100 - percentage}`;
 
     return (
-      <div className="animate-in fade-in mx-auto flex w-full max-w-2xl flex-col items-center py-10 duration-500">
+      <div className="animate-in fade-in mx-auto flex w-full max-w-2xl flex-col items-center py-10 duration-500 pb-[50vh]">
         <div className="relative mb-10 size-48">
           <svg viewBox="0 0 36 36" className="h-full w-full rotate-[-90deg]">
             <path
@@ -175,20 +182,14 @@ export const TestRunner: React.FC<TestRunnerProps> = ({ test, onDirtyStateChange
                         </div>
                       ) : (
                         ans.map((a) => (
-                          <div
-                            key={a}
-                            className="rounded-xl bg-primary/10 p-3 text-primary"
-                          >
+                          <div key={a} className="rounded-xl bg-primary/10 p-3 text-primary">
                             {q.options[a]}
                           </div>
                         ))
                       )}
                       <div className="mt-4 text-text/60">Правильный ответ:</div>
                       {q.correctAnswers.map((ca) => (
-                        <div
-                          key={ca}
-                          className="rounded-xl  bg-access/10 p-3 text-access"
-                        >
+                        <div key={ca} className="rounded-xl bg-access/10 p-3 text-access">
                           {q.options[ca]}
                         </div>
                       ))}
@@ -251,7 +252,7 @@ export const TestRunner: React.FC<TestRunnerProps> = ({ test, onDirtyStateChange
 
   // --- ЭКРАН ПРОХОЖДЕНИЯ ТЕСТА ---
   return (
-    <div className="mx-auto flex h-full w-full max-w-2xl flex-col pt-4 pb-8">
+    <div className="mx-auto flex h-full w-full max-w-2xl flex-col pt-4 pb-[50vh]">
       <div className="mb-8 w-full">
         <p className="mb-2 font-medium text-text">
           Вопрос {currentIndex + 1} из {totalQuestions}

@@ -8,6 +8,7 @@ import confetti from 'canvas-confetti';
 import { useHomeworksData } from './useHomeworksData';
 import { DetailLayout } from '@/shared/layouts/DetailLayout';
 import { MdxSkeleton } from '@/shared/MdxSkeleton';
+import { Modal } from '@/shared/Modal';
 
 const mdxFiles = import.meta.glob('/src/content/*.mdx');
 
@@ -115,21 +116,15 @@ export const HomeworksPage = () => {
   };
 
   const EmptyState = (
-    <div className="flex w-full max-w-2xl flex-col items-start justify-center gap-5 rounded-xl bg-surface p-6 sm:flex-row sm:items-center sm:justify-between sm:gap-0">
-      <div className="flex flex-col items-start gap-1 pr-6">
-        <h2 className="text-start text-base font-medium text-text">
-          После прохождения первого урока эта страница пополнится первыми домашними заданиями
-        </h2>
-        <p className="text-start text-sm text-text/40">Они будут накапливаться здесь</p>
-      </div>
-
-      <button
-        onClick={() => navigate('/app/tree')}
-        className="flex size-14 shrink-0 cursor-pointer items-center justify-center self-end rounded-2xl bg-primary text-white transition-transform hover:scale-105 active:scale-95 sm:size-16 sm:self-auto"
-      >
-        <GitFork className="size-8 sm:size-10" size={40} />
-      </button>
-    </div>
+    <Modal
+      inline
+      layout="horizontal"
+      title="После прохождения первого урока эта страница пополнится первыми домашними заданиями"
+      description="Они будут накапливаться здесь"
+      icon={<GitFork className="size-8 sm:size-10" weight="regular" />}
+      onIconClick={() => navigate('/app/tree', { replace: true })}
+      iconContainerClassName="bg-primary"
+    />
   );
 
   const ListContent = (

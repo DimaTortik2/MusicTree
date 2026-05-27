@@ -1,0 +1,5 @@
+/* Стили Bootstrap и JQuery UI будут применены ИСКЛЮЧИТЕЛЬНО внутри контейнера с классом .bootstrap-scope */
+.bootstrap-scope {
+  @import "bootstrap/scss/bootstrap";
+  @import "jquery-ui-dist/jquery-ui.min.css";
+}

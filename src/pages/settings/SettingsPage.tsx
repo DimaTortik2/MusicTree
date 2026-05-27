@@ -1,8 +1,11 @@
 import { useState } from 'react';
-import * as Dialog from '@radix-ui/react-dialog';
 import { SpeakerHigh, PianoKeys, ArrowCounterClockwise } from '@phosphor-icons/react';
 import { useProgressStore } from '@/app/store/useProgressStore';
 import { TabBarCustomization } from '@/pages/settings/TabBarCustomization';
+
+import { cn } from '@/app/utils/cn';
+import { Modal } from '@/shared/Modal';
+import { Button } from '@/shared/Button';
 
 export default function SettingsPage() {
   const [isCustomizingMobile, setIsCustomizingMobile] = useState(false);
@@ -18,12 +21,14 @@ export default function SettingsPage() {
         <p className="mb-4 text-[14px] leading-tight text-white/40">
           Вы можете настроить приоритетность кнопок в тап баре. Вы должны увидеть все функции!
         </p>
-        <button
+        <Button
+          variant="outline"
+          size="sm"
+          color="text"
           onClick={() => setIsCustomizingMobile(true)}
-          className="rounded-xl border border-text px-6 py-3 text-sm transition-colors active:bg-surface"
         >
           Кастомизировать тап-бар
-        </button>
+        </Button>
       </div>
 
       {/* 2. Кастомизация Пианино (Видно только на >=768px) */}
@@ -31,16 +36,16 @@ export default function SettingsPage() {
         <div className="mb-4 flex items-center gap-4">
           <h2 className="text-2xl">Клавиатура</h2>
           <span className="text-sm text-white/40">Нажмите на ноту и переназначьте клавишу</span>
+          {/* Оставляем нативным, так как это чисто иконка без бордеров и паддингов */}
           <button
             onClick={() => handleMockAction('Сброс хоткеев')}
-            className="text-white/40 transition-colors hover:text-text"
+            className="cursor-pointer text-white/40 transition-colors hover:text-text"
           >
             <ArrowCounterClockwise size={24} />
           </button>
         </div>
-        {/* Заглушка клавиатуры (Визуал по макету) */}
+        {/* Заглушка клавиатуры */}
         <div className="flex items-start gap-1">
-          {/* Фейковая левая часть пианино */}
           <div className="flex gap-1 rounded bg-surface p-1">
             {['Q', 'W', 'E', 'R', 'T', 'Y', 'U'].map((key, i) => (
               <div
@@ -48,7 +53,6 @@ export default function SettingsPage() {
                 className="relative flex h-32 w-10 items-end justify-center rounded-sm bg-text pb-2 font-medium text-background"
               >
                 {key}
-                {/* Черные клавиши (просто для визуала) */}
                 {[0, 1, 3, 4, 5].includes(i) && (
                   <div className="absolute top-0 right-[-14px] z-10 flex h-20 w-6 items-end justify-center rounded-sm border border-surface bg-background pb-2 text-sm text-white/40">
                     {i + 2}
@@ -57,7 +61,6 @@ export default function SettingsPage() {
               </div>
             ))}
           </div>
-          {/* Фейковая правая часть пианино */}
           <div className="ml-2 flex gap-1 rounded bg-surface p-1">
             {['Z', 'X', 'C', 'V', 'B', 'N', 'M'].map((key, i) => (
               <div
@@ -135,10 +138,9 @@ export default function SettingsPage() {
       <div className="mb-10 max-w-lg">
         <h2 className="mb-6 text-2xl">Данные</h2>
 
-        {/* Круговая диаграмма (SVG Mock) */}
+        {/* Круговая диаграмма */}
         <div className="relative mb-6 h-48 w-48">
           <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90 transform">
-            {/* Оставшееся место */}
             <circle
               cx="50"
               cy="50"
@@ -148,7 +150,6 @@ export default function SettingsPage() {
               strokeWidth="6"
               className="text-white/20"
             />
-            {/* Занятое место */}
             <circle
               cx="50"
               cy="50"
@@ -193,8 +194,8 @@ export default function SettingsPage() {
             triggerText="Удалить все свои данные"
             title={
               <>
-                Вы действительно хотите удалить{' '}
-                <span className="text-primary">все свои данные</span> с этого сайта?
+                Вы действительно хотите удалить <span className="text-primary">все данные</span> с
+                этого сайта?
               </>
             }
             description="Вы потеряете все свои записи и прогресс без возможности восстановления"
@@ -204,13 +205,11 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Рендер мобильного оверлея настроек тап-бара */}
       {isCustomizingMobile && <TabBarCustomization onClose={() => setIsCustomizingMobile(false)} />}
     </div>
   );
 }
 
-// Компонент переиспользуемой модалки удаления на Radix UI
 function DeleteDialog({
   triggerText,
   title,
@@ -229,45 +228,54 @@ function DeleteDialog({
   const [open, setOpen] = useState(false);
 
   return (
-    <Dialog.Root open={open} onOpenChange={setOpen}>
-      <Dialog.Trigger asChild>
-        <button
-          className={`rounded-xl border px-6 py-3 text-sm transition-colors ${
-            isSecondary
-              ? 'border-primary bg-primary/20 text-text hover:bg-primary/30'
-              : 'border-surface bg-surface text-white/40 hover:text-text'
-          }`}
-        >
-          {triggerText}
-        </button>
-      </Dialog.Trigger>
+    <>
+      <Button
+        variant="outline"
+        size="sm"
+        color={isSecondary ? 'primary' : 'text'}
+        onClick={() => setOpen(true)}
+        className={cn(
+          isSecondary
+            ? 'bg-primary/20 text-text hover:bg-primary'
+            : 'border-surface bg-surface text-text/40 hover:text-text hover:bg-primary',
+        )}
+      >
+        {triggerText}
+      </Button>
 
-      <Dialog.Portal>
-        <Dialog.Overlay className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-[200] bg-background/80 backdrop-blur-sm" />
-        <Dialog.Content className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-[200] w-[90vw] max-w-md translate-x-[-50%] translate-y-[-50%] rounded-2xl bg-surface p-6 shadow-xl outline-none">
-          <Dialog.Title className="mb-2 text-xl font-medium text-text">{title}</Dialog.Title>
-          <Dialog.Description className="mb-6 text-sm leading-tight text-white/40">
-            {description}
-          </Dialog.Description>
-
-          <div className="flex gap-4">
-            <Dialog.Close asChild>
-              <button className="flex-1 rounded-xl border border-text py-3 text-text transition-colors hover:bg-background">
-                Отмена
-              </button>
-            </Dialog.Close>
-            <button
+      <Modal
+        isOpen={open}
+        onClose={() => setOpen(false)}
+        layout="vertical"
+        title={title}
+        description={<span className="text-text/40">{description}</span>}
+        className="max-w-2xl rounded-[32px] p-8 md:p-10"
+        actions={
+          <>
+            <Button
+              variant="outline"
+              size="md"
+              color="primary"
+              onClick={() => setOpen(false)}
+              className="w-full px-4 sm:flex-1"
+            >
+              Отмена
+            </Button>
+            <Button
+              variant="solid"
+              size="md"
+              color="primary"
               onClick={() => {
                 onConfirm();
                 setOpen(false);
               }}
-              className="flex-1 rounded-xl bg-primary py-3 text-text transition-opacity hover:opacity-90"
+              className="w-full px-4 sm:flex-1"
             >
               {confirmText}
-            </button>
-          </div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+            </Button>
+          </>
+        }
+      />
+    </>
   );
 }

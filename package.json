@@ -19,8 +19,11 @@
     "@phosphor-icons/react": "^2.1.10",
     "@radix-ui/react-dialog": "^1.1.15",
     "@tailwindcss/vite": "^4.3.0",
+    "bootstrap": "^5.3.8",
     "canvas-confetti": "^1.9.4",
     "clsx": "^2.1.1",
+    "jquery": "^4.0.0",
+    "jquery-ui-dist": "^1.13.3",
     "localforage": "^1.10.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
@@ -34,6 +37,8 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/canvas-confetti": "^1.9.0",
+    "@types/jquery": "^4.0.0",
+    "@types/jqueryui": "^1.12.24",
     "@types/mdx": "^2.0.13",
     "@types/node": "^24.12.3",
     "@types/react": "^19.2.14",
@@ -45,6 +50,7 @@
     "globals": "^17.6.0",
     "prettier": "^3.8.3",
     "prettier-plugin-tailwindcss": "^0.8.0",
+    "sass": "^1.100.0",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",
     "vite": "^8.0.12"

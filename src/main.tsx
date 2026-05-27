@@ -10,6 +10,7 @@ import { ThemeProvider } from '@/app/providers/ThemeProvider';
 import { CurrentLecturePage } from '@/pages/CurrentLecturePage';
 import SettingsPage from '@/pages/settings/SettingsPage';
 import { HomeworksPage } from '@/pages/HomeworksPage/HomeworksPage';
+import { DebugPage } from '@/pages/debug/DebugPage';
 
 const router = createBrowserRouter([
   {
@@ -43,6 +44,10 @@ const router = createBrowserRouter([
       {
         path: 'homeworks/:homeworkId?',
         element: <HomeworksPage />,
+      },
+      {
+        path: 'debug',
+        element: <DebugPage />,
       },
     ],
   },

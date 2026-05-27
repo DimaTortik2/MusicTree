@@ -18,4 +18,26 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  server: {
+    hmr: {
+      overlay: false, // Отключает всплывающее окно с ошибками, если они не критичны
+    },
+  },
+  // ДОБАВЛЯЕМ ВОТ ЭТОТ БЛОК:
+  css: {
+    preprocessorOptions: {
+      scss: {
+        // Указываем компилятору молчать про эти устаревшие фичи
+        silenceDeprecations: [
+          'import',
+          'global-builtin',
+          'color-functions',
+          'if-function',
+          'legacy-js-api',
+        ],
+        // quietDeps отключает ворнинги из папки node_modules (включая Bootstrap)
+        quietDeps: true,
+      },
+    },
+  },
 });

@@ -32,7 +32,7 @@ export const DetailLayout: React.FC<DetailLayoutProps> = ({
   }
 
   return (
-    <div className="relative flex h-full w-full overflow-hidden bg-background font-sans">
+    <div className="relative flex h-full w-full overflow-hidden font-sans">
       {/* ЛЕВАЯ КОЛОНКА (СПИСОК) */}
       <div
         className={cn(

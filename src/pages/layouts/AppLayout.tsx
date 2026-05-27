@@ -5,6 +5,7 @@ import { useProgressStore } from '@/app/store/useProgressStore';
 import { TABS_INFO } from '@/shared/config/tabsConfig';
 import { TabBarCustomization } from '@/pages/settings/TabBarCustomization';
 import { cn } from '@/app/utils/cn';
+import { RouteWallpaper } from '@/shared/RouteWallpaper';
 
 // Роуты для каждой из вкладок
 const TAB_ROUTES: Record<string, string> = {
@@ -159,17 +160,20 @@ export const AppLayout = () => {
   const gridColsClass = getGridColsClass(bottomSlotsCount);
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background font-sans text-text antialiased">
-      {/* 1. Десктопный Сайдбар (Игнорирует мобильную кастомизацию) */}
-      <aside className="z-10 hidden h-full w-16 flex-col items-center justify-between border-r-[3px] border-text/18 bg-background py-4 select-none md:flex">
+    <div className="relative flex h-screen w-full overflow-hidden bg-background font-sans text-text antialiased">
+      {/* 1. Десктопный Сайдбар (ИЗМЕНЕНО: подняли на z-20, чтобы обои заходили ПОД него) */}
+      <aside className="z-20 hidden h-full w-16 flex-col items-center justify-between border-r-[3px] border-text/18 bg-background py-4 select-none md:flex">
         <nav className="flex w-full flex-col items-center gap-5">
           {DESKTOP_NAV_ITEMS.map((id) => renderTabIcon(id, false))}
         </nav>
         <div className="flex w-full flex-col items-center">{renderTabIcon('piano', false)}</div>
       </aside>
 
-      {/* 2. Основная рабочая область */}
-      <main className="flex-1 overflow-y-auto bg-background transition-all duration-300">
+      {/* Обои на фоне (z-0) */}
+      <RouteWallpaper />
+
+      {/* 2. Основная рабочая область (z-10, прозрачный фон) */}
+      <main className="relative z-10 flex-1 overflow-y-auto bg-transparent transition-all duration-300">
         <div className="h-full w-full">
           <Outlet />
         </div>

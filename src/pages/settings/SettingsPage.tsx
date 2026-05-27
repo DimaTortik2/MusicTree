@@ -14,7 +14,7 @@ export default function SettingsPage() {
   const handleMockAction = (msg: string) => console.log(`[Mock Action]: ${msg}`);
 
   return (
-    <div className="relative min-h-screen w-full bg-background p-6 pb-[50vh] text-text md:p-10 md:pb-[50vh]">
+    <div className="relative min-h-screen w-full  p-6 pb-[50vh] text-text md:p-10 md:pb-[50vh]">
       {/* 1. Мобильная кастомизация (Видно только на <768px) */}
       <div className="mb-10 md:hidden">
         <h2 className="mb-1 text-2xl">Тап-бар</h2>

@@ -86,7 +86,7 @@ export const CurrentLecturePage = () => {
   }, [showSuccessOverlay]);
 
   return (
-    <div className="relative flex min-h-full w-full flex-col bg-background p-6 pb-[50vh] font-sans text-text">
+    <div className="relative flex min-h-full w-full flex-col p-6 pb-[50vh] font-sans text-text">
       <header className="pb-2">
         <h1 className="mb-2 text-3xl font-bold text-text">{lesson.title}</h1>
       </header>

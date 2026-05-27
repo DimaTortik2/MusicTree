@@ -117,7 +117,7 @@ export const TreePage = () => {
   const dynamicContainerHeight = getY(maxRow) + ROW_HEIGHT;
 
   return (
-    <div className="flex min-h-screen w-full justify-center overflow-x-hidden bg-background py-10 pb-[50vh]">
+    <div className="flex min-h-screen w-full justify-center overflow-x-hidden  py-10 pb-[50vh]">
       <div
         ref={containerRef}
         className="relative w-full max-w-250"

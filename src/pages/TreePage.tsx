@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TreeElement } from '@/shared/TreeElement';
 import type { TreeElementState } from '@/shared/TreeElement';
@@ -21,7 +21,9 @@ interface Line {
 
 export const TreePage = () => {
   const navigate = useNavigate();
-  const { passedLessons, currentLesson, setCurrentLesson, _hasHydrated } = useProgressStore();
+  // Достаем lastUncompletedLesson из хранилища
+  const { passedLessons, lastUncompletedLesson, setCurrentLesson, _hasHydrated } =
+    useProgressStore();
   const containerRef = useRef<HTMLDivElement>(null);
   const [lines, setLines] = useState<Line[]>([]);
 
@@ -67,23 +69,39 @@ export const TreePage = () => {
     return () => ro.disconnect();
   }, [_hasHydrated]);
 
+  // Вычисляем активный непройденный урок, который будет светиться розовым
+  const activeUncompletedLessonId = useMemo(() => {
+    // Если урок из памяти существует и еще не пройден — берем его
+    const isValidAndUncompleted = lastUncompletedLesson
+      ? contentConfig.some((l) => l.id === lastUncompletedLesson && !passedLessons.includes(l.id))
+      : false;
+
+    if (isValidAndUncompleted) return lastUncompletedLesson;
+
+    // Фолбэк: если мы прошли lastUncompletedLesson, автоматически ищем первый доступный непройденный
+    return contentConfig.find(
+      (l) =>
+        !passedLessons.includes(l.id) && l.prerequisites.every((p) => passedLessons.includes(p)),
+    )?.id;
+  }, [lastUncompletedLesson, passedLessons]);
+
   if (!_hasHydrated) return null;
 
-  // Логика вычисления 5-ти состояний
+  // Логика вычисления состояний
   const getLessonState = (lesson: LessonConfig): TreeElementState => {
-    const isCurrent = lesson.id === currentLesson;
     const isPassed = passedLessons.includes(lesson.id);
 
-    // Сначала проверяем новое комбинированное состояние по ТЗ
-    if (isCurrent && isPassed) return 'current_completed';
-    if (isCurrent) return 'current';
+    // 1. Если урок пройденный, то он НИКАК не помечается по-особому (даже если мы его сейчас читаем)
     if (isPassed) return 'completed';
 
-    // Проверяем, пройдены ли все предыдущие уроки для открытия
+    // 2. Проверяем, пройдены ли все предыдущие уроки для открытия
     const isAvailable = lesson.prerequisites.every((pId) => passedLessons.includes(pId));
-    if (isAvailable) return 'ordinary';
+    if (!isAvailable) return 'locked';
 
-    return 'locked';
+    // 3. Урок открыт и не пройден. Подсвечиваем розовым, если он является нашим активным непройденным
+    if (lesson.id === activeUncompletedLessonId) return 'current';
+
+    return 'ordinary';
   };
 
   const handleLessonClick = (lessonId: string) => {
@@ -129,7 +147,6 @@ export const TreePage = () => {
                 transform: 'translate(-50%, -50%)',
               }}
             >
-              {/* Передаем функцию клика напрямую в компонент-кнопку */}
               <TreeElement state={state} onClick={() => handleLessonClick(lesson.id)} />
 
               {/* Адаптивная текстовая подпись */}

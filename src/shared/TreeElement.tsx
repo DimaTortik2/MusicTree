@@ -15,7 +15,7 @@ const stateStyles: Record<TreeElementState, string> = {
   completed: 'border-accent hover:bg-accent',
   ordinary: 'border-transparent',
   locked: 'opacity-40',
-  current_completed: 'border-accent bg-transparent text-primary hover:bg-accent hover:text-primary',
+  current_completed: 'border-accent hover:bg-accent',
 };
 
 export const TreeElement = React.forwardRef<HTMLButtonElement, TreeElementProps>(

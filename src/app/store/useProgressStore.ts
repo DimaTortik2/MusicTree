@@ -16,6 +16,7 @@ export interface AppState {
   unlockedChains: string[];
   passedTests: Record<string, TestResult>;
   currentLesson: string | null;
+  lastUncompletedLesson: string | null; // <-- НОВОЕ ПОЛЕ
 
   // Настройки
   theme: 'dark' | 'light';
@@ -80,6 +81,7 @@ export const useProgressStore = create<AppState>()(
       unlockedChains: [],
       passedTests: {},
       currentLesson: 'lesson_1', // Начинаем с Введения
+      lastUncompletedLesson: 'lesson_1', // <-- Инициализируем первым уроком
 
       theme: 'dark', // Жесткий старт с темной темы по ТЗ
       mediaVolume: 50,
@@ -100,7 +102,15 @@ export const useProgressStore = create<AppState>()(
           passedLessons: [...new Set([...state.passedLessons, id])],
         })),
 
-      setCurrentLesson: (id) => set({ currentLesson: id }),
+      setCurrentLesson: (id) =>
+        set((state) => {
+          const isPassed = state.passedLessons.includes(id);
+          return {
+            currentLesson: id,
+            // Если кликнули на пройденный, оставляем старый lastUncompletedLesson
+            lastUncompletedLesson: isPassed ? state.lastUncompletedLesson : id,
+          };
+        }),
 
       passTest: (testId, result) =>
         set((state) => ({
@@ -162,8 +172,6 @@ export const useProgressStore = create<AppState>()(
         state.setHasHydrated(true);
       },
       migrate: (persistedState: any, version) => {
-        // Задел на будущее. Если сменится version (например, на 2),
-        // здесь можно перегонять старую схему данных в новую.
         console.log(version);
         return persistedState as AppState;
       },

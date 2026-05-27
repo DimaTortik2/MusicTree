@@ -8,6 +8,7 @@ import { Modal } from '@/shared/Modal';
 import { DetailLayout } from '@/shared/layouts/DetailLayout';
 import { useTestsData } from './useTestsData';
 import { TestRunner } from './TestRunner';
+import { useRememberSelection } from '@/shared/hooks/useRememberSelection';
 
 export const TestsPage = () => {
   const navigate = useNavigate();
@@ -49,9 +50,21 @@ export const TestsPage = () => {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [isTestDirty]);
 
-  useEffect(() => {
-    if (detailRef.current) detailRef.current.scrollTop = 0;
-  }, [testId]);
+useEffect(() => {
+  if (detailRef.current) {
+    detailRef.current.scrollTop = 0;
+  }
+
+  if (testId) {
+    const timer = setTimeout(() => {
+      const item = document.getElementById(`test-item-${testId}`);
+      if (item) {
+        item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 50);
+    return () => clearTimeout(timer);
+  }
+}, [testId]);
 
   useEffect(() => {
     if (!testId && !data.isEmpty && data.allItems.length > 0) {
@@ -62,6 +75,25 @@ export const TestsPage = () => {
       navigate(`/app/tests/${defaultId}`, { replace: true });
     }
   }, [testId, data, navigate]);
+
+  const getSavedId = useRememberSelection('music-tree-last-test', testId, (id) =>
+    data.allItems.some((t) => t.id === id),
+  );
+
+  useEffect(() => {
+    if (!testId && !data.isEmpty && data.allItems.length > 0) {
+      const savedId = getSavedId();
+
+      // Твой оригинальный фоллбек
+      const defaultId =
+        savedId ||
+        (data.activeItems.length > 0
+          ? data.activeItems[data.activeItems.length - 1].id
+          : data.archivedItems[data.archivedItems.length - 1].id);
+
+      navigate(`/app/tests/${defaultId}`, { replace: true });
+    }
+  }, [testId, data, navigate, getSavedId]);
 
   const selectedTest = data.allItems.find((t) => t.id === testId);
 
@@ -264,4 +296,4 @@ export const TestsPage = () => {
       detailRef={detailRef}
     />
   );
-};
+};;

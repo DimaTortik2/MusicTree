@@ -9,6 +9,7 @@ import { useHomeworksData } from './useHomeworksData';
 import { DetailLayout } from '@/shared/layouts/DetailLayout';
 import { MdxSkeleton } from '@/shared/MdxSkeleton';
 import { Modal } from '@/shared/Modal';
+import { useRememberSelection } from '@/shared/hooks/useRememberSelection';
 
 const mdxFiles = import.meta.glob('/src/content/*.mdx');
 
@@ -30,11 +31,21 @@ export const HomeworksPage = () => {
   const listRef = useRef<HTMLDivElement>(null);
   const detailRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (detailRef.current) {
-      detailRef.current.scrollTop = 0;
-    }
-  }, [homeworkId]);
+useEffect(() => {
+  if (detailRef.current) {
+    detailRef.current.scrollTop = 0;
+  }
+
+  if (homeworkId) {
+    const timer = setTimeout(() => {
+      const item = document.getElementById(`hw-item-${homeworkId}`);
+      if (item) {
+        item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 50);
+    return () => clearTimeout(timer);
+  }
+}, [homeworkId]);
 
   useEffect(() => {
     if (!homeworkId && !data.isEmpty && data.allItems.length > 0) {
@@ -47,6 +58,24 @@ export const HomeworksPage = () => {
     }
   }, [homeworkId, data, navigate]);
 
+  const getSavedId = useRememberSelection('music-tree-last-homework', homeworkId, (id) =>
+    data.allItems.some((hw) => hw.id === id),
+  );
+
+  useEffect(() => {
+    if (!homeworkId && !data.isEmpty && data.allItems.length > 0) {
+      const savedId = getSavedId();
+
+      // Твоя старая логика как фоллбек:
+      const defaultId =
+        savedId ||
+        (data.activeItems.length > 0
+          ? data.activeItems[data.activeItems.length - 1].id
+          : data.archivedItems[data.archivedItems.length - 1].id);
+
+      navigate(`/app/homeworks/${defaultId}`, { replace: true });
+    }
+  }, [homeworkId, data, navigate, getSavedId]);
   const selectedHw = data.allItems.find((hw) => hw.id === homeworkId);
   const isSelectedArchived = selectedHw ? passedHomeworks.includes(selectedHw.id) : false;
 
@@ -189,7 +218,7 @@ export const HomeworksPage = () => {
                   variant={isSelected ? 'solid' : 'outline'}
                   color="homework"
                   className={cn(
-                    'h-auto w-full flex-col items-start justify-start gap-1 p-5 transition-opacity duration-300 scale-90 hover:scale-92',
+                    'h-auto w-full scale-90 flex-col items-start justify-start gap-1 p-5 transition-opacity duration-300 hover:scale-92',
                     isArchived && 'opacity-40 hover:opacity-70',
                   )}
                   onClick={() => handleSelect(hw.id)}
@@ -257,4 +286,4 @@ export const HomeworksPage = () => {
       detailRef={detailRef}
     />
   );
-};
+};;

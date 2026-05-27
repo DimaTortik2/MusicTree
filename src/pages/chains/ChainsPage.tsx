@@ -7,6 +7,7 @@ import { DetailLayout } from '@/shared/layouts/DetailLayout';
 import { MdxSkeleton } from '@/shared/MdxSkeleton';
 import { Modal } from '@/shared/Modal';
 import { useChainsData } from './useChainsData';
+import { useRememberSelection } from '@/shared/hooks/useRememberSelection';
 
 const mdxFiles = import.meta.glob('/src/content/*.mdx');
 
@@ -26,11 +27,23 @@ export const ChainsPage = () => {
   const listRef = useRef<HTMLDivElement>(null);
   const detailRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (detailRef.current) {
-      detailRef.current.scrollTop = 0;
-    }
-  }, [chainId]);
+ useEffect(() => {
+   // 1. Скроллим MDX-контент наверх
+   if (detailRef.current) {
+     detailRef.current.scrollTop = 0;
+   }
+
+   // 2. Подкручиваем левый список к активному звену
+   if (chainId) {
+     const timer = setTimeout(() => {
+       const item = document.getElementById(`chain-item-${chainId}`);
+       if (item) {
+         item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+       }
+     }, 50); // Небольшая задержка для точного рендера DOM
+     return () => clearTimeout(timer);
+   }
+ }, [chainId]);
 
   useEffect(() => {
     if (!data.isEmpty && data.chains.length > 0) {
@@ -48,6 +61,21 @@ export const ChainsPage = () => {
     navigate(`/app/chains/${id}`);
     if (window.innerWidth < 768) setIsMobileOpen(true);
   };
+
+  const getSavedId = useRememberSelection('music-tree-last-chain', chainId, (id) =>
+    data.chains.some((c) => c.id === id),
+  );
+
+  useEffect(() => {
+    if (!data.isEmpty && data.chains.length > 0) {
+      const isValidId = data.chains.some((c) => c.id === chainId);
+      if (!chainId || !isValidId) {
+        // Берем сохраненный ID, либо фоллбечимся на дефолтный (самый первый)
+        const fallbackId = getSavedId() || data.chains[0].id;
+        navigate(`/app/chains/${fallbackId}`, { replace: true });
+      }
+    }
+  }, [chainId, data, navigate, getSavedId]);
 
   // Точная реализация модалки, как ты просил
   const EmptyState = (
@@ -136,4 +164,4 @@ export const ChainsPage = () => {
       detailRef={detailRef}
     />
   );
-};
+};;

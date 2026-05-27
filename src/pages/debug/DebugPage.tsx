@@ -126,7 +126,7 @@ export const DebugPage: React.FC = () => {
               Для разработчиков
             </h1>
             <p className="lead mt-2" style={{ color: 'var(--text)', opacity: 0.8 }}>
-              Изолированная среда с Bootstrap и JQuerryUI
+              Написано с использованием Bootstrap и JQuerryUI
             </p>
           </div>
         </div>

@@ -1,10 +1,11 @@
-import React, { useMemo, useState, useEffect, Suspense } from 'react';
+import React, { useMemo, useState, useEffect, Suspense, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useProgressStore } from '@/app/store/useProgressStore';
 import { contentConfig } from '@/contentConfig';
 import { FireSimple } from '@phosphor-icons/react';
 import { Button } from '@/shared/Button';
 import { MdxSkeleton } from '@/shared/MdxSkeleton';
+import confetti from 'canvas-confetti'; // Импортируем конфетти
 
 const mdxLectures = import.meta.glob('/src/content/*.mdx');
 
@@ -17,35 +18,75 @@ for (const path in mdxLectures) {
 
 export const CurrentLecturePage = () => {
   const navigate = useNavigate();
-  // 👇 Достаем passedLessons из стора
   const { currentLesson, passLesson, passedLessons } = useProgressStore();
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const lesson = useMemo(() => {
     return contentConfig.find((l) => l.id === currentLesson) || contentConfig[0];
   }, [currentLesson]);
 
-  // 👇 Проверяем, пройдена ли уже эта лекция
   const isPassed = useMemo(() => passedLessons.includes(lesson.id), [passedLessons, lesson.id]);
 
   const LazyMdxContent = lesson ? mdxLecturesCache[lesson.mdxPath] : null;
 
+  // Функция салюта (цвета берутся из корневых CSS-переменных)
+  const fireConfetti = () => {
+    const root = getComputedStyle(document.documentElement);
+    const colors = [
+      root.getPropertyValue('--primary').trim() || '#ec4899',
+    ];
+
+    confetti({
+      particleCount: 500,
+      spread: 200,
+      startVelocity: 45,
+      origin: { y: 0.4 },
+      colors,
+      zIndex: 1000,
+    });
+
+   
+  };
+
+  // Метод завершения урока и перехода с гарантированным сбросом скролла
+  const handleFinish = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
+
+    passLesson(lesson.id);
+    setShowSuccessOverlay(false);
+
+    navigate('/app/tree');
+
+    // Железобетонный сброс скролла в следующем макросигма-тике (после смены роута)
+    setTimeout(() => {
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    }, 0);
+  };
+
+  const handleCompleteClick = () => {
+    fireConfetti(); // Запускаем конфетти
+    setShowSuccessOverlay(true); // Показываем оверлей
+  };
+
   useEffect(() => {
-    let timer: ReturnType<typeof setTimeout>;
     if (showSuccessOverlay) {
-      timer = setTimeout(() => {
-        passLesson(lesson.id);
-        setShowSuccessOverlay(false);
-        // 👇 Сбрасываем скролл прямо перед переходом, чтобы не было дерганий
-        window.scrollTo(0, 0);
-        navigate('/app/tree');
+      timerRef.current = setTimeout(() => {
+        handleFinish();
       }, 3000);
     }
-    return () => clearTimeout(timer);
-  }, [showSuccessOverlay, lesson.id, passLesson, navigate]);
+
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [showSuccessOverlay]);
 
   return (
-    <div className="relative flex min-h-full w-full flex-col bg-background font-sans text-text">
+    <div className="relative flex min-h-full w-full flex-col bg-background p-6 pb-[50vh] font-sans text-text">
       <header className="pb-2">
         <h1 className="mb-2 text-3xl font-bold text-text">{lesson.title}</h1>
       </header>
@@ -62,17 +103,15 @@ export const CurrentLecturePage = () => {
         )}
 
         <div className="mt-12 flex justify-center pt-8">
-          {/* 👇 Если не пройдено - кнопка завершения. Если пройдено - заменяем на "Вернуться", 
-                 или вообще можешь убрать весь блок, если кнопка там не нужна */}
           {!isPassed ? (
-            <Button variant="outline" onClick={() => setShowSuccessOverlay(true)}>
+            <Button variant="outline" onClick={handleCompleteClick}>
               Завершить урок
             </Button>
           ) : (
             <Button
               variant="outline"
               onClick={() => {
-                window.scrollTo(0, 0); // Сбрасываем скролл для ручного возврата
+                window.scrollTo(0, 0);
                 navigate('/app/tree');
               }}
             >
@@ -82,7 +121,6 @@ export const CurrentLecturePage = () => {
         </div>
       </main>
 
-      {/* Оверлей успеха оставляем без изменений */}
       {showSuccessOverlay && (
         <>
           <style>{`
@@ -102,12 +140,15 @@ export const CurrentLecturePage = () => {
             }
           `}</style>
 
-          <div className="animate-overlay-fade fixed inset-0 z-50 flex flex-col items-center justify-center bg-(--background)/90 backdrop-blur-[2px]">
+          <div
+            onClick={handleFinish}
+            className="animate-overlay-fade fixed inset-0 z-50 flex cursor-pointer flex-col items-center justify-center bg-(--background)/90 backdrop-blur-[2px]"
+          >
             <div className="animate-content-scale flex flex-col items-center gap-8 px-4 text-center">
               <FireSimple
                 size="100%"
                 weight="light"
-                className="md:size-80lg:size-100 size-45 text-primary transition-all duration-300 sm:size-60"
+                className="size-45 text-primary transition-all duration-300 sm:size-60 md:size-80 lg:size-100"
               />
               <h2 className="text-3xl font-medium tracking-wide text-text selection:bg-transparent sm:text-5xl md:text-6xl">
                 Замечательно!

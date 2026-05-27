@@ -131,15 +131,16 @@ export const HomeworksPage = () => {
     <>
       {data.activeGroups.map((group, i) => (
         <div key={`active-${group.lessonId}`} className="mb-2">
-          <div className="space-y-4">
+          <div className="space-y-2">
             {group.items.map((hw) => (
               <Button
                 id={`hw-item-${hw.id}`}
                 key={hw.id}
                 variant={homeworkId === hw.id ? 'solid' : 'outline'}
                 color="homework"
-                className="!h-auto w-full flex-col !items-start !justify-start gap-1 p-5 shadow-lg"
+                className="h-auto w-full flex-col items-start justify-start gap-1 p-5 shadow-lg scale-90 hover:scale-92"
                 onClick={() => handleSelect(hw.id)}
+                size="md"
               >
                 <span
                   className={cn(

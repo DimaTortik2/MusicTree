@@ -138,11 +138,6 @@ export const AppLayout = () => {
     );
   };
 
-  // Динамический паддинг для мобильной версии, чтобы пианино не перекрывало контент
-  const mobilePadding = isPianoActive
-    ? 'max-md:pb-[calc(env(safe-area-inset-bottom)+260px)]'
-    : 'max-md:pb-[calc(env(safe-area-inset-bottom)+110px)]';
-
   // --- Динамический расчет колонок верхней панели (для идеального совпадения с нижней) ---
   const bottomSlotsCount = activeTabs.length + 1; // +1 для кнопки троеточия
   const getGridColsClass = (count: number) => {
@@ -174,10 +169,8 @@ export const AppLayout = () => {
       </aside>
 
       {/* 2. Основная рабочая область */}
-      <main
-        className={`flex-1 overflow-y-auto bg-background transition-all duration-300 md:pb-0 ${mobilePadding}`}
-      >
-        <div className="h-full w-full p-4 md:p-8">
+      <main className="flex-1 overflow-y-auto bg-background transition-all duration-300">
+        <div className="h-full w-full">
           <Outlet />
         </div>
       </main>

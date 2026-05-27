@@ -1,3 +1,4 @@
+import { Cat, Wind, Waveform, MusicNotes, type IconProps } from '@phosphor-icons/react';
 export interface LessonConfig {
   id: string;
   title: string;
@@ -14,7 +15,40 @@ export interface HomeworkConfig {
   title: string;
   mdxPath: string;
 }
+export interface ChainConfig {
+  id: string;
+  title: string;
+  mdxPath: string;
+  icon?: React.FC<IconProps>;
+}
 
+//  Его порядок — это то, как должна выглядеть идеальная цепь в самом конце.
+export const chainsConfig: ChainConfig[] = [
+  {
+    id: 'chain_1',
+    title: 'Зевок и мурчание',
+    mdxPath: '/src/content/chain_1.mdx',
+    icon: Cat,
+  },
+  {
+    id: 'chain_final',
+    title: 'Полная распевка',
+    mdxPath: '/src/content/chain_final.mdx',
+    icon: MusicNotes,
+  },
+  {
+    id: 'chain_2',
+    title: 'Разогрев диафрагмы',
+    mdxPath: '/src/content/chain_2.mdx',
+    icon: Wind,
+  },
+  {
+    id: 'chain_3',
+    title: 'Сирена и глиссандо',
+    mdxPath: '/src/content/chain_3.mdx',
+    icon: Waveform,
+  },
+];
 export const homeworksConfig: Record<string, HomeworkConfig> = {
   // Урок 2
   hw_breath_1: { id: 'hw_breath_1', title: 'Пылесоссс', mdxPath: '/src/content/hw_breath_1.mdx' },
@@ -62,7 +96,6 @@ export const homeworksConfig: Record<string, HomeworkConfig> = {
   hw_vocal_2: { id: 'hw_vocal_2', title: 'Микст', mdxPath: '/src/content/hw_vocal_2.mdx' },
 };
 
-// SSOT: Дерево уроков (с привязанными домашками)
 export const contentConfig: LessonConfig[] = [
   {
     id: 'lesson_1',
@@ -92,7 +125,7 @@ export const contentConfig: LessonConfig[] = [
     prerequisites: ['lesson_1'],
     linkedHomeworks: ['hw_rhythm_1', 'hw_rhythm_2'],
     linkedTests: ['test_rhythm'],
-    linkedChains: [],
+    linkedChains: ['chain_2'],
   },
   {
     id: 'lesson_4',
@@ -102,7 +135,7 @@ export const contentConfig: LessonConfig[] = [
     prerequisites: ['lesson_1'],
     linkedHomeworks: ['hw_path_1'],
     linkedTests: [],
-    linkedChains: [],
+    linkedChains: ['chain_3'],
   },
   {
     id: 'lesson_5',

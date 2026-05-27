@@ -14,7 +14,7 @@ export default function SettingsPage() {
   const handleMockAction = (msg: string) => console.log(`[Mock Action]: ${msg}`);
 
   return (
-    <div className="relative min-h-screen w-full bg-background p-4 pb-24 text-text md:p-10 md:pb-10">
+    <div className="relative min-h-screen w-full bg-background p-6 pb-[50vh] text-text md:p-10 md:pb-[50vh]">
       {/* 1. Мобильная кастомизация (Видно только на <768px) */}
       <div className="mb-10 md:hidden">
         <h2 className="mb-1 text-2xl">Тап-бар</h2>
@@ -237,7 +237,7 @@ function DeleteDialog({
         className={cn(
           isSecondary
             ? 'bg-primary/20 text-text hover:bg-primary'
-            : 'border-surface bg-surface text-text/40 hover:text-text hover:bg-primary',
+            : 'border-surface bg-surface text-text/40 hover:bg-primary hover:text-text',
         )}
       >
         {triggerText}

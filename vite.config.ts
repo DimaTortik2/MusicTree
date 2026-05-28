@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { fileURLToPath } from 'url';
 import mdx from '@mdx-js/rollup';
+import { qrcode } from 'vite-plugin-qrcode';
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -10,8 +11,9 @@ export default defineConfig({
     mdx({
       providerImportSource: '@mdx-js/react',
     }),
-    react(),
     tailwindcss(),
+    react(),
+    qrcode(),
   ],
   resolve: {
     alias: {
@@ -20,10 +22,10 @@ export default defineConfig({
   },
   server: {
     hmr: {
-      overlay: false, // Отключает всплывающее окно с ошибками, если они не критичны
+      overlay: false,
     },
+    host: true,
   },
-  // ДОБАВЛЯЕМ ВОТ ЭТОТ БЛОК:
   css: {
     preprocessorOptions: {
       scss: {

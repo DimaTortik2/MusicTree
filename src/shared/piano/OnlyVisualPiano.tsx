@@ -127,7 +127,7 @@ export const OnlyVisualPiano: React.FC<PianoProps> = ({ className, ...props }) =
     <div {...props} className={cn('w-full select-none', className)}>
       {/* ======================= МОБИЛЬНАЯ ВЕРСИЯ (< 768px) ======================= */}
       <div
-        className="relative flex w-full [scrollbar-width:none] overflow-x-auto bg-background p-2 pt-4 [-ms-overflow-style:none] md:hidden [&::-webkit-scrollbar]:hidden"
+        className="relative flex w-full [scrollbar-width:none] overflow-x-auto p-2 pt-4 [-ms-overflow-style:none] md:hidden [&::-webkit-scrollbar]:hidden"
         ref={scrollRef}
       >
         <div className="inline-flex min-w-max gap-1">
@@ -136,7 +136,7 @@ export const OnlyVisualPiano: React.FC<PianoProps> = ({ className, ...props }) =
       </div>
 
       {/* ======================= ДЕСКТОПНАЯ ВЕРСИЯ (>= 768px) ======================= */}
-      <div className="hidden w-full items-center justify-between rounded-2xl bg-background px-4 py-4 shadow-xl md:flex md:px-6 md:py-5 lg:px-8 lg:py-6">
+      <div className="hidden w-full items-center justify-between px-4 py-4 md:flex md:px-6 md:py-5 lg:px-8 lg:py-6">
         {/* Крайний левый блок */}
         <div className="flex flex-col gap-2 lg:gap-3">
           <ControlButton

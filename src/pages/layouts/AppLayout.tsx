@@ -1,14 +1,15 @@
 import { useState, useRef, useEffect } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
 import { DotsThree } from '@phosphor-icons/react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useProgressStore } from '@/app/store/useProgressStore';
 import { TABS_INFO } from '@/shared/config/tabsConfig';
 import { TabBarCustomization } from '@/pages/settings/TabBarCustomization';
 import { cn } from '@/app/utils/cn';
 import { RouteWallpaper } from '@/shared/RouteWallpaper';
 import { ControlButton } from '@/shared/buttons/ControlButton';
+import { OnlyVisualPiano } from '@/shared/piano/OnlyVisualPiano';
 
-// Роуты для каждой из вкладок
 const TAB_ROUTES: Record<string, string> = {
   tree: '/app/tree',
   lesson: '/app/current/lecture',
@@ -21,8 +22,6 @@ const TAB_ROUTES: Record<string, string> = {
   settings: '/app/settings',
 };
 
-// Десктопная панель всегда показывает вкладки в стандартном порядке
-// (Игнорирует мобильный стор, не содержит вкладку 'customize' по ТЗ)
 const DESKTOP_NAV_ITEMS = [
   'tree',
   'lesson',
@@ -37,24 +36,19 @@ const DESKTOP_NAV_ITEMS = [
 
 export const AppLayout = () => {
   const [isPianoActive, setIsPianoActive] = useState(false);
-
-  // Состояния для мобильной навигации
   const [isOverflowOpen, setIsOverflowOpen] = useState(false);
   const [isCustomizing, setIsCustomizing] = useState(false);
 
   const overflowRef = useRef<HTMLDivElement>(null);
-  const toggleBtnRef = useRef<HTMLButtonElement>(null); // Ref для кнопки троеточия
+  const toggleBtnRef = useRef<HTMLButtonElement>(null);
 
-  // Берем стейт напрямую (без искусственного обрезания)
   const { activeTabs, inactiveTabs } = useProgressStore();
 
   const handlePianoClick = () => setIsPianoActive((prev) => !prev);
 
-  // Правильное закрытие меню "Троеточия"
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node;
-      // Если клик не по самой панели И не по кнопке её вызова - закрываем
       if (
         overflowRef.current &&
         !overflowRef.current.contains(target) &&
@@ -73,25 +67,22 @@ export const AppLayout = () => {
     if (!info) return null;
     const Icon = info.icon;
 
-    // Специфика пианино (модалка/всплывашка снизу, а не роут)
- if (id === 'piano') {
-   return (
-     <ControlButton
-       key={id}
-       icon={<Icon size={isMobile ? 22 : 20} weight="fill" />}
-       isActive={isPianoActive}
-       onClick={() => {
-         handlePianoClick();
-         if (isMobile) setIsOverflowOpen(false);
-       }}
-       className={cn(isMobile ? 'p-1.5' : 'rounded-lg p-1.5 hover:cursor-pointer')}
-       innerClassName="p-1"
-     />
-   );
- }
+    if (id === 'piano') {
+      return (
+        <ControlButton
+          key={id}
+          icon={<Icon size={isMobile ? 22 : 20} weight="fill" />}
+          isActive={isPianoActive}
+          onClick={() => {
+            handlePianoClick();
+            if (isMobile) setIsOverflowOpen(false);
+          }}
+          className={cn(isMobile ? 'p-1.5' : 'rounded-lg p-1.5 hover:cursor-pointer')}
+          innerClassName="p-1"
+        />
+      );
+    }
 
-    // Специфика кастомизации (это элемент массива inactiveTabs по дефолту)
-    // Он не является ссылкой, а открывает мобильный оверлей настроек
     if (id === 'customize') {
       return (
         <button
@@ -108,7 +99,6 @@ export const AppLayout = () => {
       );
     }
 
-    // Обычные роуты-вкладки
     const route = TAB_ROUTES[id] || '/app';
 
     return (
@@ -133,8 +123,7 @@ export const AppLayout = () => {
     );
   };
 
-  // --- Динамический расчет колонок верхней панели (для идеального совпадения с нижней) ---
-  const bottomSlotsCount = activeTabs.length + 1; // +1 для кнопки троеточия
+  const bottomSlotsCount = activeTabs.length + 1;
   const getGridColsClass = (count: number) => {
     switch (count) {
       case 2:
@@ -155,7 +144,7 @@ export const AppLayout = () => {
 
   return (
     <div className="relative flex h-screen w-full overflow-hidden bg-background font-sans text-text antialiased">
-      {/* 1. Десктопный Сайдбар (ИЗМЕНЕНО: подняли на z-20, чтобы обои заходили ПОД него) */}
+      {/* 1. Десктопный Сайдбар (z-20) */}
       <aside className="z-20 hidden h-full w-16 flex-col items-center justify-between border-r-[3px] border-text/18 bg-background py-4 select-none md:flex">
         <nav className="flex w-full flex-col items-center gap-5">
           {DESKTOP_NAV_ITEMS.map((id) => renderTabIcon(id, false))}
@@ -163,57 +152,94 @@ export const AppLayout = () => {
         <div className="flex w-full flex-col items-center">{renderTabIcon('piano', false)}</div>
       </aside>
 
-      {/* Обои на фоне (z-0) */}
       <RouteWallpaper />
 
-      {/* 2. Основная рабочая область (z-10, прозрачный фон) */}
+      {/* 2. Основная рабочая область */}
       <main className="relative z-10 flex-1 overflow-y-auto bg-transparent transition-all duration-300">
         <div className="h-full w-full">
           <Outlet />
         </div>
       </main>
 
-      {/* 3. Мобильный Tab Bar */}
-      <div
-        className="pointer-events-none fixed right-0 bottom-0 left-0 z-101 flex flex-col items-center px-4 md:hidden"
-        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}
-      >
-        {/* Оверлей меню Троеточия (Рендерит строго inactiveTabs) */}
-        {isOverflowOpen && (
-          <div
-            ref={overflowRef}
-            className="animate-in slide-in-from-bottom-2 fade-in pointer-events-auto mb-2 w-full max-w-[500px] rounded-[14px] border-[3px] border-text/10 bg-surface px-6 py-4 shadow-xl backdrop-blur-md duration-200"
-          >
-            {/* Иконки выстраиваются в сетку, колонки которой 1-в-1 повторяют нижнюю панель */}
-            <div className={`grid w-full justify-items-center gap-y-5 ${gridColsClass}`}>
-              {inactiveTabs.map((id) => renderTabIcon(id, true))}
-            </div>
-          </div>
-        )}
+      {/* 3. ОБЩИЙ КОНТЕЙНЕР (z-[101]) 
+          Вернули md:left-16, чтобы на ПК контейнер прилипал строго справа от сайдбара */}
+      <div className="pointer-events-none fixed right-0 bottom-0 left-0 z-[101] flex flex-col justify-end md:left-16">
+        {/* --- Мобильный Таббар --- */}
+        <motion.div
+          layout
+          className="pointer-events-none z-10 flex w-full flex-col items-center px-4 md:hidden"
+          style={{
+            paddingBottom: isPianoActive ? '16px' : 'calc(env(safe-area-inset-bottom) + 16px)',
+          }}
+          transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
+        >
+          <div className="relative w-full max-w-[500px]">
+            {/* Меню троеточия (Выезжает снизу-вверх из-под таббара) */}
+            <AnimatePresence>
+              {isOverflowOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 40 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 40 }}
+                  transition={{ duration: 0.25, ease: 'easeOut' }}
+                  ref={overflowRef}
+                  className="pointer-events-auto absolute right-0 bottom-[calc(100%+8px)] left-0 z-0 rounded-[14px] border-[3px] border-text/10 bg-surface px-6 py-4 shadow-xl backdrop-blur-md"
+                >
+                  <div className={`grid w-full justify-items-center gap-y-5 ${gridColsClass}`}>
+                    {inactiveTabs.map((id) => renderTabIcon(id, true))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-        {/* Главная плавающая панель (Рендерит строго activeTabs) */}
-        <div className="pointer-events-auto w-full max-w-[500px] rounded-[14px] border-[3px] border-text/10 bg-surface px-6 py-3.5 shadow-[0_8px_30px_rgba(0,0,0,0.4)] backdrop-blur-md">
-          <div className="flex w-full items-center">
-            {activeTabs.map((id) => (
-              <div key={`bottom-${id}`} className="flex flex-1 justify-center">
-                {renderTabIcon(id, true)}
+            {/* Главная плавающая панель */}
+            <div className="pointer-events-auto relative z-10 w-full rounded-[14px] border-[3px] border-text/10 bg-surface px-6 py-3.5 shadow-[0_8px_30px_rgba(0,0,0,0.4)] backdrop-blur-md">
+              <div className="flex w-full items-center">
+                {activeTabs.map((id) => (
+                  <div key={`bottom-${id}`} className="flex flex-1 justify-center">
+                    {renderTabIcon(id, true)}
+                  </div>
+                ))}
+
+                <div className="flex flex-1 justify-center">
+                  <button
+                    ref={toggleBtnRef}
+                    onClick={() => setIsOverflowOpen((prev) => !prev)}
+                    className={`flex items-center justify-center p-1.5 transition-colors duration-150 outline-none ${
+                      isOverflowOpen ? 'text-text' : 'text-text/40 hover:text-text'
+                    }`}
+                  >
+                    <DotsThree size={28} weight="bold" />
+                  </button>
+                </div>
               </div>
-            ))}
-
-            {/* Кнопка Троеточия (Последний слот) */}
-            <div className="flex flex-1 justify-center">
-              <button
-                ref={toggleBtnRef}
-                onClick={() => setIsOverflowOpen((prev) => !prev)}
-                className={`flex items-center justify-center p-1.5 transition-colors duration-150 outline-none ${
-                  isOverflowOpen ? 'text-text' : 'text-text/40 hover:text-text'
-                }`}
-              >
-                <DotsThree size={28} weight="bold" />
-              </button>
             </div>
           </div>
-        </div>
+        </motion.div>
+
+        {/* --- Визуальное Пианино --- */}
+        <AnimatePresence>
+          {isPianoActive && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
+              className="pointer-events-auto w-full shrink-0 overflow-hidden"
+            >
+              {/* Подложка под пианино: bg-surface, бордер 3px сверху opacity 18%, тянется на весь Outlet */}
+              <motion.div
+                initial={{ y: '100%' }}
+                animate={{ y: 0 }}
+                exit={{ y: '100%' }}
+                transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
+                className="w-full border-t-[3px] border-text/18 bg-background pt-4 pb-[max(env(safe-area-inset-bottom),8px)] md:py-0"
+              >
+                <OnlyVisualPiano />
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* 4. Оверлей кастомизации на мобильном */}

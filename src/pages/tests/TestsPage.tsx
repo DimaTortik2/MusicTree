@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams, useBlocker } from 'react-router-dom';
 import { GitFork } from '@phosphor-icons/react';
-import { Button } from '@/shared/Button';
+import { Button } from '@/shared/buttons/Button';
 import { cn } from '@/app/utils/cn';
 import { Modal } from '@/shared/Modal';
 import { DetailLayout } from '@/shared/layouts/DetailLayout';
@@ -50,21 +50,21 @@ export const TestsPage = () => {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [isTestDirty]);
 
-useEffect(() => {
-  if (detailRef.current) {
-    detailRef.current.scrollTop = 0;
-  }
+  useEffect(() => {
+    if (detailRef.current) {
+      detailRef.current.scrollTop = 0;
+    }
 
-  if (testId) {
-    const timer = setTimeout(() => {
-      const item = document.getElementById(`test-item-${testId}`);
-      if (item) {
-        item.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }, 50);
-    return () => clearTimeout(timer);
-  }
-}, [testId]);
+    if (testId) {
+      const timer = setTimeout(() => {
+        const item = document.getElementById(`test-item-${testId}`);
+        if (item) {
+          item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [testId]);
 
   useEffect(() => {
     if (!testId && !data.isEmpty && data.allItems.length > 0) {
@@ -296,4 +296,4 @@ useEffect(() => {
       detailRef={detailRef}
     />
   );
-};;
+};

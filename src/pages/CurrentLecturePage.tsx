@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useProgressStore } from '@/app/store/useProgressStore';
 import { contentConfig } from '@/contentConfig';
 import { FireSimple } from '@phosphor-icons/react';
-import { Button } from '@/shared/Button';
+import { Button } from '@/shared/buttons/Button';
 import { MdxSkeleton } from '@/shared/MdxSkeleton';
 import confetti from 'canvas-confetti'; // Импортируем конфетти
 
@@ -33,9 +33,7 @@ export const CurrentLecturePage = () => {
   // Функция салюта (цвета берутся из корневых CSS-переменных)
   const fireConfetti = () => {
     const root = getComputedStyle(document.documentElement);
-    const colors = [
-      root.getPropertyValue('--primary').trim() || '#ec4899',
-    ];
+    const colors = [root.getPropertyValue('--primary').trim() || '#ec4899'];
 
     confetti({
       particleCount: 500,
@@ -45,8 +43,6 @@ export const CurrentLecturePage = () => {
       colors,
       zIndex: 1000,
     });
-
-   
   };
 
   // Метод завершения урока и перехода с гарантированным сбросом скролла

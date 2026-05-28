@@ -19,6 +19,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
 import { toast } from 'react-toastify';
 import { useProgressStore } from '@/app/store/useProgressStore';
+import { ControlButton } from '@/shared/buttons/ControlButton';
 
 function SortableTabItem({
   id,
@@ -60,9 +61,12 @@ function SortableTabItem({
       {/* Иконка вкладки */}
       <div className="flex w-7 shrink-0 items-center justify-center">
         {id === 'piano' ? (
-          <div className="flex items-center justify-center rounded-md bg-text/70 p-1 text-surface">
-            <info.icon size={22} weight="fill" />
-          </div>
+          <ControlButton
+            icon={<info.icon size={22} weight="fill" />}
+            className="pointer-events-none"
+            innerClassName="p-1 bg-text/70"
+            tabIndex={-1}
+          />
         ) : (
           <info.icon size={28} className="text-text/80" />
         )}

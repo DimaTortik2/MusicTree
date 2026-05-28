@@ -1,7 +1,7 @@
 import { Logo } from '@/pages/LandingPage/Logo';
 import { Microphone } from '@/pages/LandingPage/Microphone';
 import { PinkWave } from '@/pages/LandingPage/PinkWave';
-import { Button } from '@/shared/Button';
+import { Button } from '@/shared/buttons/Button';
 import { NavLink } from 'react-router-dom';
 
 export function LandingPage() {

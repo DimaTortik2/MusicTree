@@ -11,6 +11,14 @@
   --text: #f3f4f6;
   --homework: #57430b;
   --access: #10b981;
+    /* --- Цвета для пианино --- */
+  --piano-white: #f8f9fa;
+  --piano-white-hover: #e9ecef;
+  --piano-white-active: #dee2e6;
+  --piano-black: var(--background);
+  --piano-black-hover: var(--surface);
+  --piano-black-active: #242222;
+
 }
 
 .light {
@@ -21,6 +29,14 @@
   --text: #1a0b22;
   --homework: #fef08a;
   --access: #059669;
+
+    /* --- Цвета для пианино  --- */
+  --piano-white: #f8f9fa;
+  --piano-white-hover: #e9ecef;
+  --piano-white-active: #dee2e6;
+  --piano-black: #0f0510;
+  --piano-black-hover: #1a0b22;
+  --piano-black-active: #242222;
 }
 
 @theme {
@@ -34,6 +50,13 @@
   --color-text: var(--text);
   --color-homework: var(--homework);
   --color-access: var(--access);
+
+   --color-piano-white: var(--piano-white);
+  --color-piano-white-hover: var(--piano-white-hover);
+  --color-piano-white-active: var(--piano-white-active);
+  --color-piano-black: var(--piano-black);
+  --color-piano-black-hover: var(--piano-black-hover);
+  --color-piano-black-active: var(--piano-black-active);
 }
 /* --- Полное скрытие скроллбаров на всём сайте с сохранением скролла --- */
 

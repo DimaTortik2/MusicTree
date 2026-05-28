@@ -6,6 +6,7 @@ import { TABS_INFO } from '@/shared/config/tabsConfig';
 import { TabBarCustomization } from '@/pages/settings/TabBarCustomization';
 import { cn } from '@/app/utils/cn';
 import { RouteWallpaper } from '@/shared/RouteWallpaper';
+import { ControlButton } from '@/shared/buttons/ControlButton';
 
 // Роуты для каждой из вкладок
 const TAB_ROUTES: Record<string, string> = {
@@ -73,28 +74,21 @@ export const AppLayout = () => {
     const Icon = info.icon;
 
     // Специфика пианино (модалка/всплывашка снизу, а не роут)
-    if (id === 'piano') {
-      return (
-        <button
-          key={id}
-          type="button"
-          onClick={() => {
-            handlePianoClick();
-            if (isMobile) setIsOverflowOpen(false);
-          }}
-          className={cn(
-            'flex cursor-pointer items-center justify-center transition-all duration-150 outline-none',
-            isMobile ? 'p-1.5' : 'rounded-lg p-1.5 hover:cursor-pointer',
-            isPianoActive ? 'opacity-100' : 'opacity-40 hover:opacity-100',
-          )}
-        >
-          {/* Единый визуал пианино с подложкой для всех платформ */}
-          <div className="rounded-md bg-text p-1 text-surface">
-            <Icon size={isMobile ? 22 : 20} weight="fill" />
-          </div>
-        </button>
-      );
-    }
+ if (id === 'piano') {
+   return (
+     <ControlButton
+       key={id}
+       icon={<Icon size={isMobile ? 22 : 20} weight="fill" />}
+       isActive={isPianoActive}
+       onClick={() => {
+         handlePianoClick();
+         if (isMobile) setIsOverflowOpen(false);
+       }}
+       className={cn(isMobile ? 'p-1.5' : 'rounded-lg p-1.5 hover:cursor-pointer')}
+       innerClassName="p-1"
+     />
+   );
+ }
 
     // Специфика кастомизации (это элемент массива inactiveTabs по дефолту)
     // Он не является ссылкой, а открывает мобильный оверлей настроек

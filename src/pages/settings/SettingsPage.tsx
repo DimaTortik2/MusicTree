@@ -5,7 +5,7 @@ import { TabBarCustomization } from '@/pages/settings/TabBarCustomization';
 
 import { cn } from '@/app/utils/cn';
 import { Modal } from '@/shared/Modal';
-import { Button } from '@/shared/Button';
+import { Button } from '@/shared/buttons/Button';
 
 export default function SettingsPage() {
   const [isCustomizingMobile, setIsCustomizingMobile] = useState(false);
@@ -14,7 +14,7 @@ export default function SettingsPage() {
   const handleMockAction = (msg: string) => console.log(`[Mock Action]: ${msg}`);
 
   return (
-    <div className="relative min-h-screen w-full  p-6 pb-[50vh] text-text md:p-10 md:pb-[50vh]">
+    <div className="relative min-h-screen w-full p-6 pb-[50vh] text-text md:p-10 md:pb-[50vh]">
       {/* 1. Мобильная кастомизация (Видно только на <768px) */}
       <div className="mb-10 md:hidden">
         <h2 className="mb-1 text-2xl">Тап-бар</h2>

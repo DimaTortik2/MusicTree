@@ -13,6 +13,7 @@ import { HomeworksPage } from '@/pages/HomeworksPage/HomeworksPage';
 import { DebugPage } from '@/pages/debug/DebugPage';
 import { ChainsPage } from '@/pages/chains/ChainsPage';
 import { TestsPage } from '@/pages/tests/TestsPage';
+import { DevPage } from '@/pages/DevPage';
 
 const router = createBrowserRouter([
   {
@@ -38,6 +39,10 @@ const router = createBrowserRouter([
       {
         path: 'settings',
         element: <SettingsPage />,
+      },
+      {
+        path: 'dev',
+        element: <DevPage/>,
       },
       {
         path: 'homeworks',

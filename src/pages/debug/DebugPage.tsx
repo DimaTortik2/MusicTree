@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import $ from 'jquery';
 import './bootstrap-scoped.scss';
 import { useProgressStore } from '@/app/store/useProgressStore';
-import { Button } from '@/shared/Button';
+import { Button } from '@/shared/buttons/Button';
 import ThemeToggle from '@/shared/ThemeSwither';
 
 export const DebugPage: React.FC = () => {

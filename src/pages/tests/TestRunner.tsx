@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, X, ExclamationMark } from '@phosphor-icons/react';
-import { Button } from '@/shared/Button';
+import { Button } from '@/shared/buttons/Button';
 import { cn } from '@/app/utils/cn';
 import { useProgressStore } from '@/app/store/useProgressStore';
 import { Modal } from '@/shared/Modal';
@@ -131,7 +131,7 @@ export const TestRunner: React.FC<TestRunnerProps> = ({ test, onDirtyStateChange
     const strokeDasharray = `${percentage} ${100 - percentage}`;
 
     return (
-      <div className="animate-in fade-in mx-auto flex w-full max-w-2xl flex-col items-center py-10 duration-500 pb-[50vh]">
+      <div className="animate-in fade-in mx-auto flex w-full max-w-2xl flex-col items-center py-10 pb-[50vh] duration-500">
         <div className="relative mb-10 size-48">
           <svg viewBox="0 0 36 36" className="h-full w-full rotate-[-90deg]">
             <path
@@ -314,7 +314,9 @@ export const TestRunner: React.FC<TestRunnerProps> = ({ test, onDirtyStateChange
                   )}
                 >
                   <span className="pr-4">{option}</span>
-                  {Icon}
+                  {Icon && (
+                    <div className="ml-2 flex shrink-0 items-center justify-center">{Icon}</div>
+                  )}
                 </button>
               );
             })}

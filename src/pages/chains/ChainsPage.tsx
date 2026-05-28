@@ -1,7 +1,7 @@
 import React, { useState, useEffect, Suspense, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { GitFork } from '@phosphor-icons/react'; // Поменяли иконку для модалки и фоллбэка
-import { Button } from '@/shared/Button';
+import { Button } from '@/shared/buttons/Button';
 import { cn } from '@/app/utils/cn';
 import { DetailLayout } from '@/shared/layouts/DetailLayout';
 import { MdxSkeleton } from '@/shared/MdxSkeleton';
@@ -27,23 +27,23 @@ export const ChainsPage = () => {
   const listRef = useRef<HTMLDivElement>(null);
   const detailRef = useRef<HTMLDivElement>(null);
 
- useEffect(() => {
-   // 1. Скроллим MDX-контент наверх
-   if (detailRef.current) {
-     detailRef.current.scrollTop = 0;
-   }
+  useEffect(() => {
+    // 1. Скроллим MDX-контент наверх
+    if (detailRef.current) {
+      detailRef.current.scrollTop = 0;
+    }
 
-   // 2. Подкручиваем левый список к активному звену
-   if (chainId) {
-     const timer = setTimeout(() => {
-       const item = document.getElementById(`chain-item-${chainId}`);
-       if (item) {
-         item.scrollIntoView({ behavior: 'smooth', block: 'center' });
-       }
-     }, 50); // Небольшая задержка для точного рендера DOM
-     return () => clearTimeout(timer);
-   }
- }, [chainId]);
+    // 2. Подкручиваем левый список к активному звену
+    if (chainId) {
+      const timer = setTimeout(() => {
+        const item = document.getElementById(`chain-item-${chainId}`);
+        if (item) {
+          item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 50); // Небольшая задержка для точного рендера DOM
+      return () => clearTimeout(timer);
+    }
+  }, [chainId]);
 
   useEffect(() => {
     if (!data.isEmpty && data.chains.length > 0) {
@@ -164,4 +164,4 @@ export const ChainsPage = () => {
       detailRef={detailRef}
     />
   );
-};;
+};

@@ -2,7 +2,7 @@ import React, { useState, useEffect, Suspense, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useProgressStore } from '@/app/store/useProgressStore';
 import { GitFork } from '@phosphor-icons/react';
-import { Button } from '@/shared/Button';
+import { Button } from '@/shared/buttons/Button';
 import { cn } from '@/app/utils/cn';
 import confetti from 'canvas-confetti';
 import { useHomeworksData } from './useHomeworksData';
@@ -31,21 +31,21 @@ export const HomeworksPage = () => {
   const listRef = useRef<HTMLDivElement>(null);
   const detailRef = useRef<HTMLDivElement>(null);
 
-useEffect(() => {
-  if (detailRef.current) {
-    detailRef.current.scrollTop = 0;
-  }
+  useEffect(() => {
+    if (detailRef.current) {
+      detailRef.current.scrollTop = 0;
+    }
 
-  if (homeworkId) {
-    const timer = setTimeout(() => {
-      const item = document.getElementById(`hw-item-${homeworkId}`);
-      if (item) {
-        item.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }, 50);
-    return () => clearTimeout(timer);
-  }
-}, [homeworkId]);
+    if (homeworkId) {
+      const timer = setTimeout(() => {
+        const item = document.getElementById(`hw-item-${homeworkId}`);
+        if (item) {
+          item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [homeworkId]);
 
   useEffect(() => {
     if (!homeworkId && !data.isEmpty && data.allItems.length > 0) {
@@ -286,4 +286,4 @@ useEffect(() => {
       detailRef={detailRef}
     />
   );
-};;
+};

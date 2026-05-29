@@ -161,7 +161,7 @@ export const AppLayout = () => {
         </div>
       </main>
 
-      {/* 3. ОБЩИЙ КОНТЕЙНЕР (z-[101]) 
+      {/* 3. ОБЩИЙ КОНТЕЙНЕР (z-[101])
           Вернули md:left-16, чтобы на ПК контейнер прилипал строго справа от сайдбара */}
       <div className="pointer-events-none fixed right-0 bottom-0 left-0 z-[101] flex flex-col justify-end md:left-16">
         {/* --- Мобильный Таббар --- */}

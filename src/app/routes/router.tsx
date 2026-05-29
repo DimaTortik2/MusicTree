@@ -10,6 +10,7 @@ import { DebugPage } from '@/pages/debug/DebugPage';
 import { ChainsPage } from '@/pages/chains/ChainsPage';
 import { TestsPage } from '@/pages/tests/TestsPage';
 import PitchDetectorPiano from '@/features/Pitcher/Pitcher';
+import { NotFoundPage } from '@/pages/NotFoundPage';
 
 export const router = createBrowserRouter([
   {
@@ -67,6 +68,10 @@ export const router = createBrowserRouter([
       {
         path: 'debug',
         element: <DebugPage />,
+      },
+      {
+        path: '*',
+        element: <NotFoundPage />,
       },
     ],
   },

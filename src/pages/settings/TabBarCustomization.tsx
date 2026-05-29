@@ -17,9 +17,10 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
-import { toast } from 'react-toastify';
 import { useProgressStore } from '@/app/store/useProgressStore';
 import { ControlButton } from '@/shared/buttons/ControlButton';
+import { toast } from '@/app/utils/toast';
+import { useMemo } from 'react';
 
 function SortableTabItem({
   id,
@@ -33,7 +34,12 @@ function SortableTabItem({
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id,
   });
+
   const info = TABS_INFO[id];
+
+  // Защита: если вкладки больше нет в конфиге, не ломаем рендер
+  if (!info) return null;
+
   const isUnremovable = isActive && (id === 'tree' || id === 'lesson');
 
   const style = {
@@ -93,6 +99,16 @@ function SortableTabItem({
 export function TabBarCustomization({ onClose }: { onClose: () => void }) {
   const { activeTabs, inactiveTabs, setActiveTabs, setInactiveTabs } = useProgressStore();
 
+  // Фильтруем вкладки на лету. Если в сторе остался мусор или удаленные ID (типа exam),
+  // интерфейс их просто проигнорирует и ничего не упадет.
+  const validActiveTabs = useMemo(() => {
+    return activeTabs.filter((id) => id in TABS_INFO);
+  }, [activeTabs]);
+
+  const validInactiveTabs = useMemo(() => {
+    return inactiveTabs.filter((id) => id in TABS_INFO);
+  }, [inactiveTabs]);
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -101,34 +117,34 @@ export function TabBarCustomization({ onClose }: { onClose: () => void }) {
   const handleDragEndActive = (event: any) => {
     const { active, over } = event;
     if (over && active.id !== over.id) {
-      const oldIndex = activeTabs.indexOf(active.id);
-      const newIndex = activeTabs.indexOf(over.id);
-      setActiveTabs(arrayMove(activeTabs, oldIndex, newIndex));
+      const oldIndex = validActiveTabs.indexOf(active.id);
+      const newIndex = validActiveTabs.indexOf(over.id);
+      setActiveTabs(arrayMove(validActiveTabs, oldIndex, newIndex));
     }
   };
 
   const handleDragEndInactive = (event: any) => {
     const { active, over } = event;
     if (over && active.id !== over.id) {
-      const oldIndex = inactiveTabs.indexOf(active.id);
-      const newIndex = inactiveTabs.indexOf(over.id);
-      setInactiveTabs(arrayMove(inactiveTabs, oldIndex, newIndex));
+      const oldIndex = validInactiveTabs.indexOf(active.id);
+      const newIndex = validInactiveTabs.indexOf(over.id);
+      setInactiveTabs(arrayMove(validInactiveTabs, oldIndex, newIndex));
     }
   };
 
   const handleRemove = (id: string) => {
     if (id === 'tree' || id === 'lesson') return;
-    setActiveTabs(activeTabs.filter((t) => t !== id));
-    setInactiveTabs([id, ...inactiveTabs]);
+    setActiveTabs(validActiveTabs.filter((t) => t !== id));
+    setInactiveTabs([id, ...validInactiveTabs]);
   };
 
   const handleAdd = (id: string) => {
-    if (activeTabs.length >= 5) {
-      toast.error('Нельзя добавить больше 5 вкладок. Уберите одну из активных', { theme: 'dark' });
+    if (validActiveTabs.length >= 5) {
+      toast.error('Нельзя добавить больше 5 вкладок', { toastId: 'max-5-tabbar' });
       return;
     }
-    setInactiveTabs(inactiveTabs.filter((t) => t !== id));
-    setActiveTabs([...activeTabs, id]);
+    setInactiveTabs(validInactiveTabs.filter((t) => t !== id));
+    setActiveTabs([...validActiveTabs, id]);
   };
 
   const dragModifiers = [restrictToVerticalAxis, restrictToParentElement];
@@ -152,8 +168,8 @@ export function TabBarCustomization({ onClose }: { onClose: () => void }) {
           modifiers={dragModifiers}
         >
           <div className="relative flex flex-col">
-            <SortableContext items={activeTabs} strategy={verticalListSortingStrategy}>
-              {activeTabs.map((id) => (
+            <SortableContext items={validActiveTabs} strategy={verticalListSortingStrategy}>
+              {validActiveTabs.map((id) => (
                 <SortableTabItem key={id} id={id} isActive={true} onMove={() => handleRemove(id)} />
               ))}
             </SortableContext>
@@ -171,8 +187,8 @@ export function TabBarCustomization({ onClose }: { onClose: () => void }) {
           modifiers={dragModifiers}
         >
           <div className="relative flex flex-col">
-            <SortableContext items={inactiveTabs} strategy={verticalListSortingStrategy}>
-              {inactiveTabs.map((id) => (
+            <SortableContext items={validInactiveTabs} strategy={verticalListSortingStrategy}>
+              {validInactiveTabs.map((id) => (
                 <SortableTabItem key={id} id={id} isActive={false} onMove={() => handleAdd(id)} />
               ))}
             </SortableContext>

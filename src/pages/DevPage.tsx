@@ -1,4 +1,4 @@
-import { OnlyVisualPiano } from '@/shared/piano/OnlyVisualPiano';
+import { VisualPiano } from '@/shared/piano/VisualPiano';
 
 interface DevPageProps {
   className?: string;
@@ -7,7 +7,7 @@ interface DevPageProps {
 export const DevPage = ({ className }: DevPageProps) => {
   return (
     <div className={className}>
-      <OnlyVisualPiano />
+      <VisualPiano />
     </div>
   );
 };

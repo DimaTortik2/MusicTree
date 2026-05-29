@@ -8,7 +8,7 @@ import { TabBarCustomization } from '@/pages/settings/TabBarCustomization';
 import { cn } from '@/app/utils/cn';
 import { RouteWallpaper } from '@/shared/RouteWallpaper';
 import { ControlButton } from '@/shared/buttons/ControlButton';
-import { OnlyVisualPiano } from '@/shared/piano/OnlyVisualPiano';
+import { VisualPiano } from '@/shared/piano/VisualPiano';
 import { AudioUnlockOverlay } from '@/app/providers/AudioUnlockOverlay';
 import { useGlobalPiano } from '@/app/hooks/useGlobalPiano';
 
@@ -238,7 +238,7 @@ useGlobalPiano();
                 transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
                 className="w-full border-t-[3px] border-text/18 bg-background pt-2 pb-[max(env(safe-area-inset-bottom),8px)] md:py-0"
               >
-                <OnlyVisualPiano />
+                <VisualPiano />
               </motion.div>
             </motion.div>
           )}

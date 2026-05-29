@@ -118,7 +118,7 @@ export const useProgressStore = create<AppState>()(
       pianoBindings: DEFAULT_PIANO_BINDINGS,
 
       activeTabs: ['tree', 'lesson', 'homeworks', 'vocal', 'piano'],
-      inactiveTabs: ['chains', 'tests', 'exam', 'debug', 'settings', 'customize'],
+      inactiveTabs: ['chains', 'tests', 'debug', 'settings', 'customize'],
       audioRecordIds: [],
 
       isKeyboardPianoActive: false,

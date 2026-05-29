@@ -12,6 +12,7 @@ import { useProgressStore } from '@/app/store/useProgressStore';
 import { useActiveKeysStore } from '@/app/store/useActiveKeysStore';
 import { ControlButton } from '@/shared/buttons/ControlButton';
 import { toneEngine } from '@/shared/lib/toneEngine';
+import { toast } from '@/app/utils/toast';
 
 interface PianoKey {
   baseNote: string;
@@ -126,7 +127,7 @@ const formatHint = (binding: string | null | undefined) => {
   return binding.replace('Key', '').replace('Digit', '');
 };
 
-export const OnlyVisualPiano: React.FC<PianoProps> = ({ className, ...props }) => {
+export const VisualPiano: React.FC<PianoProps> = ({ className, ...props }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Стейт для кастомного ползунка (0-100%)
@@ -213,6 +214,12 @@ export const OnlyVisualPiano: React.FC<PianoProps> = ({ className, ...props }) =
   };
 
   const handlePlayNote = (playNoteFreq: string, baseNoteId: string) => {
+      if (isPianoMuted || pianoVolume === 0) {
+        toast.error('Звук пианино выключен!', {
+          toastId: 'visual-piano-muted-error',
+          autoClose: 3000,
+        });
+      }
     toneEngine.playNote(playNoteFreq);
     addKey(baseNoteId);
   };

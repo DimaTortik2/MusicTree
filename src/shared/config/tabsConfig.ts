@@ -6,7 +6,6 @@ import {
   PianoKeys,
   Link,
   GraduationCap,
-  Exam,
   Wrench,
   Gear,
   PencilSimple,
@@ -36,7 +35,6 @@ export const TABS_INFO: Record<string, { icon: any; title: string; desc: string 
     title: 'Тесты',
     desc: 'Проверяйте усвоение материала, проходя тесты',
   },
-  exam: { icon: Exam, title: 'Экзамен', desc: 'Доступен после полного прохождения дерева' },
   debug: { icon: Wrench, title: 'Для разработчиков', desc: 'Симуляция любой ситуации' },
   settings: { icon: Gear, title: 'Настройки', desc: 'Громкость, хоткеи, данные и т.д.' },
   customize: {

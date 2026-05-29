@@ -5,7 +5,7 @@ import { contentConfig } from '@/contentConfig';
 import { FireSimple } from '@phosphor-icons/react';
 import { Button } from '@/shared/buttons/Button';
 import { MdxSkeleton } from '@/shared/MdxSkeleton';
-import confetti from 'canvas-confetti'; // Импортируем конфетти
+import confetti from 'canvas-confetti';
 
 const mdxLectures = import.meta.glob('/src/content/*.mdx');
 
@@ -30,7 +30,6 @@ export const CurrentLecturePage = () => {
 
   const LazyMdxContent = lesson ? mdxLecturesCache[lesson.mdxPath] : null;
 
-  // Функция салюта (цвета берутся из корневых CSS-переменных)
   const fireConfetti = () => {
     const root = getComputedStyle(document.documentElement);
     const colors = [root.getPropertyValue('--primary').trim() || '#ec4899'];
@@ -45,7 +44,6 @@ export const CurrentLecturePage = () => {
     });
   };
 
-  // Метод завершения урока и перехода с гарантированным сбросом скролла
   const handleFinish = () => {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
@@ -55,18 +53,11 @@ export const CurrentLecturePage = () => {
     setShowSuccessOverlay(false);
 
     navigate('/app/tree');
-
-    // Железобетонный сброс скролла в следующем макросигма-тике (после смены роута)
-    setTimeout(() => {
-      window.scrollTo(0, 0);
-      document.documentElement.scrollTop = 0;
-      document.body.scrollTop = 0;
-    }, 0);
   };
 
   const handleCompleteClick = () => {
-    fireConfetti(); // Запускаем конфетти
-    setShowSuccessOverlay(true); // Показываем оверлей
+    fireConfetti();
+    setShowSuccessOverlay(true);
   };
 
   useEffect(() => {
@@ -82,40 +73,50 @@ export const CurrentLecturePage = () => {
   }, [showSuccessOverlay]);
 
   return (
-    <div className="relative flex min-h-full w-full flex-col p-6 pb-[50vh] font-sans text-text">
-      <header className="pb-2">
-        <h1 className="mb-2 text-3xl font-bold text-text">{lesson.title}</h1>
-      </header>
+    <div className="relative flex min-h-full w-full justify-center bg-background font-sans text-text selection:bg-primary/20">
+      {/* Декоративные фоновые свечения как на макете */}
+      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+        <div className="absolute -top-[15%] -left-[10%] h-[500px] w-[500px] rounded-full bg-accent/5 blur-[100px] sm:bg-accent/8" />
+        <div className="absolute -right-[10%] -bottom-[15%] h-[700px] w-[700px] rounded-full bg-primary/3 blur-[130px] sm:bg-primary/5" />
+      </div>
 
-      <main className="prose prose-invert max-w-none flex-1 pb-24">
-        {LazyMdxContent ? (
-          <Suspense fallback={<MdxSkeleton />}>
-            <LazyMdxContent />
-          </Suspense>
-        ) : (
-          <div className="font-sans text-red-500">
-            Файл лекции по пути {lesson.mdxPath} не найден.
-          </div>
-        )}
+      {/* Контейнер с идеальной шириной для чтения */}
+      <div className="w-full max-w-[1000px] px-6 py-12 pb-[50vh]">
+        <header className="mb-5">
+          <h1 className="text-3xl leading-tight font-normal tracking-tight text-text sm:text-4xl md:text-[42px]">
+            {lesson.title}
+          </h1>
+        </header>
 
-        <div className="mt-12 flex justify-center pt-8">
-          {!isPassed ? (
-            <Button variant="outline" onClick={handleCompleteClick}>
-              Завершить урок
-            </Button>
+        <main className="prose prose-invert prose-p:text-text/85 prose-p:leading-relaxed prose-p:text-[17px] prose-headings:font-normal prose-headings:tracking-tight prose-h2:text-xl sm:prose-h2:text-2xl prose-h2:mt-12 prose-h2:mb-6 prose-hr:border-text/10 prose-hr:my-10 max-w-none">
+          {LazyMdxContent ? (
+            <Suspense fallback={<MdxSkeleton />}>
+              <LazyMdxContent />
+            </Suspense>
           ) : (
-            <Button
-              variant="outline"
-              onClick={() => {
-                window.scrollTo(0, 0);
-                navigate('/app/tree');
-              }}
-            >
-              Вернуться к дереву
-            </Button>
+            <div className="font-sans text-red-500">
+              Файл лекции по пути {lesson.mdxPath} не найден.
+            </div>
           )}
-        </div>
-      </main>
+
+          <div className="mt-16 flex justify-center border-t border-text/5">
+            {!isPassed ? (
+              <Button variant="outline" onClick={handleCompleteClick}>
+                Завершить урок
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  navigate('/app/tree');
+                }}
+              >
+                Вернуться к дереву
+              </Button>
+            )}
+          </div>
+        </main>
+      </div>
 
       {showSuccessOverlay && (
         <>

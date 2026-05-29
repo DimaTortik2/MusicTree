@@ -7,6 +7,12 @@ interface ActiveKeysState {
   clearKeys: () => void;
   mobileScrollPercent: number | null;
   setMobileScrollPercent: (percent: number) => void;
+
+  // ✨ Стейты для загрузки акустики
+  isPianoLoading: boolean;
+  setIsPianoLoading: (state: boolean) => void;
+  pianoLoadProgress: number;
+  setPianoLoadProgress: (progress: number) => void;
 }
 
 export const useActiveKeysStore = create<ActiveKeysState>((set) => ({
@@ -24,8 +30,12 @@ export const useActiveKeysStore = create<ActiveKeysState>((set) => ({
       return { activeKeys: newKeys };
     }),
   clearKeys: () => set({ activeKeys: new Set() }),
-
-  // Инициализация
   mobileScrollPercent: null,
   setMobileScrollPercent: (percent) => set({ mobileScrollPercent: percent }),
+
+  // Инициализация загрузки
+  isPianoLoading: false,
+  setIsPianoLoading: (state) => set({ isPianoLoading: state }),
+  pianoLoadProgress: 0,
+  setPianoLoadProgress: (progress) => set({ pianoLoadProgress: progress }),
 }));

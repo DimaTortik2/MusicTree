@@ -12,13 +12,14 @@ export const useGlobalPiano = () => {
     rightOctaveShift,
     isPianoMuted,
     pianoVolume,
+    pianoSoundType, // ✨ Достаем тип звука из стора
   } = useProgressStore();
 
   const bindingsRef = useRef(pianoBindings);
   const shiftsRef = useRef({ left: leftOctaveShift, right: rightOctaveShift });
   const volumeStateRef = useRef({ isMuted: isPianoMuted, volume: pianoVolume });
 
-  // ✨ ФИКС: Храним информацию о том, какая физическая кнопка какую ноту сейчас играет
+  // Запоминаем, какая кнопка какую ноту играет (защита от залипаний)
   const activePresses = useRef(new Map<string, { baseNote: string; playNote: string }>());
 
   bindingsRef.current = pianoBindings;
@@ -35,13 +36,11 @@ export const useGlobalPiano = () => {
       if (activeEl) {
         const tag = activeEl.tagName.toLowerCase();
         const isContentEditable = activeEl.getAttribute('contenteditable') === 'true';
-
         const isRange = tag === 'input' && activeEl.getAttribute('type') === 'range';
 
         if ((tag === 'input' && !isRange) || tag === 'textarea' || isContentEditable) return;
       }
 
-      // Если эта физическая кнопка уже зажата (защита от залипания системы), игнорируем
       if (activePresses.current.has(e.code)) return;
 
       const baseNote = Object.keys(bindingsRef.current).find(
@@ -67,16 +66,15 @@ export const useGlobalPiano = () => {
         const baseOctave = parseInt(baseNote.slice(-1), 10);
         const playNote = `${pitchClass}${baseOctave + shift}`;
 
-        // ✨ ФИКС: Запоминаем, что именно мы начали играть этой кнопкой
         activePresses.current.set(e.code, { baseNote, playNote });
 
+        // Зажигаем визуал и играем звук
         useActiveKeysStore.getState().addKey(baseNote);
         toneEngine.playNote(playNote);
       }
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
-      // ✨ ФИКС: Достаем ноту ИЗ ПАМЯТИ, а не из текущих настроек
       const pressed = activePresses.current.get(e.code);
 
       if (pressed) {
@@ -104,7 +102,7 @@ export const useGlobalPiano = () => {
       useActiveKeysStore.getState().clearKeys();
       activePresses.current.clear();
     };
-  }, [isKeyboardPianoActive]);
+  }, [isKeyboardPianoActive, pianoSoundType]); // ✨ Теперь хук реагирует на смену режима!
 
   useEffect(() => {
     return () => {

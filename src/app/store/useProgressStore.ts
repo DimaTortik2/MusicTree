@@ -37,6 +37,9 @@ export interface AppState {
   leftOctaveShift: number;
   rightOctaveShift: number;
 
+  pianoSoundType: 'synth' | 'acoustic';
+  setPianoSoundType: (type: 'synth' | 'acoustic') => void;
+
   // Техническое
   _hasHydrated: boolean;
   setHasHydrated: (state: boolean) => void;
@@ -192,6 +195,9 @@ export const useProgressStore = create<AppState>()(
           newBindings[note] = keyCode;
           return { pianoBindings: newBindings };
         }),
+
+      pianoSoundType: 'synth', // по умолчанию синтезатор
+      setPianoSoundType: (type) => set({ pianoSoundType: type }),
 
       resetPianoBindings: () => set({ pianoBindings: DEFAULT_PIANO_BINDINGS }),
       setShowPianoHints: (state) => set({ showPianoHints: state }),

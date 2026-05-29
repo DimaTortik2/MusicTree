@@ -3,6 +3,7 @@ import { SpeakerHigh, PianoKeys, ArrowCounterClockwise } from '@phosphor-icons/r
 import localforage from 'localforage';
 
 import { useProgressStore } from '@/app/store/useProgressStore';
+import { useActiveKeysStore } from '@/app/store/useActiveKeysStore';
 import { useTheme } from '@/app/providers/ThemeProvider';
 import { TabBarCustomization } from '@/pages/settings/TabBarCustomization';
 
@@ -10,7 +11,6 @@ import { cn } from '@/app/utils/cn';
 import { Modal } from '@/shared/Modal';
 import { Button } from '@/shared/buttons/Button';
 import { VolumeSlider } from '@/shared/VolumeSlider';
-import { useActiveKeysStore } from '@/app/store/useActiveKeysStore';
 import { toneEngine } from '@/shared/lib/toneEngine';
 
 // Форматирование клавиш (убираем Key и Digit)
@@ -35,6 +35,9 @@ const getSettingsOctaveKeys = (baseOctave: number) => {
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
 
+  // ✨ Достаем стейты прогресса скачивания и активные клавиши
+  const { activeKeys, isPianoLoading, pianoLoadProgress } = useActiveKeysStore();
+
   const {
     mediaVolume,
     setMediaVolume,
@@ -43,6 +46,8 @@ export default function SettingsPage() {
     pianoBindings,
     updatePianoBinding,
     resetPianoBindings,
+    pianoSoundType,
+    setPianoSoundType,
   } = useProgressStore();
 
   const [isCustomizingMobile, setIsCustomizingMobile] = useState(false);
@@ -130,7 +135,7 @@ export default function SettingsPage() {
 
       e.preventDefault();
 
-      // ✨ ФИКС: Сбрасываем все звуки и визуальные нажатия при переназначении клавиши
+      // Сбрасываем все звуки и визуальные нажатия при переназначении клавиши
       toneEngine.releaseAll();
       useActiveKeysStore.getState().clearKeys();
 
@@ -173,6 +178,10 @@ export default function SettingsPage() {
           const isListeningWhite = listeningNote === item.baseNote;
           const isListeningBlack = item.hasBlack && listeningNote === item.blackBaseNote;
 
+          // ✨ Проверяем, играет ли эта нота сейчас (нажата с клавиатуры)
+          const isWhitePressed = activeKeys.has(item.baseNote);
+          const isBlackPressed = item.hasBlack && activeKeys.has(item.blackBaseNote!);
+
           return (
             <div key={item.baseNote} className="relative flex shrink-0 select-none">
               {/* Белая клавиша */}
@@ -183,7 +192,9 @@ export default function SettingsPage() {
                   'h-[140px] w-[32px] rounded-b-[6px] lg:h-[180px] lg:w-[46px]',
                   isListeningWhite
                     ? 'bg-primary'
-                    : 'bg-piano-white hover:bg-piano-white-hover active:bg-piano-white-active',
+                    : isWhitePressed
+                      ? 'bg-piano-white-active'
+                      : 'bg-piano-white hover:bg-piano-white-hover active:bg-piano-white-active',
                 )}
               >
                 <span
@@ -209,7 +220,9 @@ export default function SettingsPage() {
                     '-right-[11px] lg:-right-[16px]',
                     isListeningBlack
                       ? 'bg-primary'
-                      : 'bg-piano-black hover:bg-piano-black-hover active:bg-piano-black-active',
+                      : isBlackPressed
+                        ? 'bg-piano-black-active'
+                        : 'bg-piano-black hover:bg-piano-black-hover active:bg-piano-black-active',
                   )}
                 >
                   <span
@@ -298,7 +311,77 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* 4. Тема */}
+      {/* ✨ 4. ЗВУЧАНИЕ ПИАНИНО */}
+      <div className="mb-10 max-w-sm">
+        <h2 className="mb-4 text-2xl">Звучание пианино</h2>
+        <div className="flex flex-col gap-5">
+          <label className="group flex cursor-pointer items-start gap-3 select-none">
+            <input
+              type="radio"
+              name="soundType"
+              checked={pianoSoundType === 'synth'}
+              onChange={() => {
+                setPianoSoundType('synth');
+                toneEngine.releaseAll(); // ✨ Глушим звуки при переключении
+              }}
+              className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-text"
+            />
+            <div className="flex flex-col">
+              <span className="text-[16px] transition-colors group-hover:text-primary">
+                Синтезатор
+              </span>
+              <span className="mt-0.5 text-[14px] leading-tight text-white/40">
+                Электронный звук. Работает моментально и не тратит интернет.
+              </span>
+            </div>
+          </label>
+
+          <label className="group flex cursor-pointer items-start gap-3 select-none">
+            <input
+              type="radio"
+              name="soundType"
+              checked={pianoSoundType === 'acoustic'}
+              onChange={() => {
+                setPianoSoundType('acoustic');
+                toneEngine.releaseAll(); // ✨ Глушим звуки при переключении
+                toneEngine.loadAcousticSamples(); // Запускаем закачку
+              }}
+              className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-text"
+            />
+            <div className="flex w-full flex-col">
+              <span
+                className={cn(
+                  'text-[16px] transition-colors',
+                  !isPianoLoading && 'group-hover:text-primary',
+                )}
+              >
+                Акустика
+              </span>
+              <span className="mt-0.5 text-[14px] leading-tight text-white/40">
+                Реалистичный звук рояля. Требует однократной загрузки (~2 МБ).
+              </span>
+
+              {/* UI ПРОГРЕСС-БАРА */}
+              {isPianoLoading && (
+                <div className="animate-fade-in mt-3 w-full rounded-xl border border-text/5 bg-surface p-3">
+                  <div className="mb-1.5 flex justify-between text-[11px] font-semibold tracking-wider text-primary uppercase">
+                    <span>Загрузка аудио...</span>
+                    <span>{Math.round(pianoLoadProgress)}%</span>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-text/10">
+                    <div
+                      className="h-full rounded-full bg-primary transition-all duration-200 ease-out"
+                      style={{ width: `${Math.max(2, pianoLoadProgress)}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </label>
+        </div>
+      </div>
+
+      {/* 5. Тема */}
       <div className="mb-10">
         <h2 className="mb-4 text-2xl">Тема</h2>
         <div className="flex items-center gap-6">
@@ -325,7 +408,7 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* 5. Данные */}
+      {/* 6. Данные */}
       <div className="mb-10 max-w-lg">
         <h2 className="mb-6 text-2xl">Данные</h2>
 

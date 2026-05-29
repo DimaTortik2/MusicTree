@@ -9,6 +9,8 @@ import { cn } from '@/app/utils/cn';
 import { RouteWallpaper } from '@/shared/RouteWallpaper';
 import { ControlButton } from '@/shared/buttons/ControlButton';
 import { OnlyVisualPiano } from '@/shared/piano/OnlyVisualPiano';
+import { AudioUnlockOverlay } from '@/app/providers/AudioUnlockOverlay';
+import { useGlobalPiano } from '@/app/hooks/useGlobalPiano';
 
 const TAB_ROUTES: Record<string, string> = {
   tree: '/app/tree',
@@ -43,7 +45,7 @@ export const AppLayout = () => {
   const toggleBtnRef = useRef<HTMLButtonElement>(null);
 
   const { activeTabs, inactiveTabs } = useProgressStore();
-
+useGlobalPiano();
   const handlePianoClick = () => setIsPianoActive((prev) => !prev);
 
   useEffect(() => {
@@ -157,6 +159,7 @@ export const AppLayout = () => {
       {/* 2. Основная рабочая область */}
       <main className="relative z-10 flex-1 overflow-y-auto bg-transparent transition-all duration-300">
         <div className="h-full w-full">
+          <AudioUnlockOverlay/>
           <Outlet />
         </div>
       </main>
@@ -233,7 +236,7 @@ export const AppLayout = () => {
                 animate={{ y: 0 }}
                 exit={{ y: '100%' }}
                 transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
-                className="w-full border-t-[3px] border-text/18 bg-background pt-4 pb-[max(env(safe-area-inset-bottom),8px)] md:py-0"
+                className="w-full border-t-[3px] border-text/18 bg-background pt-2 pb-[max(env(safe-area-inset-bottom),8px)] md:py-0"
               >
                 <OnlyVisualPiano />
               </motion.div>

@@ -2,9 +2,19 @@ import { Logo } from '@/pages/LandingPage/Logo';
 import { Microphone } from '@/pages/LandingPage/Microphone';
 import { PinkWave } from '@/pages/LandingPage/PinkWave';
 import { Button } from '@/shared/buttons/Button';
-import { NavLink } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { unlockAudioContext } from '@/shared/lib/audioEngine';
 
 export function LandingPage() {
+  const navigate = useNavigate();
+
+  const handleStart = async () => {
+    // 1. Сначала разблокируем звук (взаимодействие пользователя!)
+    await unlockAudioContext();
+
+    // 2. Затем делаем редирект в приложение (на дерево)
+    navigate('/app');
+  };
   return (
     <div className="relative flex min-h-dvh flex-col overflow-hidden bg-background font-sans text-text">
       <header className="absolute top-0 z-20 flex w-full justify-center px-4 pt-6 sm:pt-8">
@@ -34,11 +44,9 @@ export function LandingPage() {
             <Microphone className="h-auto w-[120%] rotate-[-20deg]" />
           </div>
           {/* Кнопка, на которую будет навешано дофига всякого */}
-          <NavLink to={'/app'}>
-            <Button color="accent" variant="solid" size="lg">
-              Начать
-            </Button>
-          </NavLink>
+          <Button onClick={handleStart} color="accent" variant="solid" size="lg">
+            Начать
+          </Button>
         </div>
       </main>
     </div>

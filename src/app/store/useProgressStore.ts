@@ -31,6 +31,12 @@ export interface AppState {
   // Аудио
   audioRecordIds: string[];
 
+  // Пианино
+  isKeyboardPianoActive: boolean;
+
+  leftOctaveShift: number;
+  rightOctaveShift: number;
+
   // Техническое
   _hasHydrated: boolean;
   setHasHydrated: (state: boolean) => void;
@@ -44,6 +50,13 @@ export interface AppState {
   setInactiveTabs: (tabs: string[]) => void;
   passHomework: (id: string) => void;
   returnHomeworkFromArchive: (id: string) => void;
+
+  // Пианино
+  setKeyboardPianoActive: (state: boolean) => void;
+  setPianoVolume: (volume: number) => void;
+
+  setLeftOctaveShift: (shift: number) => void;
+  setRightOctaveShift: (shift: number) => void;
 }
 
 // Дефолтная раскладка по ТЗ (q2w3... и zsxd...)
@@ -94,6 +107,10 @@ export const useProgressStore = create<AppState>()(
       inactiveTabs: ['chains', 'tests', 'exam', 'debug', 'settings', 'customize'],
       audioRecordIds: [],
 
+      isKeyboardPianoActive: false,
+      leftOctaveShift: 0,
+      rightOctaveShift: 0,
+
       _hasHydrated: false,
 
       // Экшены
@@ -139,6 +156,11 @@ export const useProgressStore = create<AppState>()(
         set((state) => ({
           passedHomeworks: state.passedHomeworks.filter((hwId) => hwId !== id),
         })),
+
+      setKeyboardPianoActive: (state) => set({ isKeyboardPianoActive: state }),
+      setPianoVolume: (volume) => set({ pianoVolume: volume }),
+      setLeftOctaveShift: (shift) => set({ leftOctaveShift: shift }),
+      setRightOctaveShift: (shift) => set({ rightOctaveShift: shift }),
     }),
     {
       name: 'music-tree-progress',

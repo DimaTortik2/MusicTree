@@ -57,6 +57,18 @@ export interface AppState {
 
   setLeftOctaveShift: (shift: number) => void;
   setRightOctaveShift: (shift: number) => void;
+
+  setMediaVolume: (volume: number) => void;
+  updatePianoBinding: (note: string, keyCode: string) => void;
+  resetPianoBindings: () => void;
+
+  showPianoHints: boolean;
+  setShowPianoHints: (state: boolean) => void;
+
+  isPianoMuted: boolean;
+  previousPianoVolume: number;
+
+  togglePianoMute: () => void;
 }
 
 // Дефолтная раскладка по ТЗ (q2w3... и zsxd...)
@@ -101,6 +113,8 @@ export const useProgressStore = create<AppState>()(
       theme: 'dark', // Жесткий старт с темной темы по ТЗ
       mediaVolume: 50,
       pianoVolume: 50,
+      isPianoMuted: false,
+      previousPianoVolume: 50,
       pianoBindings: DEFAULT_PIANO_BINDINGS,
 
       activeTabs: ['tree', 'lesson', 'homeworks', 'vocal', 'piano'],
@@ -108,6 +122,7 @@ export const useProgressStore = create<AppState>()(
       audioRecordIds: [],
 
       isKeyboardPianoActive: false,
+      showPianoHints: true,
       leftOctaveShift: 0,
       rightOctaveShift: 0,
 
@@ -158,9 +173,49 @@ export const useProgressStore = create<AppState>()(
         })),
 
       setKeyboardPianoActive: (state) => set({ isKeyboardPianoActive: state }),
-      setPianoVolume: (volume) => set({ pianoVolume: volume }),
+      setPianoVolume: (volume) => set({ pianoVolume: volume, isPianoMuted: false }),
       setLeftOctaveShift: (shift) => set({ leftOctaveShift: shift }),
       setRightOctaveShift: (shift) => set({ rightOctaveShift: shift }),
+      setMediaVolume: (volume) => set({ mediaVolume: volume }),
+
+      updatePianoBinding: (note, keyCode) =>
+        set((state) => {
+          const newBindings = { ...state.pianoBindings };
+
+          // Проверка на уникальность: если эта кнопка уже привязана к другой ноте, сбрасываем старую
+          for (const [existingNote, boundKey] of Object.entries(newBindings)) {
+            if (boundKey === keyCode) {
+              newBindings[existingNote] = null;
+            }
+          }
+
+          newBindings[note] = keyCode;
+          return { pianoBindings: newBindings };
+        }),
+
+      resetPianoBindings: () => set({ pianoBindings: DEFAULT_PIANO_BINDINGS }),
+      setShowPianoHints: (state) => set({ showPianoHints: state }),
+      togglePianoMute: () =>
+        set((state) => {
+          // Считаем пианино "замьюченным", если включен флаг ИЛИ громкость вручную скручена в 0
+          const effectivelyMuted = state.isPianoMuted || state.pianoVolume === 0;
+
+          if (effectivelyMuted) {
+            // РАЗМЬЮТ: возвращаем предыдущую громкость (если она была 0, ставим дефолтные 50)
+            const restoreVol = state.previousPianoVolume > 0 ? state.previousPianoVolume : 50;
+            return {
+              isPianoMuted: false,
+              pianoVolume: restoreVol,
+            };
+          } else {
+            // МЬЮТ: запоминаем текущую громкость и скручиваем ползунок в 0
+            return {
+              isPianoMuted: true,
+              previousPianoVolume: state.pianoVolume,
+              pianoVolume: 0,
+            };
+          }
+        }),
     }),
     {
       name: 'music-tree-progress',

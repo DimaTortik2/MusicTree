@@ -1,21 +1,235 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { SpeakerHigh, PianoKeys, ArrowCounterClockwise } from '@phosphor-icons/react';
+import localforage from 'localforage';
+
 import { useProgressStore } from '@/app/store/useProgressStore';
+import { useTheme } from '@/app/providers/ThemeProvider';
 import { TabBarCustomization } from '@/pages/settings/TabBarCustomization';
 
 import { cn } from '@/app/utils/cn';
 import { Modal } from '@/shared/Modal';
 import { Button } from '@/shared/buttons/Button';
+import { VolumeSlider } from '@/shared/VolumeSlider';
+
+// Форматирование клавиш (убираем Key и Digit)
+const formatKeyName = (code: string | null) => {
+  if (!code) return '—';
+  return code.replace('Key', '').replace('Digit', '');
+};
+
+// Генерация октавы, как в OnlyVisualPiano
+const getSettingsOctaveKeys = (baseOctave: number) => {
+  return [
+    { baseNote: `C${baseOctave}`, hasBlack: true, blackBaseNote: `C#${baseOctave}` },
+    { baseNote: `D${baseOctave}`, hasBlack: true, blackBaseNote: `D#${baseOctave}` },
+    { baseNote: `E${baseOctave}`, hasBlack: false },
+    { baseNote: `F${baseOctave}`, hasBlack: true, blackBaseNote: `F#${baseOctave}` },
+    { baseNote: `G${baseOctave}`, hasBlack: true, blackBaseNote: `G#${baseOctave}` },
+    { baseNote: `A${baseOctave}`, hasBlack: true, blackBaseNote: `A#${baseOctave}` },
+    { baseNote: `B${baseOctave}`, hasBlack: false },
+  ];
+};
 
 export default function SettingsPage() {
-  const [isCustomizingMobile, setIsCustomizingMobile] = useState(false);
-  const { theme, mediaVolume, pianoVolume } = useProgressStore();
+  const { theme, setTheme } = useTheme();
 
-  const handleMockAction = (msg: string) => console.log(`[Mock Action]: ${msg}`);
+  const {
+    mediaVolume,
+    setMediaVolume,
+    pianoVolume,
+    setPianoVolume,
+    pianoBindings,
+    updatePianoBinding,
+    resetPianoBindings,
+  } = useProgressStore();
+
+  const [isCustomizingMobile, setIsCustomizingMobile] = useState(false);
+  const [listeningNote, setListeningNote] = useState<string | null>(null);
+
+  const [storageText, setStorageText] = useState('0 МБ');
+  const [storagePercent, setStoragePercent] = useState(0);
+
+  // --- 1. Оценка занимаемой памяти (Storage API) ---
+  useEffect(() => {
+    async function checkStorage() {
+      if (navigator.storage && navigator.storage.estimate) {
+        try {
+          const { usage, quota } = await navigator.storage.estimate();
+          if (usage !== undefined && quota !== undefined) {
+            const mb = usage / (1024 * 1024);
+
+            // Форматируем текст
+            if (mb > 1024) {
+              setStorageText(`${(mb / 1024).toFixed(1)} ГБ`);
+            } else {
+              setStorageText(`${mb > 0 && mb < 1 ? '<1' : Math.round(mb)} МБ`);
+            }
+
+            // Вычисляем процент. Если диск огромный, а аудио весит мало - процент будет 0.0001%
+            let percent = quota > 0 ? (usage / quota) * 100 : 0;
+
+            // Делаем минимум 2%, чтобы линию было видно визуально, если есть хоть какие-то данные
+            if (usage > 0 && percent < 2) percent = 2;
+
+            setStoragePercent(Math.min(percent, 100));
+          }
+        } catch (e) {
+          console.error('Ошибка оценки памяти:', e);
+        }
+      }
+    }
+
+    // Проверяем при монтировании и при каждом возврате на вкладку (фокус)
+    checkStorage();
+    window.addEventListener('focus', checkStorage);
+    return () => window.removeEventListener('focus', checkStorage);
+  }, []);
+
+  // --- 2. Логика переназначения клавиш с защитой системных кнопок ---
+  useEffect(() => {
+    if (!listeningNote) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // 1. Запрещаем перехват комбинаций (Ctrl+C, Alt+Tab, Cmd+R и тд)
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+      // 2. Блокируем медиа-клавиши и функциональные (F1-F12)
+      if (/^(Media|Audio|Volume|Browser|Launch|F\d+)/.test(e.code)) return;
+
+      // 3. Блокируем базовые системные кнопки навигации
+      const invalidKeys = [
+        'Space',
+        'Enter',
+        'Tab',
+        'Escape',
+        'Backspace',
+        'ArrowUp',
+        'ArrowDown',
+        'ArrowLeft',
+        'ArrowRight',
+        'CapsLock',
+        'ShiftLeft',
+        'ShiftRight',
+        'ControlLeft',
+        'ControlRight',
+        'AltLeft',
+        'AltRight',
+        'MetaLeft',
+        'MetaRight',
+        'ContextMenu',
+        'PrintScreen',
+        'ScrollLock',
+        'Pause',
+        'Insert',
+        'Delete',
+        'Home',
+        'End',
+        'PageUp',
+        'PageDown',
+      ];
+
+      if (invalidKeys.includes(e.code)) return;
+
+      // Только если клавиша валидная (буква, цифра и тд), глушим браузерное действие
+      e.preventDefault();
+      updatePianoBinding(listeningNote, e.code);
+      setListeningNote(null);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [listeningNote, updatePianoBinding]);
+
+  const handleClearAudio = async () => {
+    try {
+      await localforage.clear();
+      useProgressStore.setState({ audioRecordIds: [] });
+      setStorageText('0 МБ');
+      setStoragePercent(0);
+    } catch (e) {
+      console.error('Ошибка очистки аудио:', e);
+    }
+  };
+
+  const handleClearAll = async () => {
+    try {
+      await localforage.clear();
+      localStorage.clear();
+      window.location.href = '/';
+    } catch (e) {
+      console.error('Ошибка полного сброса:', e);
+    }
+  };
+
+  // --- Идентичный рендер пианино из OnlyVisualPiano ---
+  const renderKeyboardLayout = (octave: number) => {
+    const keys = getSettingsOctaveKeys(octave);
+
+    return (
+      <div className="flex gap-0.5 lg:gap-1">
+        {keys.map((item) => {
+          const isListeningWhite = listeningNote === item.baseNote;
+          const isListeningBlack = item.hasBlack && listeningNote === item.blackBaseNote;
+
+          return (
+            <div key={item.baseNote} className="relative flex shrink-0 select-none">
+              {/* Белая клавиша */}
+              <div
+                onClick={() => setListeningNote(item.baseNote)}
+                className={cn(
+                  'relative flex cursor-pointer flex-col justify-end pb-3 transition-colors duration-100 ease-in-out',
+                  'h-[140px] w-[32px] rounded-b-[6px] lg:h-[180px] lg:w-[46px]',
+                  isListeningWhite
+                    ? 'bg-primary'
+                    : 'bg-piano-white hover:bg-piano-white-hover active:bg-piano-white-active',
+                )}
+              >
+                <span
+                  className={cn(
+                    'pointer-events-none text-center text-xs font-semibold select-none lg:text-sm',
+                    isListeningWhite ? 'text-white' : 'text-[#1a0b22]/30',
+                  )}
+                >
+                  {isListeningWhite ? '?' : formatKeyName(pianoBindings[item.baseNote])}
+                </span>
+              </div>
+
+              {/* Черная клавиша */}
+              {item.hasBlack && (
+                <div
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setListeningNote(item.blackBaseNote!);
+                  }}
+                  className={cn(
+                    'absolute top-0 z-10 flex cursor-pointer flex-col justify-end pb-2 transition-colors duration-100 ease-in-out',
+                    'h-[85px] w-[20px] rounded-b-[4px] lg:h-[110px] lg:w-[28px]',
+                    '-right-[11px] lg:-right-[16px]',
+                    isListeningBlack
+                      ? 'bg-primary'
+                      : 'bg-piano-black hover:bg-piano-black-hover active:bg-piano-black-active',
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'pointer-events-none text-center text-[9px] font-semibold select-none lg:text-[11px]',
+                      isListeningBlack ? 'text-white' : 'text-text/40',
+                    )}
+                  >
+                    {isListeningBlack ? '?' : formatKeyName(pianoBindings[item.blackBaseNote!])}
+                  </span>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
     <div className="relative min-h-screen w-full p-6 pb-[50vh] text-text md:p-10 md:pb-[50vh]">
-      {/* 1. Мобильная кастомизация (Видно только на <768px) */}
+      {/* 1. Мобильная кастомизация */}
       <div className="mb-10 md:hidden">
         <h2 className="mb-1 text-2xl">Тап-бар</h2>
         <p className="mb-4 text-[14px] leading-tight text-white/40">
@@ -31,77 +245,53 @@ export default function SettingsPage() {
         </Button>
       </div>
 
-      {/* 2. Кастомизация Пианино (Видно только на >=768px) */}
-      <div className="mb-10 hidden md:block">
+      {/* 2. Кастомизация Пианино */}
+      <div className="mb-10 hidden overflow-hidden md:block">
         <div className="mb-4 flex items-center gap-4">
           <h2 className="text-2xl">Клавиатура</h2>
           <span className="text-sm text-white/40">Нажмите на ноту и переназначьте клавишу</span>
-          {/* Оставляем нативным, так как это чисто иконка без бордеров и паддингов */}
           <button
-            onClick={() => handleMockAction('Сброс хоткеев')}
-            className="cursor-pointer text-white/40 transition-colors hover:text-text"
+            onClick={resetPianoBindings}
+            title="Сбросить раскладку"
+            className="cursor-pointer text-white/40 transition-colors outline-none hover:text-text active:scale-95"
           >
             <ArrowCounterClockwise size={24} />
           </button>
         </div>
-        {/* Заглушка клавиатуры */}
+
+        {listeningNote && (
+          <div className="mb-4 animate-pulse text-sm text-primary">
+            Нажмите любую доступную клавишу для ноты {listeningNote}...
+          </div>
+        )}
+
         <div className="flex items-start gap-1">
-          <div className="flex gap-1 rounded bg-surface p-1">
-            {['Q', 'W', 'E', 'R', 'T', 'Y', 'U'].map((key, i) => (
-              <div
-                key={i}
-                className="relative flex h-32 w-10 items-end justify-center rounded-sm bg-text pb-2 font-medium text-background"
-              >
-                {key}
-                {[0, 1, 3, 4, 5].includes(i) && (
-                  <div className="absolute top-0 right-[-14px] z-10 flex h-20 w-6 items-end justify-center rounded-sm border border-surface bg-background pb-2 text-sm text-white/40">
-                    {i + 2}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-          <div className="ml-2 flex gap-1 rounded bg-surface p-1">
-            {['Z', 'X', 'C', 'V', 'B', 'N', 'M'].map((key, i) => (
-              <div
-                key={i}
-                className="relative flex h-32 w-10 items-end justify-center rounded-sm bg-text pb-2 font-medium text-background"
-              >
-                {key}
-                {[0, 1, 3, 4, 5].includes(i) && (
-                  <div className="absolute top-0 right-[-14px] z-10 flex h-20 w-6 items-end justify-center rounded-sm border border-surface bg-background pb-2 text-sm text-white/40">
-                    {['S', 'D', 'G', 'H', 'J'][i > 2 ? i - 1 : i]}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+          {renderKeyboardLayout(4)} {/* Левая часть (Октава 4) */}
+          {renderKeyboardLayout(5)} {/* Правая часть (Октава 5) */}
         </div>
       </div>
 
       {/* 3. Громкость */}
       <div className="mb-10 max-w-sm">
         <h2 className="mb-4 text-2xl">Громкость</h2>
-        <div className="mb-4 flex items-center gap-4 text-text/80">
-          <SpeakerHigh size={24} className="shrink-0" />
-          <input
-            type="range"
-            min="0"
-            max="100"
+
+        <div className="mb-6 flex items-center gap-4">
+          {/* Обычная иконка медиа */}
+          <SpeakerHigh size={24} className="shrink-0 text-text/80" />
+          <VolumeSlider
             value={mediaVolume}
-            onChange={() => {}}
-            className="h-1.5 w-full cursor-pointer appearance-none rounded-lg bg-surface accent-text"
+            onChange={(e) => setMediaVolume(Number(e.target.value))}
           />
         </div>
-        <div className="flex items-center gap-4 text-text/80">
-          <PianoKeys size={24} className="shrink-0" />
-          <input
-            type="range"
-            min="0"
-            max="100"
+
+        <div className="flex items-center gap-4">
+          {/* Стилизованная некликабельная иконка пианино под ControlButton */}
+          <div className="flex shrink-0 items-center justify-center rounded-md bg-text p-1.5 text-surface opacity-70">
+            <PianoKeys size={20} weight="fill"  />
+          </div>
+          <VolumeSlider
             value={pianoVolume}
-            onChange={() => {}}
-            className="h-1.5 w-full cursor-pointer appearance-none rounded-lg bg-surface accent-text"
+            onChange={(e) => setPianoVolume(Number(e.target.value))}
           />
         </div>
       </div>
@@ -110,24 +300,23 @@ export default function SettingsPage() {
       <div className="mb-10">
         <h2 className="mb-4 text-2xl">Тема</h2>
         <div className="flex items-center gap-6">
-          <label className="flex cursor-pointer items-center gap-2">
+          <label className="flex cursor-pointer items-center gap-2 select-none">
             <input
               type="radio"
               name="theme"
               checked={theme === 'dark'}
-              onChange={() => {}}
-              className="h-4 w-4 accent-text"
+              onChange={() => setTheme('dark')}
+              className="h-4 w-4 cursor-pointer accent-text"
             />
             <span>Темная</span>
           </label>
-          <label className="flex cursor-pointer items-center gap-2 text-white/40">
+          <label className="flex cursor-pointer items-center gap-2 text-white/40 select-none">
             <input
               type="radio"
               name="theme"
               checked={theme === 'light'}
-              onChange={() => {}}
-              className="h-4 w-4 accent-text"
-              disabled
+              onChange={() => setTheme('light')}
+              className="h-4 w-4 cursor-pointer accent-text"
             />
             <span>Светлая</span>
           </label>
@@ -138,7 +327,6 @@ export default function SettingsPage() {
       <div className="mb-10 max-w-lg">
         <h2 className="mb-6 text-2xl">Данные</h2>
 
-        {/* Круговая диаграмма */}
         <div className="relative mb-6 h-48 w-48">
           <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90 transform">
             <circle
@@ -155,14 +343,16 @@ export default function SettingsPage() {
               cy="50"
               r="45"
               fill="transparent"
-              stroke="var(--primary)"
+              stroke="var(--color-primary)"
               strokeWidth="6"
               strokeDasharray="283"
-              strokeDashoffset="100"
+              // Формула сдвига (чем больше процент, тем меньше offset)
+              strokeDashoffset={283 - (283 * storagePercent) / 100}
+              className="transition-all duration-1000 ease-out"
             />
           </svg>
           <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-2xl font-bold">560 МБ</span>
+            <span className="text-xl font-bold md:text-2xl">{storageText}</span>
           </div>
         </div>
 
@@ -177,7 +367,7 @@ export default function SettingsPage() {
           title="Вы действительно хотите удалить все аудиозаписи с этого сайта?"
           description="Вы потеряете все свои записи без возможности восстановления, но прогресс останется нетронутым"
           confirmText="Очистить аудиофайлы"
-          onConfirm={() => handleMockAction('Очистка аудио IndexedDB')}
+          onConfirm={handleClearAudio}
           isSecondary
         />
 
@@ -200,7 +390,7 @@ export default function SettingsPage() {
             }
             description="Вы потеряете все свои записи и прогресс без возможности восстановления"
             confirmText="Очистить всё"
-            onConfirm={() => handleMockAction('Полный сброс LocalStorage и IndexedDB')}
+            onConfirm={handleClearAll}
           />
         </div>
       </div>
@@ -210,6 +400,7 @@ export default function SettingsPage() {
   );
 }
 
+// Модалка
 function DeleteDialog({
   triggerText,
   title,

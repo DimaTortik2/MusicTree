@@ -138,6 +138,10 @@ export const OnlyVisualPiano: React.FC<PianoProps> = ({ className, ...props }) =
     setKeyboardPianoActive,
     pianoVolume,
     setPianoVolume,
+    showPianoHints,
+    isPianoMuted, 
+    togglePianoMute,
+    setShowPianoHints,
     leftOctaveShift,
     rightOctaveShift,
     setLeftOctaveShift,
@@ -146,15 +150,12 @@ export const OnlyVisualPiano: React.FC<PianoProps> = ({ className, ...props }) =
 
   const { activeKeys, addKey, removeKey } = useActiveKeysStore();
 
-  const [showHints, setShowHints] = useState(true);
-  const [isMuted, setIsMuted] = useState(false);
-
   const leftOctave = getShiftedOctaveKeys(4, leftOctaveShift);
   const rightOctave = getShiftedOctaveKeys(5, rightOctaveShift);
 
   useEffect(() => {
-    toneEngine.setVolume(pianoVolume, isMuted);
-  }, [pianoVolume, isMuted]);
+    toneEngine.setVolume(pianoVolume, isPianoMuted || pianoVolume === 0);
+  }, [pianoVolume, isPianoMuted]);
 
   // При первой загрузке центрируем на C4, при повторном открытии - восстанавливаем
   useEffect(() => {
@@ -314,6 +315,7 @@ export const OnlyVisualPiano: React.FC<PianoProps> = ({ className, ...props }) =
           min="0"
           max="100"
           value={scrollPercent}
+          onPointerUp={(e) => e.currentTarget.blur()}
           onChange={handleRangeChange}
           className={cn(
             'h-2.5 w-full cursor-pointer appearance-none rounded-full bg-surface outline-none', // Убрали max-w-[240px] и justify-center у контейнера
@@ -341,8 +343,8 @@ export const OnlyVisualPiano: React.FC<PianoProps> = ({ className, ...props }) =
         <div className="flex flex-col gap-2 lg:gap-3">
           <ControlButton
             icon={<Sunglasses weight="regular" size={20} />}
-            isActive={showHints}
-            onClick={() => setShowHints((prev) => !prev)}
+            isActive={showPianoHints}
+            onClick={() => setShowPianoHints(!showPianoHints)}
             className="size-10 shrink-0 rounded-xl active:scale-95 md:size-8 lg:size-10"
             innerClassName="md:p-1.5 lg:p-2"
           />
@@ -372,11 +374,11 @@ export const OnlyVisualPiano: React.FC<PianoProps> = ({ className, ...props }) =
           </div>
 
           <div className="flex gap-0.5 lg:gap-1">
-            {leftOctave.map((key) => renderKey(key, showHints))}
+            {leftOctave.map((key) => renderKey(key, showPianoHints))}
           </div>
 
           <div className="flex gap-0.5 lg:gap-1">
-            {rightOctave.map((key) => renderKey(key, showHints))}
+            {rightOctave.map((key) => renderKey(key, showPianoHints))}
           </div>
 
           <div className="flex flex-col gap-1.5 lg:gap-2">
@@ -400,12 +402,10 @@ export const OnlyVisualPiano: React.FC<PianoProps> = ({ className, ...props }) =
             <input
               type="range"
               min="0"
+              onPointerUp={(e) => e.currentTarget.blur()}
               max="100"
-              value={isMuted ? 0 : pianoVolume}
-              onChange={(e) => {
-                setPianoVolume(Number(e.target.value));
-                if (isMuted) setIsMuted(false);
-              }}
+              value={pianoVolume}
+              onChange={(e) => setPianoVolume(Number(e.target.value))}
               className={cn(
                 'absolute h-1.5 w-16 cursor-pointer appearance-none rounded-full bg-transparent outline-none [-webkit-appearance:none] lg:w-20',
                 '[&::-webkit-slider-thumb]:size-3.5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-text [&::-webkit-slider-thumb]:shadow-md lg:[&::-webkit-slider-thumb]:size-4',
@@ -414,22 +414,22 @@ export const OnlyVisualPiano: React.FC<PianoProps> = ({ className, ...props }) =
               style={{
                 transform: 'rotate(-90deg)',
                 background: `linear-gradient(to right, var(--color-text) 0%, var(--color-text) ${
-                  isMuted ? 0 : pianoVolume
-                }%, transparent ${isMuted ? 0 : pianoVolume}%, transparent 100%)`,
+                  pianoVolume
+                }%, transparent ${pianoVolume}%, transparent 100%)`,
               }}
             />
           </div>
 
           <ControlButton
             icon={
-              isMuted || pianoVolume === 0 ? (
+              isPianoMuted || pianoVolume === 0 ? (
                 <SpeakerSimpleSlash weight="regular" size={20} />
               ) : (
                 <SpeakerSimpleHigh weight="regular" size={20} />
               )
             }
-            isActive={!isMuted && pianoVolume > 0}
-            onClick={() => setIsMuted((prev) => !prev)}
+            isActive={!isPianoMuted && pianoVolume > 0}
+            onClick={togglePianoMute}
             className="size-10 shrink-0 rounded-xl active:scale-95 md:size-8 lg:size-10"
             innerClassName="md:p-1.5 lg:p-2"
           />

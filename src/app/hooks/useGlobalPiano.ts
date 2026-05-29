@@ -2,17 +2,25 @@ import { useEffect, useRef } from 'react';
 import { useProgressStore } from '@/app/store/useProgressStore';
 import { useActiveKeysStore } from '@/app/store/useActiveKeysStore';
 import { toneEngine } from '@/shared/lib/toneEngine';
+import { toast } from '@/app/utils/toast';
 
 export const useGlobalPiano = () => {
-  const { isKeyboardPianoActive, pianoBindings, leftOctaveShift, rightOctaveShift } =
-    useProgressStore();
+  const {
+    isKeyboardPianoActive,
+    pianoBindings,
+    leftOctaveShift,
+    rightOctaveShift,
+    isPianoMuted,
+    pianoVolume,
+  } = useProgressStore();
 
   const bindingsRef = useRef(pianoBindings);
   const shiftsRef = useRef({ left: leftOctaveShift, right: rightOctaveShift });
+  const volumeStateRef = useRef({ isMuted: isPianoMuted, volume: pianoVolume });
 
-  // Синхронизируем рефы, чтобы слушатель всегда имел актуальные данные без пересоздания
   bindingsRef.current = pianoBindings;
   shiftsRef.current = { left: leftOctaveShift, right: rightOctaveShift };
+  volumeStateRef.current = { isMuted: isPianoMuted, volume: pianoVolume };
 
   useEffect(() => {
     if (!isKeyboardPianoActive) return;
@@ -24,19 +32,31 @@ export const useGlobalPiano = () => {
       if (activeEl) {
         const tag = activeEl.tagName.toLowerCase();
         const isContentEditable = activeEl.getAttribute('contenteditable') === 'true';
-        if (tag === 'input' || tag === 'textarea' || isContentEditable) return;
+
+        // ✨ ФИКС: Проверяем, не является ли input ползунком (range)
+        const isRange = tag === 'input' && activeEl.getAttribute('type') === 'range';
+
+        // Если это input (но НЕ range), textarea или contenteditable - игнорируем нажатие
+        if ((tag === 'input' && !isRange) || tag === 'textarea' || isContentEditable) return;
       }
 
-      // Ищем БАЗОВУЮ ноту по нажатой клавише
       const baseNote = Object.keys(bindingsRef.current).find(
         (key) => bindingsRef.current[key] === e.code,
       );
 
       if (baseNote) {
         e.preventDefault();
-        useActiveKeysStore.getState().addKey(baseNote); // Подсвечиваем клавишу на UI
 
-        // Высчитываем реальную звучащую ноту со сдвигом октавы
+        const { isMuted, volume } = volumeStateRef.current;
+        if (isMuted || volume === 0) {
+          toast.error('Пианино отслеживает клавиатуру, но звук выключен!', {
+            toastId: 'piano-muted-error',
+            autoClose: 3000,
+          });
+        }
+
+        useActiveKeysStore.getState().addKey(baseNote);
+
         let shift = 0;
         if (baseNote.includes('4')) shift = shiftsRef.current.left;
         if (baseNote.includes('5')) shift = shiftsRef.current.right;
@@ -54,7 +74,7 @@ export const useGlobalPiano = () => {
         (key) => bindingsRef.current[key] === e.code,
       );
       if (baseNote) {
-        useActiveKeysStore.getState().removeKey(baseNote); // Убираем подсветку на UI
+        useActiveKeysStore.getState().removeKey(baseNote);
 
         let shift = 0;
         if (baseNote.includes('4')) shift = shiftsRef.current.left;
@@ -70,7 +90,7 @@ export const useGlobalPiano = () => {
 
     const handleBlur = () => {
       toneEngine.releaseAll();
-      useActiveKeysStore.getState().clearKeys(); // Очищаем залипшие UI-клавиши
+      useActiveKeysStore.getState().clearKeys();
     };
 
     window.addEventListener('keydown', handleKeyDown);

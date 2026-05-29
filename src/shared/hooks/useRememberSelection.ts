@@ -1,4 +1,3 @@
-// src/shared/hooks/useRememberSelection.ts
 import { useEffect, useRef, useCallback } from 'react';
 
 export const useRememberSelection = (

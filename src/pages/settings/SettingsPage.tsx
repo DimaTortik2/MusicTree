@@ -10,6 +10,8 @@ import { cn } from '@/app/utils/cn';
 import { Modal } from '@/shared/Modal';
 import { Button } from '@/shared/buttons/Button';
 import { VolumeSlider } from '@/shared/VolumeSlider';
+import { useActiveKeysStore } from '@/app/store/useActiveKeysStore';
+import { toneEngine } from '@/shared/lib/toneEngine';
 
 // Форматирование клавиш (убираем Key и Digit)
 const formatKeyName = (code: string | null) => {
@@ -90,13 +92,9 @@ export default function SettingsPage() {
     if (!listeningNote) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // 1. Запрещаем перехват комбинаций (Ctrl+C, Alt+Tab, Cmd+R и тд)
       if (e.ctrlKey || e.metaKey || e.altKey) return;
-
-      // 2. Блокируем медиа-клавиши и функциональные (F1-F12)
       if (/^(Media|Audio|Volume|Browser|Launch|F\d+)/.test(e.code)) return;
 
-      // 3. Блокируем базовые системные кнопки навигации
       const invalidKeys = [
         'Space',
         'Enter',
@@ -130,8 +128,12 @@ export default function SettingsPage() {
 
       if (invalidKeys.includes(e.code)) return;
 
-      // Только если клавиша валидная (буква, цифра и тд), глушим браузерное действие
       e.preventDefault();
+
+      // ✨ ФИКС: Сбрасываем все звуки и визуальные нажатия при переназначении клавиши
+      toneEngine.releaseAll();
+      useActiveKeysStore.getState().clearKeys();
+
       updatePianoBinding(listeningNote, e.code);
       setListeningNote(null);
     };
@@ -287,7 +289,7 @@ export default function SettingsPage() {
         <div className="flex items-center gap-4">
           {/* Стилизованная некликабельная иконка пианино под ControlButton */}
           <div className="flex shrink-0 items-center justify-center rounded-md bg-text p-1.5 text-surface opacity-70">
-            <PianoKeys size={20} weight="fill"  />
+            <PianoKeys size={20} weight="fill" />
           </div>
           <VolumeSlider
             value={pianoVolume}

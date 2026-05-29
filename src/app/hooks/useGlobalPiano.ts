@@ -18,6 +18,9 @@ export const useGlobalPiano = () => {
   const shiftsRef = useRef({ left: leftOctaveShift, right: rightOctaveShift });
   const volumeStateRef = useRef({ isMuted: isPianoMuted, volume: pianoVolume });
 
+  // ✨ ФИКС: Храним информацию о том, какая физическая кнопка какую ноту сейчас играет
+  const activePresses = useRef(new Map<string, { baseNote: string; playNote: string }>());
+
   bindingsRef.current = pianoBindings;
   shiftsRef.current = { left: leftOctaveShift, right: rightOctaveShift };
   volumeStateRef.current = { isMuted: isPianoMuted, volume: pianoVolume };
@@ -33,12 +36,13 @@ export const useGlobalPiano = () => {
         const tag = activeEl.tagName.toLowerCase();
         const isContentEditable = activeEl.getAttribute('contenteditable') === 'true';
 
-        // ✨ ФИКС: Проверяем, не является ли input ползунком (range)
         const isRange = tag === 'input' && activeEl.getAttribute('type') === 'range';
 
-        // Если это input (но НЕ range), textarea или contenteditable - игнорируем нажатие
         if ((tag === 'input' && !isRange) || tag === 'textarea' || isContentEditable) return;
       }
+
+      // Если эта физическая кнопка уже зажата (защита от залипания системы), игнорируем
+      if (activePresses.current.has(e.code)) return;
 
       const baseNote = Object.keys(bindingsRef.current).find(
         (key) => bindingsRef.current[key] === e.code,
@@ -55,8 +59,6 @@ export const useGlobalPiano = () => {
           });
         }
 
-        useActiveKeysStore.getState().addKey(baseNote);
-
         let shift = 0;
         if (baseNote.includes('4')) shift = shiftsRef.current.left;
         if (baseNote.includes('5')) shift = shiftsRef.current.right;
@@ -65,32 +67,29 @@ export const useGlobalPiano = () => {
         const baseOctave = parseInt(baseNote.slice(-1), 10);
         const playNote = `${pitchClass}${baseOctave + shift}`;
 
+        // ✨ ФИКС: Запоминаем, что именно мы начали играть этой кнопкой
+        activePresses.current.set(e.code, { baseNote, playNote });
+
+        useActiveKeysStore.getState().addKey(baseNote);
         toneEngine.playNote(playNote);
       }
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
-      const baseNote = Object.keys(bindingsRef.current).find(
-        (key) => bindingsRef.current[key] === e.code,
-      );
-      if (baseNote) {
-        useActiveKeysStore.getState().removeKey(baseNote);
+      // ✨ ФИКС: Достаем ноту ИЗ ПАМЯТИ, а не из текущих настроек
+      const pressed = activePresses.current.get(e.code);
 
-        let shift = 0;
-        if (baseNote.includes('4')) shift = shiftsRef.current.left;
-        if (baseNote.includes('5')) shift = shiftsRef.current.right;
-
-        const pitchClass = baseNote.slice(0, -1);
-        const baseOctave = parseInt(baseNote.slice(-1), 10);
-        const playNote = `${pitchClass}${baseOctave + shift}`;
-
-        toneEngine.releaseNote(playNote);
+      if (pressed) {
+        useActiveKeysStore.getState().removeKey(pressed.baseNote);
+        toneEngine.releaseNote(pressed.playNote);
+        activePresses.current.delete(e.code);
       }
     };
 
     const handleBlur = () => {
       toneEngine.releaseAll();
       useActiveKeysStore.getState().clearKeys();
+      activePresses.current.clear();
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -103,6 +102,7 @@ export const useGlobalPiano = () => {
       window.removeEventListener('blur', handleBlur);
       toneEngine.releaseAll();
       useActiveKeysStore.getState().clearKeys();
+      activePresses.current.clear();
     };
   }, [isKeyboardPianoActive]);
 

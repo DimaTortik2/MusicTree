@@ -99,7 +99,7 @@ export const CurrentLecturePage = () => {
             </div>
           )}
 
-          <div className="mt-16 flex justify-center border-t border-text/5">
+          <div className="mt-16 flex justify-center ">
             {!isPassed ? (
               <Button variant="outline" onClick={handleCompleteClick}>
                 Завершить урок

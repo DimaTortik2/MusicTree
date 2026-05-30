@@ -34,11 +34,17 @@ export const useGlobalPiano = () => {
 
       const activeEl = document.activeElement;
       if (activeEl) {
-        const tag = activeEl.tagName.toLowerCase();
-        const isContentEditable = activeEl.getAttribute('contenteditable') === 'true';
-        const isRange = tag === 'input' && activeEl.getAttribute('type') === 'range';
+       const tag = activeEl.tagName.toLowerCase();
+       const isContentEditable = activeEl.getAttribute('contenteditable') === 'true';
+       const type = activeEl.getAttribute('type');
 
-        if ((tag === 'input' && !isRange) || tag === 'textarea' || isContentEditable) return;
+       // Инпуты, при фокусе на которых НЕ надо блокировать пианино
+       const isAllowedInput =
+         tag === 'input' &&
+         (type === 'range' || type === 'radio' || type === 'checkbox' || type === 'button');
+
+       // Блокируем только текстовые поля (text, email, password и т.д.) и текстареи
+       if ((tag === 'input' && !isAllowedInput) || tag === 'textarea' || isContentEditable) return;
       }
 
       if (activePresses.current.has(e.code)) return;

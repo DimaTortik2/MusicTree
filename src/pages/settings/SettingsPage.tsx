@@ -290,7 +290,7 @@ export default function SettingsPage() {
       <div className="mb-10 max-w-sm">
         <h2 className="mb-4 text-2xl">Громкость</h2>
 
-        <div className="mb-6 flex items-center gap-4">
+        <div className="group mb-6 flex items-center gap-4">
           {/* Обычная иконка медиа */}
           <SpeakerHigh size={24} className="shrink-0 text-text/80" />
           <VolumeSlider
@@ -299,7 +299,7 @@ export default function SettingsPage() {
           />
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="group flex items-center gap-4">
           {/* Стилизованная некликабельная иконка пианино под ControlButton */}
           <div className="flex shrink-0 items-center justify-center rounded-md bg-text p-1.5 text-surface opacity-70">
             <PianoKeys size={20} weight="fill" />
@@ -320,10 +320,12 @@ export default function SettingsPage() {
               type="radio"
               name="soundType"
               checked={pianoSoundType === 'synth'}
-              onChange={() => {
+              onChange={(e) => {
                 setPianoSoundType('synth');
                 toneEngine.releaseAll(); // ✨ Глушим звуки при переключении
+                e.target.blur();
               }}
+              onPointerUp={(e) => e.currentTarget.blur()}
               className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-text"
             />
             <div className="flex flex-col">
@@ -341,10 +343,12 @@ export default function SettingsPage() {
               type="radio"
               name="soundType"
               checked={pianoSoundType === 'acoustic'}
-              onChange={() => {
+              onPointerUp={(e) => e.currentTarget.blur()}
+              onChange={(e) => {
                 setPianoSoundType('acoustic');
                 toneEngine.releaseAll(); // ✨ Глушим звуки при переключении
                 toneEngine.loadAcousticSamples(); // Запускаем закачку
+                e.target.blur();
               }}
               className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-text"
             />
@@ -363,9 +367,9 @@ export default function SettingsPage() {
 
               {/* UI ПРОГРЕСС-БАРА */}
               {isPianoLoading && (
-                <div className="animate-fade-in mt-3 w-full rounded-xl border border-text/5 bg-surface p-3">
+                <div className="animate-fade-in mt-3 w-full rounded-xl bg-surface p-3">
                   <div className="mb-1.5 flex justify-between text-[11px] font-semibold tracking-wider text-primary uppercase">
-                    <span>Загрузка аудио...</span>
+                    <span>Скачивание аудио...</span>
                     <span>{Math.round(pianoLoadProgress)}%</span>
                   </div>
                   <div className="h-2 w-full overflow-hidden rounded-full bg-text/10">
@@ -385,25 +389,33 @@ export default function SettingsPage() {
       <div className="mb-10">
         <h2 className="mb-4 text-2xl">Тема</h2>
         <div className="flex items-center gap-6">
-          <label className="flex cursor-pointer items-center gap-2 select-none">
+          <label className="group flex cursor-pointer items-center gap-2 select-none">
             <input
               type="radio"
               name="theme"
+              onPointerUp={(e) => e.currentTarget.blur()}
               checked={theme === 'dark'}
-              onChange={() => setTheme('dark')}
+              onChange={(e) => {
+                setTheme('dark');
+                e.target.blur();
+              }}
               className="h-4 w-4 cursor-pointer accent-text"
             />
-            <span>Темная</span>
+            <span className="transition-colors group-hover:text-primary">Темная</span>
           </label>
-          <label className="flex cursor-pointer items-center gap-2 text-white/40 select-none">
+          <label className="group flex cursor-pointer items-center gap-2 text-white/40 select-none">
             <input
               type="radio"
+              onPointerUp={(e) => e.currentTarget.blur()}
               name="theme"
               checked={theme === 'light'}
-              onChange={() => setTheme('light')}
+              onChange={(e) => {
+                setTheme('light');
+                e.target.blur();
+              }}
               className="h-4 w-4 cursor-pointer accent-text"
             />
-            <span>Светлая</span>
+            <span className="transition-colors group-hover:text-primary">Светлая</span>
           </label>
         </div>
       </div>

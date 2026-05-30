@@ -122,9 +122,34 @@ const MOBILE_KEYS = generateFullPianoKeys();
 
 export interface PianoProps extends React.HTMLAttributes<HTMLDivElement> {}
 
+// Замени эту функцию в VisualPiano:
 const formatHint = (binding: string | null | undefined) => {
   if (!binding) return '';
-  return binding.replace('Key', '').replace('Digit', '');
+  let text = binding.replace('Key', '').replace('Digit', '');
+  
+  // Красиво отображаем символьные клавиши
+  const symbolMap: Record<string, string> = {
+    Minus: '-',
+    Equal: '=',
+    BracketLeft: '[',
+    BracketRight: ']',
+    Semicolon: ';',
+    Quote: "'",
+    Backslash: '\\',
+    Slash: '/',
+    Comma: ',',
+    Period: '.',
+    Backquote: '`',
+  };
+
+  // Если это Alt+Minus и т.д., заменяем конкретное слово
+  Object.keys(symbolMap).forEach((key) => {
+    if (text.includes(key)) {
+      text = text.replace(key, symbolMap[key]);
+    }
+  });
+
+  return text;
 };
 
 export const VisualPiano: React.FC<PianoProps> = ({ className, ...props }) => {
@@ -140,7 +165,7 @@ export const VisualPiano: React.FC<PianoProps> = ({ className, ...props }) => {
     pianoVolume,
     setPianoVolume,
     showPianoHints,
-    isPianoMuted, 
+    isPianoMuted,
     togglePianoMute,
     setShowPianoHints,
     leftOctaveShift,
@@ -153,10 +178,6 @@ export const VisualPiano: React.FC<PianoProps> = ({ className, ...props }) => {
 
   const leftOctave = getShiftedOctaveKeys(4, leftOctaveShift);
   const rightOctave = getShiftedOctaveKeys(5, rightOctaveShift);
-
-  useEffect(() => {
-    toneEngine.setVolume(pianoVolume, isPianoMuted || pianoVolume === 0);
-  }, [pianoVolume, isPianoMuted]);
 
   // При первой загрузке центрируем на C4, при повторном открытии - восстанавливаем
   useEffect(() => {
@@ -214,12 +235,12 @@ export const VisualPiano: React.FC<PianoProps> = ({ className, ...props }) => {
   };
 
   const handlePlayNote = (playNoteFreq: string, baseNoteId: string) => {
-      if (isPianoMuted || pianoVolume === 0) {
-        toast.error('Звук пианино выключен!', {
-          toastId: 'visual-piano-muted-error',
-          autoClose: 3000,
-        });
-      }
+    if (isPianoMuted || pianoVolume === 0) {
+      toast.error('Звук пианино выключен!', {
+        toastId: 'visual-piano-muted-error',
+        autoClose: 3000,
+      });
+    }
     toneEngine.playNote(playNoteFreq);
     addKey(baseNoteId);
   };
@@ -444,4 +465,4 @@ export const VisualPiano: React.FC<PianoProps> = ({ className, ...props }) => {
       </div>
     </div>
   );
-};;
+};

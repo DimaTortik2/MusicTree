@@ -7,6 +7,7 @@ import { ThemeProvider } from '@/app/providers/ThemeProvider';
 import { ToastContainer } from 'react-toastify';
 
 import './index.css';
+import { ShortcutManager } from '@/shared/hooks/useShortcut';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -24,6 +25,7 @@ createRoot(document.getElementById('root')!).render(
         pauseOnHover
         theme="dark"
       />
+      <ShortcutManager />
     </ThemeProvider>
   </StrictMode>,
 );

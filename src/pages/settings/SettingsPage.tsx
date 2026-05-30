@@ -1,25 +1,46 @@
 import { useState, useEffect } from 'react';
 import { SpeakerHigh, PianoKeys, ArrowCounterClockwise } from '@phosphor-icons/react';
 import localforage from 'localforage';
-
 import { useProgressStore } from '@/app/store/useProgressStore';
 import { useActiveKeysStore } from '@/app/store/useActiveKeysStore';
 import { useTheme } from '@/app/providers/ThemeProvider';
 import { TabBarCustomization } from '@/pages/settings/TabBarCustomization';
-
 import { cn } from '@/app/utils/cn';
 import { Modal } from '@/shared/Modal';
 import { Button } from '@/shared/buttons/Button';
 import { VolumeSlider } from '@/shared/VolumeSlider';
 import { toneEngine } from '@/shared/lib/toneEngine';
+import { useNavigate } from 'react-router-dom';
 
-// Форматирование клавиш (убираем Key и Digit)
+// Форматирование клавиш (убираем Key и Digit + меняем слова на символы)
 const formatKeyName = (code: string | null) => {
   if (!code) return '—';
-  return code.replace('Key', '').replace('Digit', '');
+  let text = code.replace('Key', '').replace('Digit', '');
+
+  const symbolMap: Record<string, string> = {
+    Minus: '-',
+    Equal: '=',
+    BracketLeft: '[',
+    BracketRight: ']',
+    Semicolon: ';',
+    Quote: "'",
+    Backslash: '\\',
+    Slash: '/',
+    Comma: ',',
+    Period: '.',
+    Backquote: '`',
+  };
+
+  Object.keys(symbolMap).forEach((key) => {
+    if (text.includes(key)) {
+      text = text.replace(key, symbolMap[key]);
+    }
+  });
+
+  return text;
 };
 
-// Генерация октавы, как в OnlyVisualPiano
+// Генерация октавы
 const getSettingsOctaveKeys = (baseOctave: number) => {
   return [
     { baseNote: `C${baseOctave}`, hasBlack: true, blackBaseNote: `C#${baseOctave}` },
@@ -35,9 +56,7 @@ const getSettingsOctaveKeys = (baseOctave: number) => {
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
 
-  // ✨ Достаем стейты прогресса скачивания и активные клавиши
   const { activeKeys, isPianoLoading, pianoLoadProgress } = useActiveKeysStore();
-
   const {
     mediaVolume,
     setMediaVolume,
@@ -52,11 +71,11 @@ export default function SettingsPage() {
 
   const [isCustomizingMobile, setIsCustomizingMobile] = useState(false);
   const [listeningNote, setListeningNote] = useState<string | null>(null);
-
   const [storageText, setStorageText] = useState('0 МБ');
   const [storagePercent, setStoragePercent] = useState(0);
+  const navigate = useNavigate();
 
-  // --- 1. Оценка занимаемой памяти (Storage API) ---
+  // Оценка занимаемой памяти (Storage API)
   useEffect(() => {
     async function checkStorage() {
       if (navigator.storage && navigator.storage.estimate) {
@@ -64,20 +83,13 @@ export default function SettingsPage() {
           const { usage, quota } = await navigator.storage.estimate();
           if (usage !== undefined && quota !== undefined) {
             const mb = usage / (1024 * 1024);
-
-            // Форматируем текст
             if (mb > 1024) {
               setStorageText(`${(mb / 1024).toFixed(1)} ГБ`);
             } else {
               setStorageText(`${mb > 0 && mb < 1 ? '<1' : Math.round(mb)} МБ`);
             }
-
-            // Вычисляем процент. Если диск огромный, а аудио весит мало - процент будет 0.0001%
             let percent = quota > 0 ? (usage / quota) * 100 : 0;
-
-            // Делаем минимум 2%, чтобы линию было видно визуально, если есть хоть какие-то данные
             if (usage > 0 && percent < 2) percent = 2;
-
             setStoragePercent(Math.min(percent, 100));
           }
         } catch (e) {
@@ -85,14 +97,12 @@ export default function SettingsPage() {
         }
       }
     }
-
-    // Проверяем при монтировании и при каждом возврате на вкладку (фокус)
     checkStorage();
     window.addEventListener('focus', checkStorage);
     return () => window.removeEventListener('focus', checkStorage);
   }, []);
 
-  // --- 2. Логика переназначения клавиш с защитой системных кнопок ---
+  // Логика переназначения клавиш с защитой системных кнопок
   useEffect(() => {
     if (!listeningNote) return;
 
@@ -135,7 +145,6 @@ export default function SettingsPage() {
 
       e.preventDefault();
 
-      // Сбрасываем все звуки и визуальные нажатия при переназначении клавиши
       toneEngine.releaseAll();
       useActiveKeysStore.getState().clearKeys();
 
@@ -168,7 +177,6 @@ export default function SettingsPage() {
     }
   };
 
-  // --- Идентичный рендер пианино из OnlyVisualPiano ---
   const renderKeyboardLayout = (octave: number) => {
     const keys = getSettingsOctaveKeys(octave);
 
@@ -178,7 +186,6 @@ export default function SettingsPage() {
           const isListeningWhite = listeningNote === item.baseNote;
           const isListeningBlack = item.hasBlack && listeningNote === item.blackBaseNote;
 
-          // ✨ Проверяем, играет ли эта нота сейчас (нажата с клавиатуры)
           const isWhitePressed = activeKeys.has(item.baseNote);
           const isBlackPressed = item.hasBlack && activeKeys.has(item.blackBaseNote!);
 
@@ -186,7 +193,8 @@ export default function SettingsPage() {
             <div key={item.baseNote} className="relative flex shrink-0 select-none">
               {/* Белая клавиша */}
               <div
-                onClick={() => setListeningNote(item.baseNote)}
+                // ✨ Если клавиша уже слушается - повторный клик отменяет прослушивание
+                onClick={() => setListeningNote(isListeningWhite ? null : item.baseNote)}
                 className={cn(
                   'relative flex cursor-pointer flex-col justify-end pb-3 transition-colors duration-100 ease-in-out',
                   'h-[140px] w-[32px] rounded-b-[6px] lg:h-[180px] lg:w-[46px]',
@@ -210,9 +218,10 @@ export default function SettingsPage() {
               {/* Черная клавиша */}
               {item.hasBlack && (
                 <div
+                  // ✨ Если клавиша уже слушается - повторный клик отменяет прослушивание
                   onClick={(e) => {
                     e.stopPropagation();
-                    setListeningNote(item.blackBaseNote!);
+                    setListeningNote(isListeningBlack ? null : item.blackBaseNote!);
                   }}
                   className={cn(
                     'absolute top-0 z-10 flex cursor-pointer flex-col justify-end pb-2 transition-colors duration-100 ease-in-out',
@@ -281,17 +290,30 @@ export default function SettingsPage() {
         )}
 
         <div className="flex items-start gap-1">
-          {renderKeyboardLayout(4)} {/* Левая часть (Октава 4) */}
-          {renderKeyboardLayout(5)} {/* Правая часть (Октава 5) */}
+          {renderKeyboardLayout(4)}
+          {renderKeyboardLayout(5)}
         </div>
       </div>
+
+      <div className="mb-10 hidden md:block">
+        <h2 className="mb-1 text-2xl">Горячие клавиши</h2>
+        <p className="mb-4 max-w-sm text-[14px] leading-tight text-white/40">
+          Настройте глобальные комбинации клавиш для быстрого доступа к функциям сайта из любого
+          раздела.
+        </p>
+        <Button variant="outline" size="sm" color="text" onClick={() => navigate('/app/shortcuts')}>
+          Настроить клавиши
+        </Button>
+      </div>
+
+      {/* Остальная часть компонента: Громкость, Звучание, Тема, Данные остаются без изменений */}
+      {/* ... */}
 
       {/* 3. Громкость */}
       <div className="mb-10 max-w-sm">
         <h2 className="mb-4 text-2xl">Громкость</h2>
 
         <div className="group mb-6 flex items-center gap-4">
-          {/* Обычная иконка медиа */}
           <SpeakerHigh size={24} className="shrink-0 text-text/80" />
           <VolumeSlider
             value={mediaVolume}
@@ -300,7 +322,6 @@ export default function SettingsPage() {
         </div>
 
         <div className="group flex items-center gap-4">
-          {/* Стилизованная некликабельная иконка пианино под ControlButton */}
           <div className="flex shrink-0 items-center justify-center rounded-md bg-text p-1.5 text-surface opacity-70">
             <PianoKeys size={20} weight="fill" />
           </div>
@@ -311,7 +332,7 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* ✨ 4. ЗВУЧАНИЕ ПИАНИНО */}
+      {/* 4. ЗВУЧАНИЕ ПИАНИНО */}
       <div className="mb-10 max-w-sm">
         <h2 className="mb-4 text-2xl">Звучание пианино</h2>
         <div className="flex flex-col gap-5">
@@ -322,7 +343,7 @@ export default function SettingsPage() {
               checked={pianoSoundType === 'synth'}
               onChange={(e) => {
                 setPianoSoundType('synth');
-                toneEngine.releaseAll(); // ✨ Глушим звуки при переключении
+                toneEngine.releaseAll();
                 e.target.blur();
               }}
               onPointerUp={(e) => e.currentTarget.blur()}
@@ -346,8 +367,8 @@ export default function SettingsPage() {
               onPointerUp={(e) => e.currentTarget.blur()}
               onChange={(e) => {
                 setPianoSoundType('acoustic');
-                toneEngine.releaseAll(); // ✨ Глушим звуки при переключении
-                toneEngine.loadAcousticSamples(); // Запускаем закачку
+                toneEngine.releaseAll();
+                toneEngine.loadAcousticSamples();
                 e.target.blur();
               }}
               className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-text"
@@ -365,7 +386,6 @@ export default function SettingsPage() {
                 Реалистичный звук рояля. Требует однократной загрузки (~2 МБ).
               </span>
 
-              {/* UI ПРОГРЕСС-БАРА */}
               {isPianoLoading && (
                 <div className="animate-fade-in mt-3 w-full rounded-xl bg-surface p-3">
                   <div className="mb-1.5 flex justify-between text-[11px] font-semibold tracking-wider text-primary uppercase">
@@ -443,7 +463,6 @@ export default function SettingsPage() {
               stroke="var(--color-primary)"
               strokeWidth="6"
               strokeDasharray="283"
-              // Формула сдвига (чем больше процент, тем меньше offset)
               strokeDashoffset={283 - (283 * storagePercent) / 100}
               className="transition-all duration-1000 ease-out"
             />
@@ -497,7 +516,6 @@ export default function SettingsPage() {
   );
 }
 
-// Модалка
 function DeleteDialog({
   triggerText,
   title,
@@ -514,7 +532,6 @@ function DeleteDialog({
   isSecondary?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-
   return (
     <>
       <Button
@@ -530,7 +547,6 @@ function DeleteDialog({
       >
         {triggerText}
       </Button>
-
       <Modal
         isOpen={open}
         onClose={() => setOpen(false)}

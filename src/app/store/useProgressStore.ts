@@ -76,30 +76,30 @@ export interface AppState {
 
 // Дефолтная раскладка по ТЗ (q2w3... и zsxd...)
 const DEFAULT_PIANO_BINDINGS: Record<string, string | null> = {
-  C4: 'KeyQ',
-  'C#4': 'Digit2',
-  D4: 'KeyW',
-  'D#4': 'Digit3',
-  E4: 'KeyE',
-  F4: 'KeyR',
-  'F#4': 'Digit5',
-  G4: 'KeyT',
-  'G#4': 'Digit6',
-  A4: 'KeyY',
-  'A#4': 'Digit7',
-  B4: 'KeyU',
-  C5: 'KeyZ',
-  'C#5': 'KeyS',
-  D5: 'KeyX',
-  'D#5': 'KeyD',
-  E5: 'KeyC',
-  F5: 'KeyV',
-  'F#5': 'KeyG',
-  G5: 'KeyB',
-  'G#5': 'KeyH',
-  A5: 'KeyN',
-  'A#5': 'KeyJ',
-  B5: 'KeyM',
+  C4: 'KeyZ',
+  'C#4': 'KeyS',
+  D4: 'KeyX',
+  'D#4': 'KeyD',
+  E4: 'KeyC',
+  F4: 'KeyV',
+  'F#4': 'KeyG',
+  G4: 'KeyB',
+  'G#4': 'KeyH',
+  A4: 'KeyN',
+  'A#4': 'KeyJ',
+  B4: 'KeyM',
+  C5: 'KeyY',
+  'C#5': 'Digit7',
+  D5: 'KeyU',
+  'D#5': 'Digit8',
+  E5: 'KeyI',
+  F5: 'KeyO',
+  'F#5': 'Digit0',
+  G5: 'KeyP',
+  'G#5': 'Minus', // Клавиша "-"
+  A5: 'BracketLeft', // Клавиша "[" (Левая квадратная скобка)
+  'A#5': 'Equal', // Клавиша "="
+  B5: 'BracketRight', // Клавиша "]" (Правая квадратная скобка)
 };
 
 export const useProgressStore = create<AppState>()(

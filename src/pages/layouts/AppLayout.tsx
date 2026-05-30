@@ -11,6 +11,7 @@ import { ControlButton } from '@/shared/buttons/ControlButton';
 import { VisualPiano } from '@/shared/piano/VisualPiano';
 import { AudioUnlockOverlay } from '@/app/providers/AudioUnlockOverlay';
 import { useGlobalPiano } from '@/app/hooks/useGlobalPiano';
+import { useAppShortcuts } from '@/app/hooks/useAppShortcuts';
 
 const TAB_ROUTES: Record<string, string> = {
   tree: '/app/tree',
@@ -45,8 +46,12 @@ export const AppLayout = () => {
   const toggleBtnRef = useRef<HTMLButtonElement>(null);
 
   const { activeTabs, inactiveTabs } = useProgressStore();
-useGlobalPiano();
+  useGlobalPiano();
   const handlePianoClick = () => setIsPianoActive((prev) => !prev);
+
+  useAppShortcuts({
+    togglePiano: () => setIsPianoActive((prev) => !prev),
+  });
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -159,7 +164,7 @@ useGlobalPiano();
       {/* 2. Основная рабочая область */}
       <main className="relative z-10 flex-1 overflow-y-auto bg-transparent transition-all duration-300">
         <div className="h-full w-full">
-          <AudioUnlockOverlay/>
+          <AudioUnlockOverlay />
           <Outlet />
         </div>
       </main>

@@ -11,6 +11,7 @@ import { ChainsPage } from '@/pages/chains/ChainsPage';
 import { TestsPage } from '@/pages/tests/TestsPage';
 import PitchDetectorPiano from '@/features/Pitcher/Pitcher';
 import { NotFoundPage } from '@/pages/NotFoundPage';
+import ShortcutsPage from '@/pages/ShortcutsPage';
 
 export const router = createBrowserRouter([
   {
@@ -72,6 +73,10 @@ export const router = createBrowserRouter([
       {
         path: '*',
         element: <NotFoundPage />,
+      },
+      {
+        path: 'shortcuts',
+        element: <ShortcutsPage />,
       },
     ],
   },

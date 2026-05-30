@@ -11,6 +11,7 @@ import { Button } from '@/shared/buttons/Button';
 import { VolumeSlider } from '@/shared/VolumeSlider';
 import { toneEngine } from '@/shared/lib/toneEngine';
 import { useNavigate } from 'react-router-dom';
+import { Radio } from '@/shared/buttons/Radio';
 
 // Форматирование клавиш (убираем Key и Digit + меняем слова на символы)
 const formatKeyName = (code: string | null) => {
@@ -67,6 +68,8 @@ export default function SettingsPage() {
     resetPianoBindings,
     pianoSoundType,
     setPianoSoundType,
+    uiSize,
+    setUiSize,
   } = useProgressStore();
 
   const [isCustomizingMobile, setIsCustomizingMobile] = useState(false);
@@ -306,9 +309,6 @@ export default function SettingsPage() {
         </Button>
       </div>
 
-      {/* Остальная часть компонента: Громкость, Звучание, Тема, Данные остаются без изменений */}
-      {/* ... */}
-
       {/* 3. Громкость */}
       <div className="mb-10 max-w-sm">
         <h2 className="mb-4 text-2xl">Громкость</h2>
@@ -336,72 +336,44 @@ export default function SettingsPage() {
       <div className="mb-10 max-w-sm">
         <h2 className="mb-4 text-2xl">Звучание пианино</h2>
         <div className="flex flex-col gap-5">
-          <label className="group flex cursor-pointer items-start gap-3 select-none">
-            <input
-              type="radio"
-              name="soundType"
-              checked={pianoSoundType === 'synth'}
-              onChange={(e) => {
-                setPianoSoundType('synth');
-                toneEngine.releaseAll();
-                e.target.blur();
-              }}
-              onPointerUp={(e) => e.currentTarget.blur()}
-              className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-text"
-            />
-            <div className="flex flex-col">
-              <span className="text-[16px] transition-colors group-hover:text-primary">
-                Синтезатор
-              </span>
-              <span className="mt-0.5 text-[14px] leading-tight text-white/40">
-                Электронный звук. Работает моментально и не тратит интернет.
-              </span>
-            </div>
-          </label>
+          <Radio
+            name="soundType"
+            checked={pianoSoundType === 'synth'}
+            onChange={(e) => {
+              setPianoSoundType('synth');
+              toneEngine.releaseAll();
+              e.target.blur();
+            }}
+            label="Синтезатор"
+            description="Электронный звук. Работает моментально и не тратит интернет."
+          />
 
-          <label className="group flex cursor-pointer items-start gap-3 select-none">
-            <input
-              type="radio"
-              name="soundType"
-              checked={pianoSoundType === 'acoustic'}
-              onPointerUp={(e) => e.currentTarget.blur()}
-              onChange={(e) => {
-                setPianoSoundType('acoustic');
-                toneEngine.releaseAll();
-                toneEngine.loadAcousticSamples();
-                e.target.blur();
-              }}
-              className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-text"
-            />
-            <div className="flex w-full flex-col">
-              <span
-                className={cn(
-                  'text-[16px] transition-colors',
-                  !isPianoLoading && 'group-hover:text-primary',
-                )}
-              >
-                Акустика
-              </span>
-              <span className="mt-0.5 text-[14px] leading-tight text-white/40">
-                Реалистичный звук рояля. Требует однократной загрузки (~2 МБ).
-              </span>
-
-              {isPianoLoading && (
-                <div className="animate-fade-in mt-3 w-full rounded-xl bg-surface p-3">
-                  <div className="mb-1.5 flex justify-between text-[11px] font-semibold tracking-wider text-primary uppercase">
-                    <span>Скачивание аудио...</span>
-                    <span>{Math.round(pianoLoadProgress)}%</span>
-                  </div>
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-text/10">
-                    <div
-                      className="h-full rounded-full bg-primary transition-all duration-200 ease-out"
-                      style={{ width: `${Math.max(2, pianoLoadProgress)}%` }}
-                    />
-                  </div>
-                </div>
-              )}
+          <Radio
+            name="soundType"
+            checked={pianoSoundType === 'acoustic'}
+            onChange={(e) => {
+              setPianoSoundType('acoustic');
+              toneEngine.releaseAll();
+              toneEngine.loadAcousticSamples();
+              e.target.blur();
+            }}
+            label="Акустика"
+            description="Реалистичный звук рояля. Требует однократной загрузки (~2 МБ)."
+          />
+          {isPianoLoading && (
+            <div className="animate-fade-in mt-3 w-full rounded-xl bg-surface p-3">
+              <div className="mb-1.5 flex justify-between text-[11px] font-semibold tracking-wider text-primary uppercase">
+                <span>Скачивание аудио...</span>
+                <span>{Math.round(pianoLoadProgress)}%</span>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-text/10">
+                <div
+                  className="h-full rounded-full bg-primary transition-all duration-200 ease-out"
+                  style={{ width: `${Math.max(2, pianoLoadProgress)}%` }}
+                />
+              </div>
             </div>
-          </label>
+          )}
         </div>
       </div>
 
@@ -409,35 +381,53 @@ export default function SettingsPage() {
       <div className="mb-10">
         <h2 className="mb-4 text-2xl">Тема</h2>
         <div className="flex items-center gap-6">
-          <label className="group flex cursor-pointer items-center gap-2 select-none">
-            <input
-              type="radio"
-              name="theme"
-              onPointerUp={(e) => e.currentTarget.blur()}
-              checked={theme === 'dark'}
-              onChange={(e) => {
-                setTheme('dark');
-                e.target.blur();
-              }}
-              className="h-4 w-4 cursor-pointer accent-text"
-            />
-            <span className="transition-colors group-hover:text-primary">Темная</span>
-          </label>
-          <label className="group flex cursor-pointer items-center gap-2 text-white/40 select-none">
-            <input
-              type="radio"
-              onPointerUp={(e) => e.currentTarget.blur()}
-              name="theme"
-              checked={theme === 'light'}
-              onChange={(e) => {
-                setTheme('light');
-                e.target.blur();
-              }}
-              className="h-4 w-4 cursor-pointer accent-text"
-            />
-            <span className="transition-colors group-hover:text-primary">Светлая</span>
-          </label>
+          <Radio
+            name="theme"
+            checked={theme === 'dark'}
+            onChange={(e) => {
+              setTheme('dark');
+              e.target.blur();
+            }}
+            label="Темная"
+          />
+          <Radio
+            name="theme"
+            checked={theme === 'light'}
+            onChange={(e) => {
+              setTheme('light');
+              e.target.blur();
+            }}
+            label="Светлая"
+          />
         </div>
+      </div>
+
+      <div className="mb-10 max-w-md">
+        <h2 className="mb-4 text-2xl">Масштаб интерфейса</h2>
+        <div className="flex w-full rounded-[14px] bg-surface p-1.5 shadow-inner">
+          {(['xs', 'sm', 'md', 'lg'] as const).map((size) => {
+            const labels = { xs: 'Мини', sm: 'Мелкий', md: 'Стандарт', lg: 'Крупный' };
+            const isActive = uiSize === size;
+            return (
+              <button
+                key={size}
+                onClick={() => setUiSize(size)}
+                className={cn(
+                  'flex-1 cursor-pointer rounded-[10px] px-1 py-2 text-[12px] font-medium transition-all duration-200 outline-none sm:text-[14px]',
+                  isActive
+                    ? 'bg-text text-surface shadow-sm'
+                    : 'text-text/40 hover:bg-text/5 hover:text-text',
+                )}
+              >
+                {labels[size]}
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-4 text-[14px] leading-tight text-white/40">
+          Изменяет размер шрифтов и отступов. Выберите «Мини» или «Мелкий», если элементы не
+          помещаются на экране телефона.
+        </p>
       </div>
 
       {/* 6. Данные */}

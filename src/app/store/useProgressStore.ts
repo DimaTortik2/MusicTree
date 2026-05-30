@@ -8,6 +8,7 @@ export interface TestResult {
   maxScore: number;
   userAnswers: number[][];
 }
+export type UISize = 'xs' | 'sm' | 'md' | 'lg';
 
 export interface AppState {
   // Прогресс
@@ -23,6 +24,8 @@ export interface AppState {
   mediaVolume: number;
   pianoVolume: number;
   pianoBindings: Record<string, string | null>;
+  uiSize: UISize;
+  setUiSize: (size: UISize) => void;
 
   // Tab Bar
   activeTabs: string[];
@@ -119,6 +122,7 @@ export const useProgressStore = create<AppState>()(
       isPianoMuted: false,
       previousPianoVolume: 50,
       pianoBindings: DEFAULT_PIANO_BINDINGS,
+      uiSize: 'md',
 
       activeTabs: ['tree', 'lesson', 'homeworks', 'vocal', 'piano'],
       inactiveTabs: ['chains', 'tests', 'debug', 'settings', 'customize'],
@@ -133,7 +137,7 @@ export const useProgressStore = create<AppState>()(
 
       // Экшены
       setHasHydrated: (state) => set({ _hasHydrated: state }),
-
+      setUiSize: (size) => set({ uiSize: size }),
       passLesson: (id) =>
         set((state) => ({
           passedLessons: [...new Set([...state.passedLessons, id])],

@@ -45,13 +45,24 @@ export const AppLayout = () => {
   const overflowRef = useRef<HTMLDivElement>(null);
   const toggleBtnRef = useRef<HTMLButtonElement>(null);
 
-  const { activeTabs, inactiveTabs } = useProgressStore();
+  const { activeTabs, inactiveTabs, uiSize } = useProgressStore();
   useGlobalPiano();
   const handlePianoClick = () => setIsPianoActive((prev) => !prev);
 
   useAppShortcuts({
     togglePiano: () => setIsPianoActive((prev) => !prev),
   });
+
+   useEffect(() => {
+     const html = document.documentElement;
+     if (uiSize === 'xs')
+       html.style.fontSize = '12px'; // ~75% от стандарта (очень мелко)
+     else if (uiSize === 'sm')
+       html.style.fontSize = '14px'; // ~87.5% от стандарта
+     else if (uiSize === 'lg')
+       html.style.fontSize = '18px'; // ~112.5% от стандарта
+     else html.style.fontSize = '16px'; // 100% (стандарт)
+   }, [uiSize]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {

@@ -9,9 +9,9 @@ import { HomeworksPage } from '@/pages/HomeworksPage/HomeworksPage';
 import { DebugPage } from '@/pages/debug/DebugPage';
 import { ChainsPage } from '@/pages/chains/ChainsPage';
 import { TestsPage } from '@/pages/tests/TestsPage';
-import PitchDetectorPiano from '@/features/Pitcher/Pitcher';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import ShortcutsPage from '@/pages/ShortcutsPage';
+import { VocalTunerPage } from '@/features/VocalTunerPage';
 
 export const router = createBrowserRouter([
   {
@@ -40,7 +40,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'mic',
-        element: <PitchDetectorPiano />,
+        element: <VocalTunerPage />,
       },
       {
         path: 'homeworks',

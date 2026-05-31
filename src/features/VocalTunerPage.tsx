@@ -1,0 +1,220 @@
+import { AnimatePresence, motion } from 'framer-motion';
+import { cn } from '@/app/utils/cn';
+import {
+  Play,
+  Pause,
+  Power,
+  Trash,
+  PencilSimple,
+  DownloadSimple,
+  DotsThreeVertical,
+  Record as RecordIcon,
+} from '@phosphor-icons/react';
+import { useVocalTuner } from '@/features/vocalTuner/hooks/useVocalTuner';
+import { MiniWaveform, MobileSidebarPortal, PlayerWidget, SidebarIcon, TunerVisualizer } from '@/features/vocalTuner/ui/TunerComponents';
+
+
+
+export function VocalTunerPage() {
+  const {
+    phase,
+    recordings,
+    playingId,
+    isPlaying,
+    currentNote,
+    isMobileSidebarOpen,
+    setIsMobileSidebarOpen,
+    currentTime,
+    duration,
+    startMic,
+    stopMic,
+    startRec,
+    stopRec,
+    togglePlay,
+    handleThreeDotsClick,
+    deleteRec,
+    downloadRec,
+    handleSeek,
+    handleSeekStart,
+    handleSeekEnd,
+  } = useVocalTuner();
+
+  const isListening = phase !== 'idle';
+  const isRecording = phase === 'recording';
+  const activeRecording = recordings.find((r) => r.id === playingId);
+
+  const SidebarContent = () => (
+    <div className="custom-scroll flex-1 space-y-3 overflow-y-auto px-4 py-6">
+      {recordings.map((rec) => {
+        const isActive = playingId === rec.id;
+        const isCurrentlyPlaying = isActive && isPlaying;
+
+        return (
+          <div key={rec.id} className="flex flex-col gap-1">
+            <div
+              className={cn(
+                'flex cursor-pointer items-center justify-between rounded-2xl border-2 p-3 transition-all duration-200',
+                isActive
+                  ? 'border-primary bg-primary text-white'
+                  : 'border-primary bg-transparent text-white hover:bg-primary/10',
+              )}
+              onClick={() => togglePlay(rec)}
+            >
+              <button className="flex shrink-0 items-center justify-center p-1">
+                {isCurrentlyPlaying ? (
+                  <Pause weight="fill" size={20} />
+                ) : (
+                  <Play weight="fill" size={20} />
+                )}
+              </button>
+
+              <MiniWaveform active={isActive} />
+
+              <button
+                className="shrink-0 p-1 opacity-80 hover:opacity-100"
+                onClick={(e) => handleThreeDotsClick(e, rec)}
+              >
+                <DotsThreeVertical weight="bold" size={24} />
+              </button>
+            </div>
+
+            <AnimatePresence initial={false}>
+              {isActive && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="mx-1 mt-1 flex items-center justify-between rounded-xl bg-primary px-4 py-2 text-white/90">
+                    <button
+                      className="p-1 transition-colors hover:text-white"
+                      title="Удалить"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteRec(rec.id);
+                      }}
+                    >
+                      <Trash size={18} weight="bold" />
+                    </button>
+                    <div className="flex gap-4">
+                      <button className="p-1 transition-colors hover:text-white">
+                        <PencilSimple size={18} weight="bold" />
+                      </button>
+                      <button
+                        className="p-1 transition-colors hover:text-white"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          downloadRec(rec);
+                        }}
+                      >
+                        <DownloadSimple size={18} weight="bold" />
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  return (
+    <div className="flex h-screen w-full overflow-hidden font-sans text-text">
+      {/* --- ДЕСКТОПНЫЙ САЙДБАР --- */}
+      <aside className="relative z-10 hidden w-[320px] flex-col border-r border-white/5 bg-surface md:flex">
+        <SidebarContent />
+      </aside>
+
+      {/* --- МОБИЛЬНЫЙ САЙДБАР --- */}
+      <MobileSidebarPortal
+        isOpen={isMobileSidebarOpen}
+        onClose={() => setIsMobileSidebarOpen(false)}
+      >
+        <SidebarContent />
+        {activeRecording && (
+          <div className="shrink-0 border-t border-white/10 bg-surface/80 p-4 pb-8 backdrop-blur-md">
+            <PlayerWidget
+              recording={activeRecording}
+              isPlaying={isPlaying}
+              onTogglePlay={() => togglePlay(activeRecording)}
+              currentTime={currentTime}
+              duration={duration}
+              onSeek={handleSeek}
+              onSeekStart={handleSeekStart} 
+              onSeekEnd={handleSeekEnd}
+            />
+          </div>
+        )}
+      </MobileSidebarPortal>
+
+      {/* --- ГЛАВНАЯ ОБЛАСТЬ --- */}
+      <main className="relative flex flex-1 flex-col">
+        <div className="absolute top-6 left-5 z-10 md:hidden">
+          <button
+            onClick={() => setIsMobileSidebarOpen(true)}
+            className="-m-2 p-2 text-white opacity-70 transition-opacity hover:opacity-100"
+          >
+            <SidebarIcon />
+          </button>
+        </div>
+
+        {/* --- ДЕСКТОПНЫЙ ПЛЕЕР --- */}
+        {activeRecording && (
+          <div className="animate-in fade-in slide-in-from-top-4 absolute top-12 left-1/2 z-[1000] hidden w-full max-w-[600px] -translate-x-1/2 md:block">
+            <PlayerWidget
+              recording={activeRecording}
+              isPlaying={isPlaying}
+              onTogglePlay={() => togglePlay(activeRecording)}
+              currentTime={currentTime}
+              duration={duration}
+              onSeek={handleSeek}
+            />
+          </div>
+        )}
+
+        {/* --- ЦЕНТРАЛЬНЫЙ ТЮНЕР --- */}
+        <div className="flex flex-1 items-center justify-center">
+          <TunerVisualizer noteInfo={currentNote} />
+        </div>
+
+        {/* --- КНОПКИ УПРАВЛЕНИЯ ЗАПИСЬЮ --- */}
+        <div className="absolute bottom-[100px] left-0 z-10 flex w-full items-end justify-center gap-4 md:bottom-12">
+          {isListening && (
+            <button
+              onClick={stopMic}
+              className="flex h-[64px] w-[64px] items-center justify-center rounded-[20px] bg-primary text-white transition-all hover:scale-105 hover:bg-primary/90 active:scale-95 md:h-[72px] md:w-[72px] md:rounded-[24px]"
+            >
+              <Power size={28} weight="bold" />
+            </button>
+          )}
+
+          <button
+            onClick={() => {
+              if (!isListening) startMic();
+              else if (isRecording) stopRec();
+              else startRec();
+            }}
+            className={cn(
+              'flex items-center justify-center bg-primary text-white transition-all hover:scale-105 active:scale-95',
+              isListening
+                ? 'h-[84px] w-[84px] rounded-[28px] md:h-[96px] md:w-[96px] md:rounded-[32px]'
+                : 'h-[72px] w-[72px] rounded-[24px] md:h-[84px] md:w-[84px] md:rounded-[28px]',
+            )}
+          >
+            {!isListening ? (
+              <Play size={36} weight="fill" />
+            ) : isRecording ? (
+              <div className="h-7 w-7 animate-pulse rounded-sm bg-white md:h-8 md:w-8" />
+            ) : (
+              <RecordIcon size={40} weight="bold" />
+            )}
+          </button>
+        </div>
+      </main>
+    </div>
+  );
+}

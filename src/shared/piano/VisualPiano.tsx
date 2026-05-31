@@ -122,12 +122,10 @@ const MOBILE_KEYS = generateFullPianoKeys();
 
 export interface PianoProps extends React.HTMLAttributes<HTMLDivElement> {}
 
-// Замени эту функцию в VisualPiano:
 const formatHint = (binding: string | null | undefined) => {
   if (!binding) return '';
   let text = binding.replace('Key', '').replace('Digit', '');
-  
-  // Красиво отображаем символьные клавиши
+
   const symbolMap: Record<string, string> = {
     Minus: '-',
     Equal: '=',
@@ -142,7 +140,6 @@ const formatHint = (binding: string | null | undefined) => {
     Backquote: '`',
   };
 
-  // Если это Alt+Minus и т.д., заменяем конкретное слово
   Object.keys(symbolMap).forEach((key) => {
     if (text.includes(key)) {
       text = text.replace(key, symbolMap[key]);
@@ -154,8 +151,6 @@ const formatHint = (binding: string | null | undefined) => {
 
 export const VisualPiano: React.FC<PianoProps> = ({ className, ...props }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
-
-  // Стейт для кастомного ползунка (0-100%)
   const [scrollPercent, setScrollPercent] = useState(0);
 
   const {
@@ -179,18 +174,15 @@ export const VisualPiano: React.FC<PianoProps> = ({ className, ...props }) => {
   const leftOctave = getShiftedOctaveKeys(4, leftOctaveShift);
   const rightOctave = getShiftedOctaveKeys(5, rightOctaveShift);
 
-  // При первой загрузке центрируем на C4, при повторном открытии - восстанавливаем
   useEffect(() => {
     if (scrollRef.current) {
       const container = scrollRef.current;
 
       setTimeout(() => {
         const maxScroll = container.scrollWidth - container.clientWidth;
-        // Читаем напрямую из стора без подписки, чтобы избежать ререндеров
         const savedPercent = useActiveKeysStore.getState().mobileScrollPercent;
 
         if (savedPercent === null) {
-          // 1. ПЕРВЫЙ ЗАПУСК: Ищем C4 и центрируем
           const c4Key = container.querySelector('[data-note="C4"]') as HTMLElement;
           if (c4Key) {
             const leftPos = c4Key.offsetLeft - 20;
@@ -198,35 +190,32 @@ export const VisualPiano: React.FC<PianoProps> = ({ className, ...props }) => {
             if (maxScroll > 0) {
               const percent = (leftPos / maxScroll) * 100;
               setScrollPercent(percent);
-              useActiveKeysStore.getState().setMobileScrollPercent(percent); // Сохраняем
+              useActiveKeysStore.getState().setMobileScrollPercent(percent);
             }
           }
         } else {
-          // 2. ПОВТОРНОЕ ОТКРЫТИЕ: Восстанавливаем позицию
           const restoredPos = (savedPercent / 100) * maxScroll;
           container.scrollLeft = restoredPos;
           setScrollPercent(savedPercent);
         }
       }, 100);
     }
-  }, []); // <--- Пустой массив! Срабатывает только при открытии (монтировании) пианино
+  }, []);
 
-  // Синхронизация: прокручиваем контейнер пальцем -> обновляется ползунок и память сессии
   const handleScrollSync = (e: React.UIEvent<HTMLDivElement>) => {
     const target = e.currentTarget;
     const maxScroll = target.scrollWidth - target.clientWidth;
     if (maxScroll > 0) {
       const percent = (target.scrollLeft / maxScroll) * 100;
       setScrollPercent(percent);
-      useActiveKeysStore.getState().setMobileScrollPercent(percent); // Тихая запись в стор
+      useActiveKeysStore.getState().setMobileScrollPercent(percent);
     }
   };
 
-  // Синхронизация: тянем ползунок -> прокручивается контейнер и обновляется память сессии
   const handleRangeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = Number(e.target.value);
     setScrollPercent(val);
-    useActiveKeysStore.getState().setMobileScrollPercent(val); // Тихая запись в стор
+    useActiveKeysStore.getState().setMobileScrollPercent(val);
 
     if (scrollRef.current) {
       const maxScroll = scrollRef.current.scrollWidth - scrollRef.current.clientWidth;
@@ -259,7 +248,8 @@ export const VisualPiano: React.FC<PianoProps> = ({ className, ...props }) => {
     const isBlackActive = key.blackBaseNote && activeKeys.has(key.blackBaseNote);
 
     return (
-      <div key={key.baseNote} data-note={key.baseNote} className="relative flex shrink-0">
+      // ИСПРАВЛЕНИЕ 1: Убрали flex у обертки, теперь базовые линии текста не будут ломать сетку
+      <div key={key.baseNote} data-note={key.baseNote} className="relative shrink-0">
         {/* Белая клавиша */}
         <div
           onMouseDown={() => handlePlayNote(key.playNote, key.baseNote)}
@@ -267,16 +257,17 @@ export const VisualPiano: React.FC<PianoProps> = ({ className, ...props }) => {
           onMouseLeave={() => handleStopNote(key.playNote, key.baseNote)}
           onTouchStart={() => handlePlayNote(key.playNote, key.baseNote)}
           onTouchEnd={(e) => {
-            e.preventDefault(); // Теперь это 100% безопасно, так как есть touch-none
+            e.preventDefault();
             handleStopNote(key.playNote, key.baseNote);
           }}
           onTouchCancel={() => handleStopNote(key.playNote, key.baseNote)}
           className={cn(
-            'relative flex cursor-pointer touch-none flex-col justify-end pb-3', // <-- touch-none вернули
+            'relative flex cursor-pointer touch-none flex-col justify-end pb-3 outline-none', // outline-none защищает от фокуса
             'h-[180px] w-[46px] rounded-b-[6px] md:h-[140px] md:w-[32px] lg:h-[180px] lg:w-[46px]',
+            'transition-colors duration-100 ease-in-out', // ИСПРАВЛЕНИЕ 2: Вынесли транзиции, чтобы не пропадали
             isWhiteActive
               ? 'bg-piano-white-active'
-              : 'bg-piano-white transition-colors duration-100 ease-in-out hover:bg-piano-white-hover active:bg-piano-white-active',
+              : 'bg-piano-white hover:bg-piano-white-hover active:bg-piano-white-active',
           )}
         >
           {whiteHint && (
@@ -315,12 +306,13 @@ export const VisualPiano: React.FC<PianoProps> = ({ className, ...props }) => {
               handleStopNote(key.blackPlayNote!, key.blackBaseNote!);
             }}
             className={cn(
-              'absolute top-0 z-10 flex cursor-pointer touch-none flex-col justify-end pb-2', // <-- touch-none вернули
+              'absolute top-0 z-10 flex cursor-pointer touch-none flex-col justify-end pb-2 outline-none',
               'h-[110px] w-[28px] rounded-b-[4px] md:h-[85px] md:w-[20px] lg:h-[110px] lg:w-[28px]',
               '-right-[16px] md:-right-[11px] lg:-right-[16px]',
+              'transition-colors duration-100 ease-in-out', // ИСПРАВЛЕНИЕ 2: Вынесли транзиции
               isBlackActive
                 ? 'bg-piano-black-active'
-                : 'bg-piano-black transition-colors duration-100 ease-in-out hover:bg-piano-black-hover active:bg-piano-black-active',
+                : 'bg-piano-black hover:bg-piano-black-hover active:bg-piano-black-active',
             )}
           >
             {blackHint && (
@@ -336,7 +328,7 @@ export const VisualPiano: React.FC<PianoProps> = ({ className, ...props }) => {
 
   return (
     <div {...props} className={cn('flex w-full flex-col select-none', className)}>
-      {/* ======================= КАСТОМНЫЙ СКРОЛЛБАР (ТОЛЬКО ДЛЯ МОБИЛОК) ======================= */}
+      {/* Кастомный скроллбар */}
       <div className="flex w-full items-center justify-center px-4 py-2 md:hidden">
         <input
           type="range"
@@ -346,27 +338,26 @@ export const VisualPiano: React.FC<PianoProps> = ({ className, ...props }) => {
           onPointerUp={(e) => e.currentTarget.blur()}
           onChange={handleRangeChange}
           className={cn(
-            'h-2.5 w-full cursor-pointer appearance-none rounded-full bg-surface outline-none', // Убрали max-w-[240px] и justify-center у контейнера
-            // Стилизуем "ползунок" для webkit
+            'h-2.5 w-full cursor-pointer appearance-none rounded-full bg-surface outline-none',
             '[&::-webkit-slider-thumb]:h-2.5 [&::-webkit-slider-thumb]:w-12 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-text/30 active:[&::-webkit-slider-thumb]:bg-text/50',
-            // Стилизуем "ползунок" для firefox
             '[&::-moz-range-thumb]:h-2.5 [&::-moz-range-thumb]:w-12 [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-text/30 active:[&::-moz-range-thumb]:bg-text/50',
           )}
         />
       </div>
 
-      {/* ======================= МОБИЛЬНАЯ ВЕРСИЯ (< 768px) ======================= */}
+      {/* Мобильная версия */}
       <div
         className="relative flex w-full [scrollbar-width:none] overflow-x-auto px-4 py-2 [-ms-overflow-style:none] md:hidden [&::-webkit-scrollbar]:hidden"
         ref={scrollRef}
         onScroll={handleScrollSync}
       >
-        <div className="inline-flex min-w-max gap-1">
+        {/* ИСПРАВЛЕНИЕ 3: добавили items-start для мобильного контейнера клавиш */}
+        <div className="inline-flex min-w-max items-start gap-1">
           {MOBILE_KEYS.map((key) => renderKey(key, false))}
         </div>
       </div>
 
-      {/* ======================= ДЕСКТОПНАЯ ВЕРСИЯ (>= 768px) ======================= */}
+      {/* Десктопная версия */}
       <div className="hidden w-full items-center justify-between px-4 py-4 md:flex md:px-6 md:py-5 lg:px-8 lg:py-6">
         <div className="flex flex-col gap-2 lg:gap-3">
           <ControlButton
@@ -401,11 +392,13 @@ export const VisualPiano: React.FC<PianoProps> = ({ className, ...props }) => {
             />
           </div>
 
-          <div className="flex gap-0.5 lg:gap-1">
+          {/* ИСПРАВЛЕНИЕ 3: добавили items-start для левой октавы */}
+          <div className="flex items-start gap-0.5 lg:gap-1">
             {leftOctave.map((key) => renderKey(key, showPianoHints))}
           </div>
 
-          <div className="flex gap-0.5 lg:gap-1">
+          {/* ИСПРАВЛЕНИЕ 3: добавили items-start для правой октавы */}
+          <div className="flex items-start gap-0.5 lg:gap-1">
             {rightOctave.map((key) => renderKey(key, showPianoHints))}
           </div>
 

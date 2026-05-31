@@ -3,7 +3,8 @@ import type { NoteInfo } from "@/features/vocalTuner/types";
 export const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
 export function getNoteInfo(freq: number | null): NoteInfo | null {
-  if (!freq || freq < 55 || freq > 1500) return null;
+  // ЛИМИТЫ (Правило из ТЗ): 65 Hz (C2) - 1046 Hz (C6)
+  if (!freq || freq < 65 || freq > 1046) return null;
   const n = 12 * Math.log2(freq / 440) + 69;
   const i = Math.round(n);
   const cents = Math.round((n - i) * 100);
@@ -20,15 +21,18 @@ export function detectPitch(buffer: Float32Array, sampleRate: number): number | 
   let rms = 0;
   for (let i = 0; i < n; i++) rms += buffer[i] * buffer[i];
   rms = Math.sqrt(rms / n);
-  if (rms < 0.003) return null;
+
+  // ПОРОГ ТИШИНЫ: 0.00316 ~ это примерно -50dB. Игнорируем дыхание и кулер.
+  if (rms < 0.00316) return null;
 
   let mean = 0;
   for (let i = 0; i < n; i++) mean += buffer[i];
   mean /= n;
   for (let i = 0; i < n; i++) buffer[i] -= mean;
 
-  const minFreq = 55,
-    maxFreq = 1500;
+  // ЛИМИТЫ
+  const minFreq = 65,
+    maxFreq = 1046;
   const minLag = Math.floor(sampleRate / maxFreq);
   const maxLag = Math.floor(sampleRate / minFreq);
   if (maxLag > n / 2) return null;

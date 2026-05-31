@@ -1,14 +1,13 @@
 //TunerComponents.tsx
 
-import React, { useEffect, useState, memo } from 'react';
+import React, { useEffect, useState, memo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/app/utils/cn';
 import { Play, Pause } from '@phosphor-icons/react';
 import { ControlButton } from '@/shared/buttons/ControlButton';
 import { NOTES } from '../utils/audio';
-import type { NoteInfo, Recording } from '@/features/vocalTuner/types';
-
+import type { Recording } from '@/features/vocalTuner/types';
 // --- MINI WAVEFORM ---
 export const MiniWaveform = ({ active }: { active: boolean }) => (
   <div className="flex h-6 flex-1 items-end gap-[3px] px-3">
@@ -77,7 +76,7 @@ export const MobileSidebarPortal = ({ isOpen, onClose, children }: MobileSidebar
             animate={{ x: 0 }}
             exit={{ x: '-100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 250 }}
-            className="absolute inset-y-0 left-0 flex w-full flex-col bg-surface shadow-2xl"
+            className="absolute inset-y-0 left-0 flex w-full flex-col bg-background shadow-2xl"
           >
             <div className="flex shrink-0 items-center justify-between p-6 pb-0">
               <button
@@ -127,7 +126,7 @@ export const PlayerWidget = ({
   return (
     <div
       className={cn(
-        'flex items-center justify-between rounded-[20px] border-2 border-primary bg-surface px-5 py-3 md:px-6 md:py-4',
+        'flex items-center justify-between rounded-[20px] border-2 border-primary bg-background px-5 py-3 md:px-6 md:py-4',
         className,
       )}
     >
@@ -261,37 +260,77 @@ const PlaybackSlider: React.FC<PlaybackSliderProps> = ({
 
 // --- TUNER VISUALIZER ---
 interface TunerVisualizerProps {
-  noteInfo: NoteInfo | null;
+  pitchDataRef: React.MutableRefObject<{ active: boolean; midiFloat: number | null }>;
   actions?: React.ReactNode;
 }
 
-export const TunerVisualizer = memo(({ noteInfo, actions }: TunerVisualizerProps) => {
-  const cents = noteInfo?.cents ?? 0;
-  // fillPercentage по-прежнему от 0 до 100
-  const fillPercentage = noteInfo ? Math.max(0, Math.min(100, cents + 50)) : 50;
+export const TunerVisualizer = memo(({ pitchDataRef, actions }: TunerVisualizerProps) => {
+  const controllerRef = useRef<HTMLDivElement>(null);
+  const centerNoteRef = useRef<HTMLSpanElement>(null);
+  const topNoteRef = useRef<HTMLSpanElement>(null);
+  const bottomNoteRef = useRef<HTMLSpanElement>(null);
 
-  const noteAbove = noteInfo ? NOTES[(NOTES.indexOf(noteInfo.name) + 1) % 12] : 'A#';
-  const noteBelow = noteInfo ? NOTES[(NOTES.indexOf(noteInfo.name) + 11) % 12] : 'G#';
-  const currentNoteName = noteInfo?.name ?? 'A';
+  const currentMidi = useRef<number | null>(null);
+
+  useEffect(() => {
+    let rafId: number;
+
+    const loop = () => {
+      const { active, midiFloat } = pitchDataRef.current;
+
+      if (!active || midiFloat === null) {
+        if (controllerRef.current) controllerRef.current.style.opacity = '0';
+      } else {
+        if (controllerRef.current) controllerRef.current.style.opacity = '0.3';
+
+        if (currentMidi.current === null) {
+          currentMidi.current = midiFloat;
+        } else {
+          if (Math.abs(midiFloat - currentMidi.current) > 3) {
+            currentMidi.current = midiFloat; // Телепорт
+          } else {
+            // КОЭФФИЦИЕНТ LERP СНИЖЕН ДО 0.06 (Очень плавное перетекание)
+            currentMidi.current += (midiFloat - currentMidi.current) * 0.06;
+          }
+        }
+
+        const centerInt = Math.round(currentMidi.current);
+        const cents = (currentMidi.current - centerInt) * 100;
+        const fillPercentage = cents + 50;
+
+        if (controllerRef.current) {
+          controllerRef.current.style.transform = `translateY(${100 - fillPercentage}%)`;
+        }
+
+        const getNoteName = (midi: number) => NOTES[((midi % 12) + 12) % 12];
+
+        if (centerNoteRef.current && centerNoteRef.current.innerText !== getNoteName(centerInt)) {
+          centerNoteRef.current.innerText = getNoteName(centerInt);
+          topNoteRef.current!.innerText = getNoteName(centerInt + 1);
+          bottomNoteRef.current!.innerText = getNoteName(centerInt - 1);
+        }
+      }
+
+      rafId = requestAnimationFrame(loop);
+    };
+
+    loop();
+    return () => cancelAnimationFrame(rafId);
+  }, [pitchDataRef]);
 
   return (
-    <div className="relative mt-[-40px] flex scale-90 items-start gap-10 md:mt-0 md:scale-100 md:gap-16">
-      {/* ЛЕВАЯ КОЛОНКА: Улавливатель и кнопка строго под ним */}
+    <div className="relative mt-[-40px] scale-90 md:mt-0 md:scale-100">
+      {/* Левый блок (улавливатель + кнопка), по которому происходит центровка */}
       <div className="flex flex-col items-center gap-6">
-        {/* Прямоугольник улавливателя */}
         <div className="relative h-[280px] w-[150px] overflow-hidden rounded-[28px] border-2 border-primary bg-transparent md:h-[340px] md:w-[180px] md:rounded-[32px]">
-          
-          {/* ОПТИМИЗАЦИЯ: используем transform (GPU-ускорение) вместо изменения height */}
           <div
-            className="absolute inset-0 bg-primary/40 transition-transform duration-150 ease-out w-full h-full"
-            style={{ transform: `translateY(${100 - fillPercentage}%)` }}
+            ref={controllerRef}
+            className="absolute inset-0 h-full w-full bg-primary/40 will-change-transform"
+            style={{ opacity: 0 }}
           />
-          
-          {/* Центральная линия */}
           <div className="absolute top-1/2 left-0 h-[2px] w-full -translate-y-1/2 bg-primary" />
         </div>
 
-        {/* Контейнер для кнопок управления */}
         {actions && (
           <div className="relative flex h-[84px] w-full items-center justify-center md:h-[96px]">
             {actions}
@@ -299,11 +338,26 @@ export const TunerVisualizer = memo(({ noteInfo, actions }: TunerVisualizerProps
         )}
       </div>
 
-      {/* ПРАВАЯ КОЛОНКА: Названия нот (Фиксированная ширина, выравнивание влево) */}
-      <div className="flex h-[280px] w-16 shrink-0 flex-col justify-between py-2 text-left text-2xl font-medium tracking-wide md:h-[340px] md:w-24 md:py-4 md:text-3xl">
-        <span className="text-white/40">{noteAbove}</span>
-        <span className="text-4xl text-white md:text-5xl">{currentNoteName}</span>
-        <span className="text-white/40">{noteBelow}</span>
+      {/* Столбик нот, смещенный вправо абсолютно без влияния на ширину контейнера */}
+      <div className="absolute top-0 left-[calc(100%+2.5rem)] flex h-[280px] w-16 shrink-0 flex-col justify-between py-2 text-left text-2xl font-medium tracking-wide md:left-[calc(100%+4rem)] md:h-[340px] md:w-24 md:py-4 md:text-3xl">
+        <span
+          ref={topNoteRef}
+          className="text-white/40 transition-opacity duration-300 will-change-contents"
+        >
+          A#
+        </span>
+        <span
+          ref={centerNoteRef}
+          className="text-4xl text-white transition-opacity duration-300 will-change-contents md:text-5xl"
+        >
+          A
+        </span>
+        <span
+          ref={bottomNoteRef}
+          className="text-white/40 transition-opacity duration-300 will-change-contents"
+        >
+          G#
+        </span>
       </div>
     </div>
   );

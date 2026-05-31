@@ -10,6 +10,7 @@ import {
   DownloadSimple,
   DotsThreeVertical,
   Record as RecordIcon,
+  MicrophoneSlash,
 } from '@phosphor-icons/react';
 import { useVocalTuner } from '@/features/vocalTuner/hooks/useVocalTuner';
 import {
@@ -19,6 +20,8 @@ import {
   SidebarIcon,
   TunerVisualizer,
 } from '@/features/vocalTuner/ui/TunerComponents';
+import { Modal } from '@/shared/Modal';
+import { Button } from '@/shared/buttons/Button';
 
 export function VocalTunerPage() {
   const {
@@ -26,7 +29,8 @@ export function VocalTunerPage() {
     recordings,
     playingId,
     isPlaying,
-    currentNote,
+    micError,
+    pitchDataRef,
     isMobileSidebarOpen,
     setIsMobileSidebarOpen,
     currentTime,
@@ -54,6 +58,46 @@ export function VocalTunerPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // --- ОБРАБОТКА ОШИБОК ДОСТУПА (ТЗ) ---
+  if (micError) {
+    let title = '';
+    let desc = '';
+    if (micError === 'denied') {
+      title = 'Вы заблокировали доступ';
+      desc =
+        'Чтобы продолжить, нажмите на значок замочка в адресной строке браузера, переключите тумблер микрофона в положение ВКЛ и обновите страницу';
+    } else if (micError === 'not_found') {
+      title = 'Микрофон не обнаружен';
+      desc = 'Пожалуйста, подключите записывающее устройство';
+    } else if (micError === 'busy') {
+      title = 'Микрофон занят другим приложением';
+      desc =
+        'Пожалуйста, закройте программы, использующие аудио (Zoom, Skype, OBS), и попробуйте снова';
+    }
+
+    return (
+      <div className="flex h-screen w-full items-center justify-center p-4">
+        <Modal
+          inline
+          layout="horizontal"
+          title={title}
+          description={desc}
+          icon={<MicrophoneSlash size={32} weight="fill" />}
+          iconContainerClassName="bg-primary/20 text-primary"
+        >
+          <Button
+            variant="solid"
+            color="primary"
+            onClick={() => window.location.reload()}
+            className="mt-4 sm:mt-0"
+          >
+            Обновить страницу
+          </Button>
+        </Modal>
+      </div>
+    );
+  }
+
   const sidebarContent = (
     <div className="custom-scroll flex-1 space-y-3 overflow-y-auto px-4 py-6">
       {recordings.map((rec) => {
@@ -64,14 +108,19 @@ export function VocalTunerPage() {
           <div key={rec.id} className="flex flex-col gap-1">
             <div
               className={cn(
-                'flex cursor-pointer items-center justify-between rounded-2xl border-2 p-3 transition-all duration-200',
+                'flex cursor-pointer items-center justify-between rounded-2xl border-3 p-3 transition-all duration-200',
                 isActive
                   ? 'border-primary bg-primary text-white'
                   : 'border-primary bg-transparent text-white hover:bg-primary/10',
               )}
               onClick={() => togglePlay(rec)}
             >
-              <div className="flex shrink-0 items-center justify-center p-1">
+              <div
+                className={cn(
+                  'flex shrink-0 items-center justify-center p-1 transition-colors hover:text-primary',
+                  isActive && 'hover:text-surface',
+                )}
+              >
                 {isCurrentlyPlaying ? (
                   <Pause weight="fill" size={20} />
                 ) : (
@@ -82,11 +131,11 @@ export function VocalTunerPage() {
               <MiniWaveform active={isActive} />
 
               <button
-                className="shrink-0 p-1 opacity-80 hover:opacity-100"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleThreeDotsClick(e, rec);
-                }}
+                className={cn(
+                  'shrink-0 cursor-pointer p-1 opacity-80 transition-colors hover:text-primary hover:opacity-100',
+                  isActive && 'hover:text-surface',
+                )}
+                onClick={(e) => handleThreeDotsClick(e, rec)}
               >
                 <DotsThreeVertical weight="bold" size={24} />
               </button>
@@ -103,7 +152,10 @@ export function VocalTunerPage() {
                 >
                   <div className="mx-1 mt-1 flex items-center justify-between rounded-xl bg-primary px-4 py-2 text-white/90">
                     <button
-                      className="p-1 transition-colors hover:text-white"
+                      className={cn(
+                        'cursor-pointer p-1 transition-colors hover:text-white',
+                        isActive && 'hover:text-surface',
+                      )}
                       title="Удалить"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -114,13 +166,19 @@ export function VocalTunerPage() {
                     </button>
                     <div className="flex gap-4">
                       <button
-                        className="p-1 transition-colors hover:text-white"
+                        className={cn(
+                          'cursor-pointer p-1 transition-colors hover:text-white',
+                          isActive && 'hover:text-surface',
+                        )}
                         onClick={(e) => e.stopPropagation()}
                       >
                         <PencilSimple size={18} weight="bold" />
                       </button>
                       <button
-                        className="p-1 transition-colors hover:text-white"
+                        className={cn(
+                          'cursor-pointer p-1 transition-colors hover:text-white',
+                          isActive && 'hover:text-surface',
+                        )}
                         onClick={(e) => {
                           e.stopPropagation();
                           downloadRec(rec);
@@ -142,7 +200,7 @@ export function VocalTunerPage() {
   return (
     <div className="flex h-screen w-full overflow-hidden font-sans text-text">
       {/* --- ДЕСКТОПНЫЙ САЙДБАР --- */}
-      <aside className="relative z-10 hidden w-[320px] flex-col border-r border-white/5 bg-surface md:flex">
+      <aside className="relative z-10 hidden w-[320px] flex-col border-r-3 border-white/10 bg-background md:flex">
         {sidebarContent}
       </aside>
 
@@ -159,7 +217,7 @@ export function VocalTunerPage() {
               animate={{ height: 'auto', opacity: 1, y: 0 }}
               exit={{ height: 0, opacity: 0, y: 20 }}
               transition={{ duration: 0.2, ease: 'easeInOut' }}
-              className="shrink-0 overflow-hidden border-t border-white/10 bg-surface/80 p-4 pb-8 backdrop-blur-md"
+              className="shrink-0 overflow-hidden border-t border-white/10 bg-background p-4 pb-8 backdrop-blur-md"
             >
               <PlayerWidget
                 recording={activeRecording}
@@ -204,6 +262,8 @@ export function VocalTunerPage() {
                 currentTime={currentTime}
                 duration={duration}
                 onSeek={handleSeek}
+                onSeekStart={handleSeekStart}
+                onSeekEnd={handleSeekEnd}
               />
             </motion.div>
           )}
@@ -212,7 +272,7 @@ export function VocalTunerPage() {
         {/* --- ЦЕНТРАЛЬНЫЙ ТЮНЕР И КНОПКА ЗАПИСИ --- */}
         <div className="flex flex-1 items-center justify-center">
           <TunerVisualizer
-            noteInfo={currentNote}
+            pitchDataRef={pitchDataRef} // <-- Теперь передаем Ref напрямую!
             actions={
               <button
                 onClick={() => {
@@ -229,17 +289,14 @@ export function VocalTunerPage() {
                 }}
                 className={cn(
                   'flex items-center justify-center bg-primary text-white transition-all duration-300 hover:scale-105 active:scale-95',
-                  // Уменьшенные размеры согласно макету
                   'h-[64px] w-[64px] rounded-[24px] md:h-[72px] md:w-[72px] md:rounded-[28px]',
-                  // При записи добавляем пульсацию и аккуратное розовое свечение
-                  isRecording &&
-                    'animate-pulse bg-primary/90 shadow-[0_0_24px_rgba(236,72,153,0.5)]',
+                  isRecording && 'animate-pulse bg-primary/90',
                 )}
               >
                 {isRecording ? (
-                  <Power size={32} weight="bold" /> // Иконка Power при записи
+                  <Power size={32} weight="bold" />
                 ) : (
-                  <RecordIcon size={36} weight="fill" /> // Кружок Record в режиме ожидания
+                  <RecordIcon size={36} weight="fill" />
                 )}
               </button>
             }

@@ -1,22 +1,18 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import localforage from 'localforage';
-import { toast } from 'react-toastify';
 import { create } from 'zustand';
+import { YIN } from 'pitchfinder'; // <-- Подключаем мощный YIN-алгоритм
 import type { Recording } from '@/features/vocalTuner/types';
-import { detectPitch } from '../utils/audio';
 import { globalAudioContext } from '@/shared/lib/audioEngine';
 import { useProgressStore } from '@/app/store/useProgressStore';
+import { toast } from '@/app/utils/toast';
 
 export type MicErrorType = 'denied' | 'not_found' | 'busy' | null;
 
-// ============================================================================
-// ГЛОБАЛЬНЫЙ ПЛЕЕР И ХРАНИЛИЩЕ (для воспроизведения в фоне на других страницах)
-// ============================================================================
+// --- ГЛОБАЛЬНЫЙ ПЛЕЕР ---
 export const globalAudioPlayer = new Audio();
-// Инициализируем громкость сразу из стора при загрузке
 globalAudioPlayer.volume = useProgressStore.getState().mediaVolume / 100;
 
-// Подписываемся на изменения ползунка из SettingsPage
 useProgressStore.subscribe((state) => {
   globalAudioPlayer.volume = state.mediaVolume / 100;
 });
@@ -26,7 +22,6 @@ interface VocalState {
   hasLoaded: boolean;
   setRecordings: (updater: Recording[] | ((prev: Recording[]) => Recording[])) => void;
   setHasLoaded: (v: boolean) => void;
-
   playingId: string | null;
   isPlaying: boolean;
   currentTime: number;
@@ -45,7 +40,6 @@ export const useVocalGlobalStore = create<VocalState>((set) => ({
       recordings: typeof updater === 'function' ? updater(state.recordings) : updater,
     })),
   setHasLoaded: (v) => set({ hasLoaded: v }),
-
   playingId: null,
   isPlaying: false,
   currentTime: 0,
@@ -56,7 +50,6 @@ export const useVocalGlobalStore = create<VocalState>((set) => ({
   setDuration: (duration) => set({ duration }),
 }));
 
-// Навешиваем слушатели на плеер ОДИН РАЗ, чтобы они работали даже вне страницы
 globalAudioPlayer.addEventListener('timeupdate', () => {
   useVocalGlobalStore.getState().setCurrentTime(globalAudioPlayer.currentTime);
 });
@@ -67,14 +60,13 @@ globalAudioPlayer.addEventListener('ended', () => {
 globalAudioPlayer.addEventListener('loadedmetadata', () => {
   useVocalGlobalStore.getState().setDuration(globalAudioPlayer.duration);
 });
-// ============================================================================
 
+// --- ГЛАВНЫЙ ХУК ---
 export function useVocalTuner() {
   const [phase, setPhase] = useState<'idle' | 'listening' | 'recording'>('idle');
   const [micError, setMicError] = useState<MicErrorType>(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
-  // Достаем глобальное состояние
   const {
     recordings,
     setRecordings,
@@ -93,9 +85,7 @@ export function useVocalTuner() {
     active: false,
     midiFloat: null,
   });
-
-  // История частот для алгоритма Moving Average (сглаживание джиттера)
-  const pitchHistory = useRef<number[]>([]);
+  const pitchDetectorRef = useRef<((buf: Float32Array) => number | null) | null>(null);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
@@ -116,7 +106,7 @@ export function useVocalTuner() {
     phaseRef.current = phase;
   }, [phase]);
 
-  // Загружаем записи из IndexedDB только один раз за сессию
+  // Загрузка аудио из БД
   useEffect(() => {
     if (hasLoaded) return;
     const loadRecordings = async () => {
@@ -140,33 +130,47 @@ export function useVocalTuner() {
       setHasLoaded(true);
     };
     loadRecordings();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasLoaded]);
 
-  // Очистка при размонтировании (останавливаем только запись/микрофон, ПЛЕЕР ПРОДОЛЖАЕТ ИГРАТЬ)
+  // --- ОЧИСТКА ПРИ РАЗМОНТИРОВАНИИ (Решение проблем с фоновым звуком и утечками) ---
   useEffect(() => {
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       if (mrRef.current?.state === 'recording') mrRef.current.stop();
       streamRef.current?.getTracks().forEach((t) => t.stop());
+
+      // Глушим проигрыватель, если юзер ушел на другую страницу (Дерево)
+      globalAudioPlayer.pause();
+      globalAudioPlayer.currentTime = 0;
+      useVocalGlobalStore.getState().setIsPlaying(false);
+
+      // Удаляем ObjectURLs для предотвращения Out Of Memory
+      const currentRecordings = useVocalGlobalStore.getState().recordings;
+      currentRecordings.forEach((r) => {
+        if (r.url) URL.revokeObjectURL(r.url);
+      });
+      useVocalGlobalStore.getState().setRecordings([]);
+      useVocalGlobalStore.getState().setHasLoaded(false); // Заставит загрузить заново при возврате
+      useVocalGlobalStore.getState().setPlayingId(null);
     };
   }, []);
 
+  // --- ОБРАБОТКА ФИЗИЧЕСКОГО ОТКЛЮЧЕНИЯ МИКРОФОНА ---
   useEffect(() => {
     const handleDeviceChange = () => {
       if (!streamRef.current) return;
       const tracks = streamRef.current.getAudioTracks();
       if (tracks.length === 0 || tracks[0].readyState === 'ended') {
         toast.error('Микрофон был отключен. Пожалуйста, проверьте подключение.');
-        if (phaseRef.current === 'recording') stopRec();
-        stopMic();
+        if (phaseRef.current === 'recording') stopRec(); // Сохраняем кусок записи
+        stopMic(); // Глушим процесс PitchFinder
       }
     };
     navigator.mediaDevices.addEventListener('devicechange', handleDeviceChange);
     return () => navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // --- PITCHFINDER YIN LOOP (Throttled & Ограниченный) ---
   const tickRef = useRef<() => void>(() => {});
   useEffect(() => {
     tickRef.current = () => {
@@ -176,27 +180,28 @@ export function useVocalTuner() {
       analyserRef.current.getFloatTimeDomainData(buf);
 
       const now = Date.now();
-      if (now - lastNoteUpdateRef.current > 30) {
-        const sampleRate = audioCtxRef.current?.sampleRate || 44100;
-        const freq = detectPitch(buf, sampleRate);
+      // Ограничиваем вызовы тяжелого алгоритма (Throttling ~40ms)
+      if (now - lastNoteUpdateRef.current > 40) {
+        let rms = 0;
+        for (let i = 0; i < buf.length; i++) rms += buf[i] * buf[i];
+        rms = Math.sqrt(rms / buf.length);
 
-        if (freq) {
-          const n = 12 * Math.log2(freq / 440) + 69;
-
-          // АЛГОРИТМ MOVING AVERAGE (Скользящее среднее для подавления джиттера)
-          pitchHistory.current.push(n);
-          if (pitchHistory.current.length > 5) pitchHistory.current.shift();
-
-          const avgMidi =
-            pitchHistory.current.reduce((a, b) => a + b, 0) / pitchHistory.current.length;
-          pitchDataRef.current = { active: true, midiFloat: avgMidi };
-        } else {
-          pitchHistory.current = [];
+        // Порог тишины (около -50dB): спасает от реакции UI на кулер и дыхание
+        if (rms < 0.00316) {
           pitchDataRef.current = { active: false, midiFloat: pitchDataRef.current.midiFloat };
+        } else {
+          const freq = pitchDetectorRef.current ? pitchDetectorRef.current(buf) : null;
+
+          // Жесткие лимиты: от C2 (65Hz) до C6 (1046Hz)
+          if (freq && freq >= 65 && freq <= 1046) {
+            const midi = 12 * Math.log2(freq / 440) + 69;
+            pitchDataRef.current = { active: true, midiFloat: midi };
+          } else {
+            pitchDataRef.current = { active: false, midiFloat: pitchDataRef.current.midiFloat };
+          }
         }
         lastNoteUpdateRef.current = now;
       }
-
       rafRef.current = requestAnimationFrame(() => tickRef.current());
     };
   }, []);
@@ -213,10 +218,17 @@ export function useVocalTuner() {
       if (globalAudioContext.state === 'suspended') await globalAudioContext.resume();
 
       const sr = audioCtxRef.current.sampleRate;
+
+      // Инициализация Pitchfinder YIN с актуальным Sample Rate
+      pitchDetectorRef.current = YIN({ sampleRate: sr });
+
       if (sr < 44100 && !sampleRateWarnedRef.current) {
-        toast.warn('Вы используете Bluetooth-устройство или iOS. Точность может быть снижена.', {
-          style: { opacity: 0.8 },
-        });
+        toast.error(
+          'Вы используете Bluetooth-устройство или iOS. Точность вокального тренажера может быть немного снижена.',
+          {
+            style: { opacity: 0.8 },
+          },
+        );
         sampleRateWarnedRef.current = true;
       }
 
@@ -224,14 +236,13 @@ export function useVocalTuner() {
       sourceNodeRef.current = src;
 
       const analyser = globalAudioContext.createAnalyser();
-      analyser.fftSize = 2048;
+      analyser.fftSize = 2048; // Увеличенный буфер для точности YIN
       src.connect(analyser);
       analyserRef.current = analyser;
 
       setPhase('listening');
       rafRef.current = requestAnimationFrame(() => tickRef.current());
     } catch (err: any) {
-      console.error('Mic error:', err);
       if (err.name === 'NotAllowedError') setMicError('denied');
       else if (err.name === 'NotFoundError') setMicError('not_found');
       else if (err.name === 'NotReadableError' || err.name === 'TrackStartError')
@@ -259,12 +270,14 @@ export function useVocalTuner() {
     mr.ondataavailable = (e) => {
       if (e.data.size > 0) chunksRef.current.push(e.data);
     };
+
     mr.onstop = async () => {
       if (recordTimerRef.current) clearTimeout(recordTimerRef.current);
 
       const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
       const dur = Date.now() - recStartRef.current;
-      const uuid = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
+      const uuid =
+        'randomUUID' in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2);
       const createdAt = Date.now();
       const title = `Запись от ${new Date().toLocaleDateString()}`;
 
@@ -276,20 +289,14 @@ export function useVocalTuner() {
         useProgressStore.setState({ audioRecordIds: [uuid, ...currentIds] });
 
         setRecordings((prev) => [
-          {
-            id: uuid,
-            name: title,
-            time: '',
-            url: URL.createObjectURL(blob),
-            dur,
-            blob,
-            createdAt,
-          },
+          { id: uuid, name: title, time: '', url: URL.createObjectURL(blob), dur, blob, createdAt },
           ...prev,
         ]);
       } catch (e: any) {
         if (e.name === 'QuotaExceededError') {
-          toast.error('Недостаточно памяти для сохранения записи.');
+          toast.error(
+            'Недостаточно памяти для сохранения записи. Пожалуйста, удалите старые аудиофайлы в настройках или освободите место на устройстве',
+          );
         }
       }
     };
@@ -298,9 +305,10 @@ export function useVocalTuner() {
     mrRef.current = mr;
     setPhase('recording');
 
+    // Ограничение записи ровно в 10 минут
     recordTimerRef.current = setTimeout(
       () => {
-        toast.info('Достигнут лимит времени записи (10 минут). Файл сохранен автоматически.');
+        toast.error('Достигнут лимит времени записи (10 минут). Аудиофайл сохранен автоматически.');
         stopRec();
       },
       10 * 60 * 1000,
@@ -308,6 +316,7 @@ export function useVocalTuner() {
   };
 
   const stopRec = () => {
+    if (recordTimerRef.current) clearTimeout(recordTimerRef.current);
     if (mrRef.current && mrRef.current.state !== 'inactive') mrRef.current.stop();
     setPhase('listening');
   };
@@ -317,6 +326,7 @@ export function useVocalTuner() {
     if (now - lastActionTimeRef.current < 150) return;
     lastActionTimeRef.current = now;
 
+    // Проверка рассинхрона (если кэш очищен ОС)
     const exists = await localforage.getItem(rec.id);
     if (!exists) {
       toast.error('Аудиофайл был очищен системой устройства');
@@ -329,12 +339,12 @@ export function useVocalTuner() {
         globalAudioPlayer.pause();
         setIsPlaying(false);
       } else {
-        globalAudioPlayer.play().catch((e) => e.name !== 'AbortError' && console.error(e));
+        globalAudioPlayer.play().catch(() => {});
         setIsPlaying(true);
       }
     } else {
       if (globalAudioPlayer.src !== rec.url) globalAudioPlayer.src = rec.url;
-      globalAudioPlayer.play().catch((e) => e.name !== 'AbortError' && console.error(e));
+      globalAudioPlayer.play().catch(() => {});
       setPlayingId(rec.id);
       setIsPlaying(true);
     }
@@ -354,7 +364,7 @@ export function useVocalTuner() {
 
     setRecordings((prev) => {
       const rec = prev.find((x) => x.id === id);
-      // Освобождаем память только при физическом удалении
+      // Очистка объекта из RAM
       if (rec?.url) URL.revokeObjectURL(rec.url);
       return prev.filter((x) => x.id !== id);
     });
@@ -368,13 +378,14 @@ export function useVocalTuner() {
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+
+    toast.success('Загрузка аудиофайла началась');
   };
 
   const handleThreeDotsClick = (e: React.MouseEvent, rec: Recording) => {
     e.preventDefault();
     e.stopPropagation();
     lastActionTimeRef.current = Date.now();
-
     if (playingId === rec.id) {
       globalAudioPlayer.pause();
       setIsPlaying(false);
@@ -390,17 +401,29 @@ export function useVocalTuner() {
   const handleSeekStart = useCallback(() => {
     if (!globalAudioPlayer.paused) globalAudioPlayer.pause();
   }, []);
-
   const handleSeekEnd = useCallback(() => {
     if (isPlaying) globalAudioPlayer.play().catch(() => {});
   }, [isPlaying]);
-
   const handleSeek = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const newTime = Number(e.target.value);
     setCurrentTime(newTime);
     globalAudioPlayer.currentTime = newTime;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const renameRec = async (id: string, newName: string) => {
+    if (!newName.trim()) return;
+    try {
+      const data = await localforage.getItem<any>(id);
+      if (data) {
+        data.title = newName.trim();
+        await localforage.setItem(id, data);
+      }
+      setRecordings((prev) => prev.map((r) => (r.id === id ? { ...r, name: newName.trim() } : r)));
+      toast.success('Запись успешно переименована');
+    } catch (e) {
+      toast.error('Произошла ошибка при переименовании');
+    }
+  };
 
   return {
     phase,
@@ -425,5 +448,6 @@ export function useVocalTuner() {
     handleSeek,
     handleSeekStart,
     handleSeekEnd,
+    renameRec,
   };
 }

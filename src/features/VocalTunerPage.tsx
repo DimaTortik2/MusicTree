@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { cn } from '@/app/utils/cn';
 import {
@@ -22,6 +22,8 @@ import {
 } from '@/features/vocalTuner/ui/TunerComponents';
 import { Modal } from '@/shared/Modal';
 import { Button } from '@/shared/buttons/Button';
+import type { Recording } from '@/features/vocalTuner/types';
+import { toast } from '@/app/utils/toast';
 
 export function VocalTunerPage() {
   const {
@@ -45,7 +47,12 @@ export function VocalTunerPage() {
     handleSeek,
     handleSeekStart,
     handleSeekEnd,
+    renameRec,
   } = useVocalTuner();
+
+    const [recToDelete, setRecToDelete] = useState<Recording | null>(null);
+    const [recToRename, setRecToRename] = useState<Recording | null>(null);
+    const [newName, setNewName] = useState('');
 
   const isRecording = phase === 'recording';
   const activeRecording = recordings.find((r) => r.id === playingId);
@@ -71,8 +78,7 @@ export function VocalTunerPage() {
       desc = 'Пожалуйста, подключите записывающее устройство';
     } else if (micError === 'busy') {
       title = 'Микрофон занят другим приложением';
-      desc =
-        'Пожалуйста, закройте программы, использующие аудио (Zoom, Skype, OBS), и попробуйте снова';
+      desc = 'Пожалуйста, закройте программы, использующие аудио, и попробуйте снова';
     }
 
     return (
@@ -83,7 +89,7 @@ export function VocalTunerPage() {
           title={title}
           description={desc}
           icon={<MicrophoneSlash size={32} weight="fill" />}
-          iconContainerClassName="bg-primary/20 text-primary"
+          iconContainerClassName="bg-primary/20 text-primary" // Розовый фон с розовой иконкой
         >
           <Button
             variant="solid"
@@ -159,7 +165,7 @@ export function VocalTunerPage() {
                       title="Удалить"
                       onClick={(e) => {
                         e.stopPropagation();
-                        deleteRec(rec.id);
+                        setRecToDelete(rec); // Открываем модалку удаления
                       }}
                     >
                       <Trash size={18} weight="bold" />
@@ -170,7 +176,11 @@ export function VocalTunerPage() {
                           'cursor-pointer p-1 transition-colors hover:text-white',
                           isActive && 'hover:text-surface',
                         )}
-                        onClick={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setRecToRename(rec); // Открываем модалку переименования
+                          setNewName(rec.name); // Подставляем текущее имя
+                        }}
                       >
                         <PencilSimple size={18} weight="bold" />
                       </button>
@@ -303,6 +313,118 @@ export function VocalTunerPage() {
           />
         </div>
       </main>
+      {/* --- МОДАЛКА ПОДТВЕРЖДЕНИЯ УДАЛЕНИЯ --- */}
+      <Modal
+        isOpen={!!recToDelete}
+        onClose={() => setRecToDelete(null)}
+        layout="vertical"
+        // Добавлен модификатор "!" перед p-2, чтобы гарантированно сбросить внутренние отступы родителя
+        className="max-w-[700px] rounded-3xl bg-surface p-8"
+      >
+        <div className="flex flex-col gap-6 text-left">
+          {/* Маленький подзаголовок сверху */}
+          <span className="font-normal tracking-wide text-text/40">
+            Вы действительно хотите удалить эту запись?
+          </span>
+
+          {/* Строка с контурной розовой иконкой мусорки и названием файла */}
+          <div className="mt-1.5 flex items-center gap-4">
+            <Trash size={32} weight="bold" className="shrink-0 text-primary" />
+            <span className="truncate text-2xl font-medium text-text md:text-[26px]">
+              {recToDelete?.name}
+            </span>
+          </div>
+
+          {/* Кнопки действий */}
+          <div className="mt-8 flex w-full flex-col-reverse gap-3 sm:flex-row sm:justify-end sm:gap-3.5">
+            <Button
+              variant="outline"
+              size="sm"
+              color="primary"
+              onClick={() => setRecToDelete(null)}
+              className="w-full rounded-[16px] border-2 py-3 text-[15px] font-medium sm:w-auto sm:min-w-[140px] md:min-w-[160px]"
+            >
+              Отмена
+            </Button>
+            <Button
+              variant="solid"
+              size="sm"
+              color="primary"
+              onClick={() => {
+                if (recToDelete) {
+                  deleteRec(recToDelete.id);
+                  setRecToDelete(null);
+                  toast.success('Запись удалена');
+                }
+              }}
+              className="w-full rounded-[16px] border-2 py-3 text-[15px] font-medium sm:w-auto sm:min-w-[140px] md:min-w-[160px]"
+            >
+              Удалить
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* --- МОДАЛКА ПЕРЕИМЕНОВАНИЯ --- */}
+      <Modal
+        isOpen={!!recToRename}
+        onClose={() => setRecToRename(null)}
+        layout="vertical"
+        // Убран "border border-white/5", заменены "p-8 md:p-10" на "!p-2" для соответствия первой модалке
+        className="max-w-lg rounded-[32px] bg-surface p-8 shadow-2xl md:max-w-[540px]"
+      >
+        <div className="flex flex-col gap-6 text-left">
+          {/* Маленький подзаголовок сверху */}
+          <span className="text-sm font-normal tracking-wide text-text/40">
+            Введите новое название для аудиофайла
+          </span>
+
+          {/* Прозрачный инпут с фиолетовым нижним подчеркиванием */}
+          <div className="mt-2 w-full">
+            <input
+              type="text"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && recToRename && newName.trim()) {
+                  renameRec(recToRename.id, newName);
+                  setRecToRename(null);
+                }
+              }}
+              placeholder="Имя записи..."
+              autoFocus
+              className="w-full border-b-2 border-accent bg-transparent pb-2.5 text-2xl font-medium text-text transition-colors outline-none focus:border-accent"
+            />
+          </div>
+
+          {/* Кнопки действий */}
+          <div className="mt-8 flex w-full flex-col-reverse gap-3 sm:flex-row sm:justify-end sm:gap-3.5">
+            <Button
+              variant="outline"
+              size="sm"
+              color="accent"
+              onClick={() => setRecToRename(null)}
+              className="w-full rounded-[16px] border-2 py-3 text-[15px] font-medium sm:w-auto sm:min-w-[140px] md:min-w-[160px]"
+            >
+              Отмена
+            </Button>
+            <Button
+              variant="solid"
+              size="sm"
+              color="accent"
+              onClick={() => {
+                if (recToRename && newName.trim()) {
+                  renameRec(recToRename.id, newName);
+                  setRecToRename(null);
+                }
+              }}
+              className="w-full rounded-[16px] border-2 py-3 text-[15px] font-medium sm:w-auto sm:min-w-[140px] md:min-w-[160px]"
+            >
+              Применить
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

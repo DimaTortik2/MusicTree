@@ -259,17 +259,22 @@ const PlaybackSlider: React.FC<PlaybackSliderProps> = ({
 };
 
 // --- TUNER VISUALIZER ---
+
 interface TunerVisualizerProps {
   pitchDataRef: React.MutableRefObject<{ active: boolean; midiFloat: number | null }>;
   actions?: React.ReactNode;
 }
 
+const MIN_MIDI = 30;
+const MAX_MIDI = 95;
+const DRUM_NOTES = Array.from({ length: MAX_MIDI - MIN_MIDI + 1 }, (_, i) => {
+  const midi = i + MIN_MIDI;
+  return { midi, name: NOTES[((midi % 12) + 12) % 12] };
+});
+
 export const TunerVisualizer = memo(({ pitchDataRef, actions }: TunerVisualizerProps) => {
   const controllerRef = useRef<HTMLDivElement>(null);
-  const centerNoteRef = useRef<HTMLSpanElement>(null);
-  const topNoteRef = useRef<HTMLSpanElement>(null);
-  const bottomNoteRef = useRef<HTMLSpanElement>(null);
-
+  const drumRef = useRef<HTMLDivElement>(null);
   const currentMidi = useRef<number | null>(null);
 
   useEffect(() => {
@@ -282,15 +287,13 @@ export const TunerVisualizer = memo(({ pitchDataRef, actions }: TunerVisualizerP
         if (controllerRef.current) controllerRef.current.style.opacity = '0';
       } else {
         if (controllerRef.current) controllerRef.current.style.opacity = '0.3';
-
         if (currentMidi.current === null) {
           currentMidi.current = midiFloat;
         } else {
           if (Math.abs(midiFloat - currentMidi.current) > 3) {
-            currentMidi.current = midiFloat; // Телепорт
+            currentMidi.current = midiFloat;
           } else {
-            // КОЭФФИЦИЕНТ LERP СНИЖЕН ДО 0.06 (Очень плавное перетекание)
-            currentMidi.current += (midiFloat - currentMidi.current) * 0.06;
+            currentMidi.current += (midiFloat - currentMidi.current) * 0.15;
           }
         }
 
@@ -301,13 +304,36 @@ export const TunerVisualizer = memo(({ pitchDataRef, actions }: TunerVisualizerP
         if (controllerRef.current) {
           controllerRef.current.style.transform = `translateY(${100 - fillPercentage}%)`;
         }
+      }
 
-        const getNoteName = (midi: number) => NOTES[((midi % 12) + 12) % 12];
+      if (currentMidi.current === null) currentMidi.current = 69;
 
-        if (centerNoteRef.current && centerNoteRef.current.innerText !== getNoteName(centerInt)) {
-          centerNoteRef.current.innerText = getNoteName(centerInt);
-          topNoteRef.current!.innerText = getNoteName(centerInt + 1);
-          bottomNoteRef.current!.innerText = getNoteName(centerInt - 1);
+      if (drumRef.current) {
+        const children = drumRef.current.children as HTMLCollectionOf<HTMLElement>;
+        const spacing = window.innerWidth >= 768 ? 72 : 56;
+
+        for (let i = 0; i < children.length; i++) {
+          const el = children[i];
+          const noteMidi = MIN_MIDI + i;
+          
+          const delta = noteMidi - currentMidi.current;
+          const absDelta = Math.abs(delta);
+
+          // Оптимизация: скрываем ноты, которые за границей 4 полутонов от центра
+          if (absDelta > 4.5) {
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(-50%) scale(0)';
+            continue;
+          }
+
+          const translateY = delta * -spacing;
+          const rotateX = delta * 25;
+          // КРАСИВАЯ ФОРМУЛА ЗАТУХАНИЯ: экспоненциальное падение прозрачности (1 -> 0.5 -> 0.25...)
+          const opacity = Math.pow(0.5, absDelta); 
+          const scale = Math.max(0, 1 - absDelta * 0.1); // Плавное уменьшение размера
+
+          el.style.opacity = opacity.toFixed(3);
+          el.style.transform = `translateY(calc(-50% + ${translateY}px)) rotateX(${rotateX}deg) scale(${scale})`;
         }
       }
 
@@ -320,17 +346,11 @@ export const TunerVisualizer = memo(({ pitchDataRef, actions }: TunerVisualizerP
 
   return (
     <div className="relative mt-[-40px] scale-90 md:mt-0 md:scale-100">
-      {/* Левый блок (улавливатель + кнопка), по которому происходит центровка */}
       <div className="flex flex-col items-center gap-6">
         <div className="relative h-[280px] w-[150px] overflow-hidden rounded-[28px] border-2 border-primary bg-transparent md:h-[340px] md:w-[180px] md:rounded-[32px]">
-          <div
-            ref={controllerRef}
-            className="absolute inset-0 h-full w-full bg-primary/40 will-change-transform"
-            style={{ opacity: 0 }}
-          />
+          <div ref={controllerRef} className="absolute inset-0 h-full w-full bg-primary/40 will-change-transform" style={{ opacity: 0 }} />
           <div className="absolute top-1/2 left-0 h-[2px] w-full -translate-y-1/2 bg-primary" />
         </div>
-
         {actions && (
           <div className="relative flex h-[84px] w-full items-center justify-center md:h-[96px]">
             {actions}
@@ -338,26 +358,24 @@ export const TunerVisualizer = memo(({ pitchDataRef, actions }: TunerVisualizerP
         )}
       </div>
 
-      {/* Столбик нот, смещенный вправо абсолютно без влияния на ширину контейнера */}
-      <div className="absolute top-0 left-[calc(100%+2.5rem)] flex h-[280px] w-16 shrink-0 flex-col justify-between py-2 text-left text-2xl font-medium tracking-wide md:left-[calc(100%+4rem)] md:h-[340px] md:w-24 md:py-4 md:text-3xl">
-        <span
-          ref={topNoteRef}
-          className="text-white/40 transition-opacity duration-300 will-change-contents"
-        >
-          A#
-        </span>
-        <span
-          ref={centerNoteRef}
-          className="text-4xl text-white transition-opacity duration-300 will-change-contents md:text-5xl"
-        >
-          A
-        </span>
-        <span
-          ref={bottomNoteRef}
-          className="text-white/40 transition-opacity duration-300 will-change-contents"
-        >
-          G#
-        </span>
+      <div 
+        className="pointer-events-none absolute top-0 left-[calc(100%+2.5rem)] h-[280px] w-16 shrink-0 md:left-[calc(100%+4rem)] md:h-[340px] md:w-24"
+        style={{
+          WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 20%, black 80%, transparent)',
+          maskImage: 'linear-gradient(to bottom, transparent, black 20%, black 80%, transparent)',
+        }}
+      >
+        <div ref={drumRef} className="relative h-full w-full" style={{ perspective: '300px', transformStyle: 'preserve-3d' }}>
+          {DRUM_NOTES.map((n) => (
+            <span
+              key={n.midi}
+              className="absolute left-0 w-full text-left text-3xl font-bold tracking-wider text-white will-change-transform md:text-5xl"
+              style={{ top: '50%', opacity: 0, transform: 'translateY(-50%)' }}
+            >
+              {n.name}
+            </span>
+          ))}
+        </div>
       </div>
     </div>
   );

@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import type { NoteInfo, Recording } from '@/features/vocalTuner/types';
 import { detectPitch, getNoteInfo } from '../utils/audio';
 
-// ИМПОРТИРУЙТЕ ВАШ ГЛОБАЛЬНЫЙ КОНТЕКСТ
 import { globalAudioContext } from '@/shared/lib/audioEngine';
 
 export function useVocalTuner() {
@@ -35,8 +34,9 @@ export function useVocalTuner() {
   const lastTimeUpdateRef = useRef<number>(0);
   const wasPlayingRef = useRef<boolean>(false);
 
+  // --- ЗАЩИТА ОТ ДВОЙНЫХ КЛИКОВ И ВСПЛЫТИЯ (LOCK) ---
+  const lastActionTimeRef = useRef(0);
 
-  
   const phaseRef = useRef(phase);
   useEffect(() => {
     phaseRef.current = phase;
@@ -59,8 +59,6 @@ export function useVocalTuner() {
     playerRef.current.addEventListener('loadedmetadata', handleLoadedMetadata);
 
     const updateTime = (timestamp: number) => {
-      // Ограничиваем фреймрейт стейта React ~до 30 кадров (каждые 33 мс),
-      // чтобы телефон не грелся, но UI оставался очень плавным
       if (timestamp - lastTimeUpdateRef.current > 33) {
         if (playerRef.current && !playerRef.current.paused) {
           setCurrentTime(playerRef.current.currentTime);
@@ -82,7 +80,6 @@ export function useVocalTuner() {
       }
       streamRef.current?.getTracks().forEach((t) => t.stop());
 
-      // ВАЖНО: Мы больше НЕ делаем .close() глобальному контексту!
       sourceNodeRef.current?.disconnect();
       analyserRef.current?.disconnect();
     };
@@ -114,17 +111,14 @@ export function useVocalTuner() {
         audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
       });
       streamRef.current = stream;
-
-      // ИСПОЛЬЗУЕМ ГЛОБАЛЬНЫЙ КОНТЕКСТ ИЗ ВАШЕГО ФАЙЛА
       audioCtxRef.current = globalAudioContext;
 
-      // На iOS он может быть suspended до клика - пробуждаем
       if (globalAudioContext.state === 'suspended') {
         await globalAudioContext.resume();
       }
 
       const src = globalAudioContext.createMediaStreamSource(stream);
-      sourceNodeRef.current = src; // Сохраняем, чтобы потом отсоединить
+      sourceNodeRef.current = src;
 
       const analyser = globalAudioContext.createAnalyser();
       analyser.fftSize = 4096;
@@ -144,7 +138,6 @@ export function useVocalTuner() {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
 
-    // Отсоединяем ноды от глобального контекста (чистим мусор)
     sourceNodeRef.current?.disconnect();
     analyserRef.current?.disconnect();
     sourceNodeRef.current = null;
@@ -187,38 +180,53 @@ export function useVocalTuner() {
   };
 
   const togglePlay = (rec: Recording) => {
+    // ЗАЩИТА: Если менее 150мс назад была нажата другая кнопка (3 точки), игнорируем этот клик
+    const now = Date.now();
+    if (now - lastActionTimeRef.current < 150) return;
+    lastActionTimeRef.current = now;
+
     const pl = playerRef.current;
     if (!pl) return;
+
+    // Вспомогательная функция, чтобы безопасно обрабатывать Promise от .play()
+    const safePlay = () => {
+      const playPromise = pl.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((err) => {
+          // Игнорируем AbortError (возникает, если play прервали паузой - это нормально)
+          if (err.name !== 'AbortError') console.error('Play error:', err);
+        });
+      }
+    };
 
     if (playingId === rec.id) {
       if (isPlaying) {
         pl.pause();
         setIsPlaying(false);
       } else {
-        pl.play();
+        safePlay();
         setIsPlaying(true);
       }
     } else {
       if (pl.src !== rec.url) pl.src = rec.url;
-      pl.play();
+      safePlay();
       setPlayingId(rec.id);
       setIsPlaying(true);
     }
   };
 
-  // --- ЛОГИКА СКРОЛЛА/СЛАЙДЕРА (КАК В ЮТУБЕ) ---
   const handleSeekStart = useCallback(() => {
     if (playerRef.current) {
       wasPlayingRef.current = !playerRef.current.paused;
       if (!playerRef.current.paused) {
-        playerRef.current.pause(); // Ставим на паузу пока держим мышку
+        playerRef.current.pause();
       }
     }
   }, []);
 
   const handleSeekEnd = useCallback(() => {
     if (wasPlayingRef.current && playerRef.current) {
-      playerRef.current.play().catch(console.error); // Возвращаем плей
+      playerRef.current.play().catch(() => {});
     }
   }, []);
 
@@ -231,7 +239,12 @@ export function useVocalTuner() {
   }, []);
 
   const handleThreeDotsClick = (e: React.MouseEvent, rec: Recording) => {
+    e.preventDefault();
     e.stopPropagation();
+
+    // ЗАЩИТА: Записываем время клика. Если событие все же "пробьет" наверх, togglePlay его заблокирует
+    lastActionTimeRef.current = Date.now();
+
     if (playingId === rec.id) {
       playerRef.current?.pause();
       setIsPlaying(false);
@@ -248,6 +261,7 @@ export function useVocalTuner() {
   };
 
   const deleteRec = (id: number) => {
+    lastActionTimeRef.current = Date.now(); // Также защищаем от случайных кликов
     if (playingId === id) {
       playerRef.current?.pause();
       setPlayingId(null);
@@ -267,6 +281,7 @@ export function useVocalTuner() {
   };
 
   const downloadRec = (rec: Recording) => {
+    lastActionTimeRef.current = Date.now(); // Защита
     const a = document.createElement('a');
     a.href = rec.url;
     a.download = `${rec.name.replace(/\s+/g, '_')}.webm`;

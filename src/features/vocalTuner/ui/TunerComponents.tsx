@@ -96,9 +96,6 @@ export const MobileSidebarPortal = ({ isOpen, onClose, children }: MobileSidebar
   );
 };
 
-
-
-
 // --- PLAYER WIDGET ---
 interface PlayerWidgetProps {
   recording: Recording;
@@ -152,9 +149,7 @@ export const PlayerWidget = ({
 
       <div className="ml-6 flex shrink-0 items-center justify-center">
         <ControlButton
-          icon={
-            isPlaying ? <Pause weight="fill" size={32} /> : <Play weight="fill" size={32} />
-          }
+          icon={isPlaying ? <Pause weight="fill" size={32} /> : <Play weight="fill" size={32} />}
           isActive={true}
           onClick={onTogglePlay}
           className="text-text transition-colors hover:text-primary active:scale-95"
@@ -264,12 +259,15 @@ const PlaybackSlider: React.FC<PlaybackSliderProps> = ({
   );
 };
 
-
-
-
 // --- TUNER VISUALIZER ---
-export const TunerVisualizer = memo(({ noteInfo }: { noteInfo: NoteInfo | null }) => {
+interface TunerVisualizerProps {
+  noteInfo: NoteInfo | null;
+  actions?: React.ReactNode;
+}
+
+export const TunerVisualizer = memo(({ noteInfo, actions }: TunerVisualizerProps) => {
   const cents = noteInfo?.cents ?? 0;
+  // fillPercentage по-прежнему от 0 до 100
   const fillPercentage = noteInfo ? Math.max(0, Math.min(100, cents + 50)) : 50;
 
   const noteAbove = noteInfo ? NOTES[(NOTES.indexOf(noteInfo.name) + 1) % 12] : 'A#';
@@ -277,22 +275,32 @@ export const TunerVisualizer = memo(({ noteInfo }: { noteInfo: NoteInfo | null }
   const currentNoteName = noteInfo?.name ?? 'A';
 
   return (
-    <div className="relative mt-[-40px] flex scale-90 items-center gap-10 md:mt-0 md:scale-100 md:gap-16">
-      <div className="relative h-[280px] w-[150px] overflow-hidden rounded-[28px] border-2 border-primary bg-transparent md:h-[340px] md:w-[180px] md:rounded-[32px]">
-        <div
-          className="absolute bottom-0 left-0 w-full bg-primary/40 transition-[height] duration-150 ease-out"
-          style={{ height: `${fillPercentage}%` }}
-        />
-        <div className="absolute top-1/2 left-0 h-[2px] w-full -translate-y-1/2 bg-primary" />
-        {noteInfo && (
+    <div className="relative mt-[-40px] flex scale-90 items-start gap-10 md:mt-0 md:scale-100 md:gap-16">
+      {/* ЛЕВАЯ КОЛОНКА: Улавливатель и кнопка строго под ним */}
+      <div className="flex flex-col items-center gap-6">
+        {/* Прямоугольник улавливателя */}
+        <div className="relative h-[280px] w-[150px] overflow-hidden rounded-[28px] border-2 border-primary bg-transparent md:h-[340px] md:w-[180px] md:rounded-[32px]">
+          
+          {/* ОПТИМИЗАЦИЯ: используем transform (GPU-ускорение) вместо изменения height */}
           <div
-            className="absolute left-1/2 z-10 h-[3px] w-14 -translate-x-1/2 rounded-full bg-white transition-all duration-100 md:w-16"
-            style={{ bottom: `calc(${fillPercentage}% - 1.5px)` }}
+            className="absolute inset-0 bg-primary/40 transition-transform duration-150 ease-out w-full h-full"
+            style={{ transform: `translateY(${100 - fillPercentage}%)` }}
           />
+          
+          {/* Центральная линия */}
+          <div className="absolute top-1/2 left-0 h-[2px] w-full -translate-y-1/2 bg-primary" />
+        </div>
+
+        {/* Контейнер для кнопок управления */}
+        {actions && (
+          <div className="relative flex h-[84px] w-full items-center justify-center md:h-[96px]">
+            {actions}
+          </div>
         )}
       </div>
 
-      <div className="flex h-[280px] flex-col justify-between py-2 text-2xl font-medium tracking-wide md:h-[340px] md:py-4 md:text-3xl">
+      {/* ПРАВАЯ КОЛОНКА: Названия нот (Фиксированная ширина, выравнивание влево) */}
+      <div className="flex h-[280px] w-16 shrink-0 flex-col justify-between py-2 text-left text-2xl font-medium tracking-wide md:h-[340px] md:w-24 md:py-4 md:text-3xl">
         <span className="text-white/40">{noteAbove}</span>
         <span className="text-4xl text-white md:text-5xl">{currentNoteName}</span>
         <span className="text-white/40">{noteBelow}</span>

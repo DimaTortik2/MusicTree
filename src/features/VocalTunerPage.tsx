@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { cn } from '@/app/utils/cn';
 import {
@@ -11,9 +12,13 @@ import {
   Record as RecordIcon,
 } from '@phosphor-icons/react';
 import { useVocalTuner } from '@/features/vocalTuner/hooks/useVocalTuner';
-import { MiniWaveform, MobileSidebarPortal, PlayerWidget, SidebarIcon, TunerVisualizer } from '@/features/vocalTuner/ui/TunerComponents';
-
-
+import {
+  MiniWaveform,
+  MobileSidebarPortal,
+  PlayerWidget,
+  SidebarIcon,
+  TunerVisualizer,
+} from '@/features/vocalTuner/ui/TunerComponents';
 
 export function VocalTunerPage() {
   const {
@@ -27,7 +32,6 @@ export function VocalTunerPage() {
     currentTime,
     duration,
     startMic,
-    stopMic,
     startRec,
     stopRec,
     togglePlay,
@@ -39,11 +43,18 @@ export function VocalTunerPage() {
     handleSeekEnd,
   } = useVocalTuner();
 
-  const isListening = phase !== 'idle';
   const isRecording = phase === 'recording';
   const activeRecording = recordings.find((r) => r.id === playingId);
 
-  const SidebarContent = () => (
+  // --- АВТОСТАРТ МИКРОФОНА ПРИ ЗАХОДЕ НА СТРАНИЦУ ---
+  useEffect(() => {
+    if (phase === 'idle') {
+      startMic();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const sidebarContent = (
     <div className="custom-scroll flex-1 space-y-3 overflow-y-auto px-4 py-6">
       {recordings.map((rec) => {
         const isActive = playingId === rec.id;
@@ -60,19 +71,22 @@ export function VocalTunerPage() {
               )}
               onClick={() => togglePlay(rec)}
             >
-              <button className="flex shrink-0 items-center justify-center p-1">
+              <div className="flex shrink-0 items-center justify-center p-1">
                 {isCurrentlyPlaying ? (
                   <Pause weight="fill" size={20} />
                 ) : (
                   <Play weight="fill" size={20} />
                 )}
-              </button>
+              </div>
 
               <MiniWaveform active={isActive} />
 
               <button
                 className="shrink-0 p-1 opacity-80 hover:opacity-100"
-                onClick={(e) => handleThreeDotsClick(e, rec)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleThreeDotsClick(e, rec);
+                }}
               >
                 <DotsThreeVertical weight="bold" size={24} />
               </button>
@@ -99,7 +113,10 @@ export function VocalTunerPage() {
                       <Trash size={18} weight="bold" />
                     </button>
                     <div className="flex gap-4">
-                      <button className="p-1 transition-colors hover:text-white">
+                      <button
+                        className="p-1 transition-colors hover:text-white"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <PencilSimple size={18} weight="bold" />
                       </button>
                       <button
@@ -126,7 +143,7 @@ export function VocalTunerPage() {
     <div className="flex h-screen w-full overflow-hidden font-sans text-text">
       {/* --- ДЕСКТОПНЫЙ САЙДБАР --- */}
       <aside className="relative z-10 hidden w-[320px] flex-col border-r border-white/5 bg-surface md:flex">
-        <SidebarContent />
+        {sidebarContent}
       </aside>
 
       {/* --- МОБИЛЬНЫЙ САЙДБАР --- */}
@@ -134,21 +151,29 @@ export function VocalTunerPage() {
         isOpen={isMobileSidebarOpen}
         onClose={() => setIsMobileSidebarOpen(false)}
       >
-        <SidebarContent />
-        {activeRecording && (
-          <div className="shrink-0 border-t border-white/10 bg-surface/80 p-4 pb-8 backdrop-blur-md">
-            <PlayerWidget
-              recording={activeRecording}
-              isPlaying={isPlaying}
-              onTogglePlay={() => togglePlay(activeRecording)}
-              currentTime={currentTime}
-              duration={duration}
-              onSeek={handleSeek}
-              onSeekStart={handleSeekStart} 
-              onSeekEnd={handleSeekEnd}
-            />
-          </div>
-        )}
+        {sidebarContent}
+        <AnimatePresence>
+          {activeRecording && (
+            <motion.div
+              initial={{ height: 0, opacity: 0, y: 20 }}
+              animate={{ height: 'auto', opacity: 1, y: 0 }}
+              exit={{ height: 0, opacity: 0, y: 20 }}
+              transition={{ duration: 0.2, ease: 'easeInOut' }}
+              className="shrink-0 overflow-hidden border-t border-white/10 bg-surface/80 p-4 pb-8 backdrop-blur-md"
+            >
+              <PlayerWidget
+                recording={activeRecording}
+                isPlaying={isPlaying}
+                onTogglePlay={() => togglePlay(activeRecording)}
+                currentTime={currentTime}
+                duration={duration}
+                onSeek={handleSeek}
+                onSeekStart={handleSeekStart}
+                onSeekEnd={handleSeekEnd}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </MobileSidebarPortal>
 
       {/* --- ГЛАВНАЯ ОБЛАСТЬ --- */}
@@ -163,56 +188,62 @@ export function VocalTunerPage() {
         </div>
 
         {/* --- ДЕСКТОПНЫЙ ПЛЕЕР --- */}
-        {activeRecording && (
-          <div className="animate-in fade-in slide-in-from-top-4 absolute top-12 left-1/2 z-[1000] hidden w-full max-w-[600px] -translate-x-1/2 md:block">
-            <PlayerWidget
-              recording={activeRecording}
-              isPlaying={isPlaying}
-              onTogglePlay={() => togglePlay(activeRecording)}
-              currentTime={currentTime}
-              duration={duration}
-              onSeek={handleSeek}
-            />
-          </div>
-        )}
-
-        {/* --- ЦЕНТРАЛЬНЫЙ ТЮНЕР --- */}
-        <div className="flex flex-1 items-center justify-center">
-          <TunerVisualizer noteInfo={currentNote} />
-        </div>
-
-        {/* --- КНОПКИ УПРАВЛЕНИЯ ЗАПИСЬЮ --- */}
-        <div className="absolute bottom-[100px] left-0 z-10 flex w-full items-end justify-center gap-4 md:bottom-12">
-          {isListening && (
-            <button
-              onClick={stopMic}
-              className="flex h-[64px] w-[64px] items-center justify-center rounded-[20px] bg-primary text-white transition-all hover:scale-105 hover:bg-primary/90 active:scale-95 md:h-[72px] md:w-[72px] md:rounded-[24px]"
+        <AnimatePresence>
+          {activeRecording && (
+            <motion.div
+              initial={{ opacity: 0, y: -20, x: '-50%' }}
+              animate={{ opacity: 1, y: 0, x: '-50%' }}
+              exit={{ opacity: 0, y: -20, x: '-50%' }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+              className="absolute top-12 left-1/2 z-[1000] hidden w-full max-w-[600px] md:block"
             >
-              <Power size={28} weight="bold" />
-            </button>
+              <PlayerWidget
+                recording={activeRecording}
+                isPlaying={isPlaying}
+                onTogglePlay={() => togglePlay(activeRecording)}
+                currentTime={currentTime}
+                duration={duration}
+                onSeek={handleSeek}
+              />
+            </motion.div>
           )}
+        </AnimatePresence>
 
-          <button
-            onClick={() => {
-              if (!isListening) startMic();
-              else if (isRecording) stopRec();
-              else startRec();
-            }}
-            className={cn(
-              'flex items-center justify-center bg-primary text-white transition-all hover:scale-105 active:scale-95',
-              isListening
-                ? 'h-[84px] w-[84px] rounded-[28px] md:h-[96px] md:w-[96px] md:rounded-[32px]'
-                : 'h-[72px] w-[72px] rounded-[24px] md:h-[84px] md:w-[84px] md:rounded-[28px]',
-            )}
-          >
-            {!isListening ? (
-              <Play size={36} weight="fill" />
-            ) : isRecording ? (
-              <div className="h-7 w-7 animate-pulse rounded-sm bg-white md:h-8 md:w-8" />
-            ) : (
-              <RecordIcon size={40} weight="bold" />
-            )}
-          </button>
+        {/* --- ЦЕНТРАЛЬНЫЙ ТЮНЕР И КНОПКА ЗАПИСИ --- */}
+        <div className="flex flex-1 items-center justify-center">
+          <TunerVisualizer
+            noteInfo={currentNote}
+            actions={
+              <button
+                onClick={() => {
+                  if (isRecording) {
+                    stopRec(); // Если пишем — останавливаем
+                  } else {
+                    // Страховка: если микрофон почему-то отвалился (idle), стартуем его перед записью
+                    if (phase === 'idle') {
+                      startMic().then(() => startRec());
+                    } else {
+                      startRec();
+                    }
+                  }
+                }}
+                className={cn(
+                  'flex items-center justify-center bg-primary text-white transition-all duration-300 hover:scale-105 active:scale-95',
+                  // Уменьшенные размеры согласно макету
+                  'h-[64px] w-[64px] rounded-[24px] md:h-[72px] md:w-[72px] md:rounded-[28px]',
+                  // При записи добавляем пульсацию и аккуратное розовое свечение
+                  isRecording &&
+                    'animate-pulse bg-primary/90 shadow-[0_0_24px_rgba(236,72,153,0.5)]',
+                )}
+              >
+                {isRecording ? (
+                  <Power size={32} weight="bold" /> // Иконка Power при записи
+                ) : (
+                  <RecordIcon size={36} weight="fill" /> // Кружок Record в режиме ожидания
+                )}
+              </button>
+            }
+          />
         </div>
       </main>
     </div>

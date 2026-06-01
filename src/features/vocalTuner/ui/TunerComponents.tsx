@@ -347,13 +347,13 @@ export const TunerVisualizer = memo(({ pitchDataRef, actions }: TunerVisualizerP
   return (
     <div className="relative mt-[-40px] scale-90 md:mt-0 md:scale-100">
       <div className="flex flex-col items-center gap-6">
-        <div className="relative h-[280px] w-[150px] overflow-hidden rounded-[28px] border-2 border-primary bg-transparent md:h-[340px] md:w-[180px] md:rounded-[32px]">
+        <div className="relative h-[280px] w-[150px] overflow-hidden rounded-[28px] border-3 border-primary bg-transparent md:h-[340px] md:w-[180px] md:rounded-[32px]">
           <div
             ref={controllerRef}
             className="absolute inset-0 h-full w-full bg-primary/40 will-change-transform"
             style={{ opacity: 0 }}
           />
-          <div className="absolute top-1/2 left-0 h-[2px] w-full -translate-y-1/2 bg-primary" />
+          <div className="absolute top-1/2 left-0 h-[3px] w-full -translate-y-1/2 bg-primary" />
         </div>
         {actions && (
           <div className="relative flex h-[84px] w-full items-center justify-center md:h-[96px]">

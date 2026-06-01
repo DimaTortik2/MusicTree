@@ -70,6 +70,10 @@ export default function SettingsPage() {
     setPianoSoundType,
     uiSize,
     setUiSize,
+    enableAmbientGlow,
+    setEnableAmbientGlow,
+    wallpaperMouseTracking,
+    setWallpaperMouseTracking,
   } = useProgressStore();
 
   const [isCustomizingMobile, setIsCustomizingMobile] = useState(false);
@@ -399,6 +403,62 @@ export default function SettingsPage() {
             }}
             label="Светлая"
           />
+        </div>
+      </div>
+
+      {/* --- ВИЗУАЛЬНЫЕ ЭФФЕКТЫ --- */}
+      <div className="mb-10 max-w-sm">
+        <h2 className="mb-4 text-2xl">Свечение фона</h2>
+        <div className="flex items-center gap-6">
+          <Radio
+            name="ambientGlow"
+            checked={enableAmbientGlow === true}
+            onChange={(e) => {
+              setEnableAmbientGlow(true);
+              e.target.blur();
+            }}
+            label="Включено"
+          />
+          <Radio
+            name="ambientGlow"
+            checked={enableAmbientGlow === false}
+            onChange={(e) => {
+              setEnableAmbientGlow(false);
+              e.target.blur();
+            }}
+            label="Выключено"
+          />
+        </div>
+
+        {/* Опция движения мыши для обоев — ПК-онли (скрыта на мобилках) */}
+        <div className="mt-8 hidden flex-col gap-4 md:flex">
+          <div className="flex flex-col gap-1">
+            <h3 className="text-2xl text-text">Параллакс обоев</h3>
+            <p className="text-[14px] leading-tight text-white/40">
+              Паттерн на фоне будет плавно смещаться вслед за курсором мыши.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-6">
+            <Radio
+              name="wallpaperTracking"
+              checked={wallpaperMouseTracking === true}
+              onChange={(e) => {
+                setWallpaperMouseTracking(true);
+                e.target.blur();
+              }}
+              label="Включен"
+            />
+            <Radio
+              name="wallpaperTracking"
+              checked={wallpaperMouseTracking === false}
+              onChange={(e) => {
+                setWallpaperMouseTracking(false);
+                e.target.blur();
+              }}
+              label="Выключен"
+            />
+          </div>
         </div>
       </div>
 

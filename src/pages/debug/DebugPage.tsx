@@ -73,7 +73,6 @@ export const DebugPage: React.FC = () => {
       className="bootstrap-scope"
       style={{
         minHeight: '100vh',
-        backgroundColor: 'var(--background)',
         color: 'var(--text)',
         paddingTop: '2rem',
         paddingBottom: '12rem',

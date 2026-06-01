@@ -73,12 +73,7 @@ export const CurrentLecturePage = () => {
   }, [showSuccessOverlay]);
 
   return (
-    <div className="relative flex min-h-full w-full justify-center bg-background font-sans text-text selection:bg-primary/20">
-      {/* Декоративные фоновые свечения как на макете */}
-      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-        <div className="absolute -top-[15%] -left-[10%] h-[500px] w-[500px] rounded-full bg-accent/5 blur-[100px] sm:bg-accent/8" />
-        <div className="absolute -right-[10%] -bottom-[15%] h-[700px] w-[700px] rounded-full bg-primary/3 blur-[130px] sm:bg-primary/5" />
-      </div>
+    <div className="relative flex min-h-full w-full justify-center font-sans text-text selection:bg-primary/20">
 
       {/* Контейнер с идеальной шириной для чтения */}
       <div className="w-full max-w-[1000px] px-6 py-12 pb-[50vh]">

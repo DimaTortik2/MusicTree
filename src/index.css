@@ -13,6 +13,9 @@
   --homework: #57430b;
   --access: #10b981;
 
+  --homework-glow: #d97706;
+  --access-glow: #0891b2;
+
   --piano-white: #f8f9fa;
   --piano-white-hover: #e9ecef;
   --piano-white-active: #dee2e6;
@@ -119,6 +122,9 @@
   --color-piano-black: var(--piano-black);
   --color-piano-black-hover: var(--piano-black-hover);
   --color-piano-black-active: var(--piano-black-active);
+
+  --color-homework-glow: var(--homework-glow);
+  --color-access-glow: var(--access-glow);
 }
 
 * {

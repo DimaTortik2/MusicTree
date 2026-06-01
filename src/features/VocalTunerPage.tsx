@@ -105,106 +105,118 @@ export function VocalTunerPage() {
     );
   }
 
+  // --- САЙДБАР С АНИМАЦИЕЙ СПИСКА ЗАПИСЕЙ ---
   const sidebarContent = (
     <div className="custom-scroll flex-1 space-y-3 overflow-y-auto px-4 py-6">
-      {recordings.map((rec) => {
-        const isActive = playingId === rec.id;
-        const isCurrentlyPlaying = isActive && isPlaying;
+      <AnimatePresence initial={false}>
+        {recordings.map((rec) => {
+          const isActive = playingId === rec.id;
+          const isCurrentlyPlaying = isActive && isPlaying;
 
-        return (
-          <div key={rec.id} className="flex flex-col gap-1">
-            <div
-              className={cn(
-                'flex cursor-pointer items-center justify-between rounded-2xl border-3 p-3 transition-all duration-200',
-                isActive
-                  ? 'border-primary bg-primary text-white'
-                  : 'border-primary bg-transparent text-white hover:bg-primary/10',
-              )}
-              onClick={() => togglePlay(rec)}
+          return (
+            <motion.div
+              key={rec.id}
+              // layout="position" плавно двигает соседние карточки при удалении/добавлении
+              layout="position"
+              initial={{ opacity: 0, y: 15, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.96, y: -15, transition: { duration: 0.15 } }}
+              transition={{ type: 'spring', stiffness: 450, damping: 35 }}
+              className="flex flex-col gap-1"
             >
               <div
                 className={cn(
-                  'flex shrink-0 items-center justify-center p-1 transition-colors hover:text-primary',
-                  isActive && 'hover:text-surface',
+                  'flex cursor-pointer items-center justify-between rounded-2xl border-3 p-3 transition-all duration-200',
+                  isActive
+                    ? 'border-primary bg-primary text-white'
+                    : 'border-primary bg-transparent text-white hover:bg-primary/10',
                 )}
+                onClick={() => togglePlay(rec)}
               >
-                {isCurrentlyPlaying ? (
-                  <Pause weight="fill" size={20} />
-                ) : (
-                  <Play weight="fill" size={20} />
-                )}
+                <div
+                  className={cn(
+                    'flex shrink-0 items-center justify-center p-1 transition-colors hover:text-primary',
+                    isActive && 'hover:text-surface',
+                  )}
+                >
+                  {isCurrentlyPlaying ? (
+                    <Pause weight="fill" size={20} />
+                  ) : (
+                    <Play weight="fill" size={20} />
+                  )}
+                </div>
+
+                <MiniWaveform active={isActive} />
+
+                <button
+                  className={cn(
+                    'shrink-0 cursor-pointer p-1 opacity-80 transition-colors hover:text-primary hover:opacity-100',
+                    isActive && 'hover:text-surface',
+                  )}
+                  onClick={(e) => handleThreeDotsClick(e, rec)}
+                >
+                  <DotsThreeVertical weight="bold" size={24} />
+                </button>
               </div>
 
-              <MiniWaveform active={isActive} />
-
-              <button
-                className={cn(
-                  'shrink-0 cursor-pointer p-1 opacity-80 transition-colors hover:text-primary hover:opacity-100',
-                  isActive && 'hover:text-surface',
-                )}
-                onClick={(e) => handleThreeDotsClick(e, rec)}
-              >
-                <DotsThreeVertical weight="bold" size={24} />
-              </button>
-            </div>
-
-            <AnimatePresence initial={false}>
-              {isActive && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="overflow-hidden"
-                >
-                  <div className="mx-1 mt-1 flex items-center justify-between rounded-xl bg-primary px-4 py-2 text-white/90">
-                    <button
-                      className={cn(
-                        'cursor-pointer p-1 transition-colors hover:text-white',
-                        isActive && 'hover:text-surface',
-                      )}
-                      title="Удалить"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setRecToDelete(rec); // Открываем модалку удаления
-                      }}
-                    >
-                      <Trash size={18} weight="bold" />
-                    </button>
-                    <div className="flex gap-4">
+              <AnimatePresence initial={false}>
+                {isActive && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="mx-1 mt-1 flex items-center justify-between rounded-xl bg-primary px-4 py-2 text-white/90">
                       <button
                         className={cn(
                           'cursor-pointer p-1 transition-colors hover:text-white',
                           isActive && 'hover:text-surface',
                         )}
+                        title="Удалить"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setRecToRename(rec); // Открываем модалку переименования
-                          setNewName(rec.name); // Подставляем текущее имя
+                          setRecToDelete(rec); // Открываем модалку удаления
                         }}
                       >
-                        <PencilSimple size={18} weight="bold" />
+                        <Trash size={18} weight="bold" />
                       </button>
-                      <button
-                        className={cn(
-                          'cursor-pointer p-1 transition-colors hover:text-white',
-                          isActive && 'hover:text-surface',
-                        )}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          downloadRec(rec);
-                        }}
-                      >
-                        <DownloadSimple size={18} weight="bold" />
-                      </button>
+                      <div className="flex gap-4">
+                        <button
+                          className={cn(
+                            'cursor-pointer p-1 transition-colors hover:text-white',
+                            isActive && 'hover:text-surface',
+                          )}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setRecToRename(rec); // Открываем модалку переименования
+                            setNewName(rec.name); // Подставляем текущее имя
+                          }}
+                        >
+                          <PencilSimple size={18} weight="bold" />
+                        </button>
+                        <button
+                          className={cn(
+                            'cursor-pointer p-1 transition-colors hover:text-white',
+                            isActive && 'hover:text-surface',
+                          )}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            downloadRec(rec);
+                          }}
+                        >
+                          <DownloadSimple size={18} weight="bold" />
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        );
-      })}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          );
+        })}
+      </AnimatePresence>
     </div>
   );
 

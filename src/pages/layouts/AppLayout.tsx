@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
-import { Outlet, NavLink } from 'react-router-dom';
+import { useState, useRef, useEffect, useMemo } from 'react';
+import { NavLink, useLocation, useOutlet } from 'react-router-dom';
 import { DotsThree } from '@phosphor-icons/react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, type Variants } from 'framer-motion';
 import { useProgressStore } from '@/app/store/useProgressStore';
 import { TABS_INFO } from '@/shared/config/tabsConfig';
 import { TabBarCustomization } from '@/pages/settings/TabBarCustomization';
@@ -13,8 +13,7 @@ import { AudioUnlockOverlay } from '@/app/providers/AudioUnlockOverlay';
 import { useGlobalPiano } from '@/app/hooks/useGlobalPiano';
 import { useAppShortcuts } from '@/app/hooks/useAppShortcuts';
 import { Tooltip } from '@/shared/Tooltip';
-
-// ПРОПИШИ ПРАВИЛЬНЫЙ ПУТЬ ДО ТУЛТИПА:
+import { AmbientGlow } from '@/shared/AmbientGlow';
 
 const TAB_ROUTES: Record<string, string> = {
   tree: '/app/tree',
@@ -40,31 +39,93 @@ const DESKTOP_NAV_ITEMS = [
   'settings',
 ];
 
+// ✨ Элегантное затухание через темный фон
+const pageTransitionVariants: Variants = {
+  initial: {
+    opacity: 0,
+    scale: 0.98, // Слегка уменьшено при появлении
+  },
+  animate: {
+    opacity: 1,
+    scale: 1,
+    transition: {
+      duration: 0.3,
+      ease: [0.25, 1, 0.5, 1], // Мягкий ease-out
+    },
+  },
+  exit: {
+    opacity: 0,
+    scale: 0.98, // Слегка проваливается вглубь при исчезновении
+    transition: {
+      duration: 0.2,
+      ease: [0.25, 0, 0.5, 1], // Ускоренный ease-in для быстрого исчезновения
+    },
+  },
+};
+
 export const AppLayout = () => {
   const [isPianoActive, setIsPianoActive] = useState(false);
   const [isOverflowOpen, setIsOverflowOpen] = useState(false);
   const [isCustomizing, setIsCustomizing] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   const overflowRef = useRef<HTMLDivElement>(null);
   const toggleBtnRef = useRef<HTMLButtonElement>(null);
 
   const { activeTabs, inactiveTabs, uiSize } = useProgressStore();
+  const location = useLocation();
+  const outlet = useOutlet();
+
   useGlobalPiano();
+
+  // ✨ Слушаем ресайз окна для переключения типа анимации
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const handlePianoClick = () => setIsPianoActive((prev) => !prev);
 
   useAppShortcuts({
     togglePiano: () => setIsPianoActive((prev) => !prev),
   });
 
+  // Базовый ключ анимации (чтобы не анимировать внутри одной вкладки, например /app/homeworks/123)
+  const transitionKey = useMemo(() => {
+    const segments = location.pathname.split('/');
+    return segments.slice(0, 3).join('/');
+  }, [location.pathname]);
+
+  // Вычисляем ID текущей вкладки по роуту
+  const currentTabId = useMemo(() => {
+    const entry = Object.entries(TAB_ROUTES).find(([_, route]) => transitionKey.startsWith(route));
+    return entry ? entry[0] : null;
+  }, [transitionKey]);
+
+  // ✨ Логика вычисления направления (вперед = 1, назад = -1)
+  const prevTabIdRef = useRef<string | null>(currentTabId);
+  const directionRef = useRef(1);
+
+  if (currentTabId && currentTabId !== prevTabIdRef.current) {
+    // В зависимости от платформы берем нужный порядок вкладок
+    const tabOrder = isMobile ? [...activeTabs, ...inactiveTabs] : DESKTOP_NAV_ITEMS;
+
+    const currIdx = tabOrder.indexOf(currentTabId);
+    const prevIdx = prevTabIdRef.current ? tabOrder.indexOf(prevTabIdRef.current) : -1;
+
+    if (currIdx !== -1 && prevIdx !== -1) {
+      directionRef.current = currIdx > prevIdx ? 1 : -1;
+    }
+    prevTabIdRef.current = currentTabId;
+  }
+
   useEffect(() => {
     const html = document.documentElement;
-    if (uiSize === 'xs')
-      html.style.fontSize = '12px'; // ~75% от стандарта (очень мелко)
-    else if (uiSize === 'sm')
-      html.style.fontSize = '14px'; // ~87.5% от стандарта
-    else if (uiSize === 'lg')
-      html.style.fontSize = '18px'; // ~112.5% от стандарта
-    else html.style.fontSize = '16px'; // 100% (стандарт)
+    if (uiSize === 'xs') html.style.fontSize = '12px';
+    else if (uiSize === 'sm') html.style.fontSize = '14px';
+    else if (uiSize === 'lg') html.style.fontSize = '18px';
+    else html.style.fontSize = '16px';
   }, [uiSize]);
 
   useEffect(() => {
@@ -83,12 +144,11 @@ export const AppLayout = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOverflowOpen]);
 
-  const renderTabIcon = (id: string, isMobile: boolean) => {
+  const renderTabIcon = (id: string, isMobileView: boolean) => {
     const info = TABS_INFO[id];
     if (!info) return null;
     const Icon = info.icon;
 
-    // Маппинг для названий тултипов и экшенов шорткатов
     const TAB_LABELS: Record<string, string> = {
       piano: 'Пианино',
       tree: 'Дерево',
@@ -114,11 +174,9 @@ export const AppLayout = () => {
       settings: 'navSettings',
     };
 
-    // Привязываем тексты и шорткаты
     const label = (info as any).label || TAB_LABELS[id] || 'Вкладка';
     const shortcutAction = TAB_SHORTCUTS[id] as any;
-    // Сбоку (десктоп) показываем тултип справа, снизу (мобилки) - сверху
-    const tooltipPosition = isMobile ? 'top' : 'right';
+    const tooltipPosition = isMobileView ? 'top' : 'right';
 
     if (id === 'piano') {
       return (
@@ -129,13 +187,13 @@ export const AppLayout = () => {
           position={tooltipPosition}
         >
           <ControlButton
-            icon={<Icon size={isMobile ? 22 : 20} weight="fill" />}
+            icon={<Icon size={isMobileView ? 22 : 20} weight="fill" />}
             isActive={isPianoActive}
             onClick={() => {
               handlePianoClick();
-              if (isMobile) setIsOverflowOpen(false);
+              if (isMobileView) setIsOverflowOpen(false);
             }}
-            className={cn(isMobile ? 'p-1.5' : 'rounded-lg p-1.5 hover:cursor-pointer')}
+            className={cn(isMobileView ? 'p-1.5' : 'rounded-lg p-1.5 hover:cursor-pointer')}
             innerClassName="p-1"
           />
         </Tooltip>
@@ -168,17 +226,17 @@ export const AppLayout = () => {
           onClick={() => setIsOverflowOpen(false)}
           className={({ isActive }) =>
             `flex items-center justify-center transition-colors duration-150 ${
-              isMobile ? 'p-1.5' : 'rounded-lg p-2'
+              isMobileView ? 'p-1.5' : 'rounded-lg p-2'
             } ${
               isActive
                 ? 'text-text'
-                : isMobile
+                : isMobileView
                   ? 'text-text/40 hover:text-text'
                   : 'text-text/40 hover:bg-surface/40 hover:text-text'
             }`
           }
         >
-          <Icon size={isMobile ? 24 : 22} />
+          <Icon size={isMobileView ? 24 : 22} />
         </NavLink>
       </Tooltip>
     );
@@ -204,7 +262,7 @@ export const AppLayout = () => {
   const gridColsClass = getGridColsClass(bottomSlotsCount);
 
   return (
-    <div className="relative flex h-screen w-full overflow-hidden bg-background font-sans text-text antialiased">
+    <div className="relative flex h-screen w-full overflow-hidden bg-background font-sans text-text antialiased selection:bg-primary/20">
       {/* 1. Десктопный Сайдбар (z-20) */}
       <aside className="z-20 hidden h-full w-16 flex-col items-center justify-between border-r-[3px] border-text/18 bg-background py-4 select-none md:flex">
         <nav className="flex w-full flex-col items-center gap-5">
@@ -213,18 +271,31 @@ export const AppLayout = () => {
         <div className="flex w-full flex-col items-center">{renderTabIcon('piano', false)}</div>
       </aside>
 
+      <AmbientGlow />
       <RouteWallpaper />
 
       {/* 2. Основная рабочая область */}
       <main className="relative z-10 flex-1 overflow-y-auto bg-transparent transition-all duration-300">
         <div className="h-full w-full">
           <AudioUnlockOverlay />
-          <Outlet />
+
+          {/* ✨ mode="wait" заставляет старую страницу исчезнуть до появления новой */}
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={transitionKey}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              variants={pageTransitionVariants}
+              className="h-full w-full"
+            >
+              {outlet}
+            </motion.div>
+          </AnimatePresence>
         </div>
       </main>
 
-      {/* 3. ОБЩИЙ КОНТЕЙНЕР (z-[101])
-          Вернули md:left-16, чтобы на ПК контейнер прилипал строго справа от сайдбара */}
+      {/* 3. ОБЩИЙ КОНТЕЙНЕР (z-[101]) */}
       <div className="pointer-events-none fixed right-0 bottom-0 left-0 z-[101] flex flex-col justify-end md:left-16">
         {/* --- Мобильный Таббар --- */}
         <motion.div
@@ -236,7 +307,6 @@ export const AppLayout = () => {
           transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
         >
           <div className="relative w-full max-w-[500px]">
-            {/* Меню троеточия (Выезжает снизу-вверх из-под таббара) */}
             <AnimatePresence>
               {isOverflowOpen && (
                 <motion.div
@@ -254,7 +324,6 @@ export const AppLayout = () => {
               )}
             </AnimatePresence>
 
-            {/* Главная плавающая панель */}
             <div className="pointer-events-auto relative z-10 w-full rounded-[14px] border-[3px] border-text/10 bg-surface px-6 py-3.5 shadow-[0_8px_30px_rgba(0,0,0,0.4)] backdrop-blur-md">
               <div className="flex w-full items-center">
                 {activeTabs.map((id) => (
@@ -291,7 +360,6 @@ export const AppLayout = () => {
               transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
               className="pointer-events-auto w-full shrink-0 overflow-hidden"
             >
-              {/* Подложка под пианино: bg-surface, бордер 3px сверху opacity 18%, тянется на весь Outlet */}
               <motion.div
                 initial={{ y: '100%' }}
                 animate={{ y: 0 }}

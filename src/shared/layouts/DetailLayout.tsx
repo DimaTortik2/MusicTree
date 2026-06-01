@@ -48,14 +48,14 @@ export const DetailLayout: React.FC<DetailLayoutProps> = ({
       {/* ПРАВАЯ КОЛОНКА (КОНТЕНТ) */}
       <div
         className={cn(
-          'fixed inset-0 z-[100] flex h-full flex-col bg-background md:static md:z-auto md:flex-1',
+          'fixed inset-0 z-[100] flex h-full flex-col bg-transparent md:static md:z-auto md:flex-1',
           isMobileDetailOpen
             ? 'animate-in slide-in-from-right-8 flex duration-300'
             : 'hidden md:flex',
         )}
       >
         <div
-          className="flex shrink-0 items-center bg-background px-4 pb-2 md:hidden"
+          className="flex shrink-0 items-center bg-transparent px-4 pb-2 md:hidden "
           style={{ paddingTop: 'calc(env(safe-area-inset-top) + 20px)' }}
         >
           <button

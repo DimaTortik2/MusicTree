@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '@/app/utils/cn';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
 
 export interface ModalProps {
   isOpen?: boolean;
@@ -16,6 +17,46 @@ export interface ModalProps {
   iconContainerClassName?: string;
   className?: string;
 }
+
+// Премиальный микро-скейл и микро-сдвиг без лишнего «скакания»
+const cardVariants: Variants = {
+  hidden: {
+    opacity: 0,
+    scale: 0.98,
+    y: 8,
+  },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    y: 0,
+    transition: {
+      type: 'spring',
+      stiffness: 380, // Быстрый старт
+      damping: 30, // Полное гашение отскока (никакого дрожания)
+    },
+  },
+  exit: {
+    opacity: 0,
+    scale: 0.98,
+    y: 6,
+    transition: {
+      duration: 0.15,
+      ease: 'easeIn',
+    },
+  },
+};
+
+const backdropVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { duration: 0.2, ease: 'easeOut' },
+  },
+  exit: {
+    opacity: 0,
+    transition: { duration: 0.15, ease: 'easeIn' },
+  },
+};
 
 export const Modal: React.FC<ModalProps> = ({
   isOpen = true,
@@ -47,12 +88,15 @@ export const Modal: React.FC<ModalProps> = ({
     };
   }, [isOpen, inline, onClose]);
 
-  if (!isOpen && !inline) return null;
-
   const CardContent = (
-    <div
+    <motion.div
+      variants={inline ? undefined : cardVariants}
+      initial={inline ? undefined : 'hidden'}
+      animate={inline ? undefined : 'visible'}
+      exit={inline ? undefined : 'exit'}
       className={cn(
-        'flex w-full bg-surface transition-all duration-300',
+        // Оставляем transition-colors для смены тем, убрав конфликтующий transition-all
+        'flex w-full bg-surface transition-colors duration-300',
         layout === 'vertical'
           ? 'max-w-2xl flex-col gap-6 rounded-[24px] p-6 sm:p-8'
           : 'max-w-2xl flex-col items-start justify-center gap-5 rounded-xl p-6 sm:flex-row sm:items-center sm:justify-between sm:gap-0',
@@ -105,7 +149,7 @@ export const Modal: React.FC<ModalProps> = ({
           )}
         </>
       )}
-    </div>
+    </motion.div>
   );
 
   if (inline) {
@@ -113,12 +157,20 @@ export const Modal: React.FC<ModalProps> = ({
   }
 
   return createPortal(
-    <div
-      className="animate-in fade-in fixed inset-0 z-2000 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm duration-200"
-      onClick={onClose}
-    >
-      {CardContent}
-    </div>,
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          variants={backdropVariants}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+          className="fixed inset-0 z-2000 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm"
+          onClick={onClose}
+        >
+          {CardContent}
+        </motion.div>
+      )}
+    </AnimatePresence>,
     document.body,
   );
 };

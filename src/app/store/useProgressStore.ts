@@ -26,6 +26,11 @@ export interface AppState {
   pianoBindings: Record<string, string | null>;
   uiSize: UISize;
   setUiSize: (size: UISize) => void;
+  enableAmbientGlow: boolean;
+  setEnableAmbientGlow: (state: boolean) => void;
+
+  wallpaperMouseTracking: boolean;
+  setWallpaperMouseTracking: (state: boolean) => void;
 
   // Tab Bar
   activeTabs: string[];
@@ -202,7 +207,12 @@ export const useProgressStore = create<AppState>()(
 
       pianoSoundType: 'synth', // по умолчанию синтезатор
       setPianoSoundType: (type) => set({ pianoSoundType: type }),
+      enableAmbientGlow: true,
+      setEnableAmbientGlow: (state) => set({ enableAmbientGlow: state }),
 
+      wallpaperMouseTracking: true,
+      setWallpaperMouseTracking: (state) => set({ wallpaperMouseTracking: state }),
+      
       resetPianoBindings: () => set({ pianoBindings: DEFAULT_PIANO_BINDINGS }),
       setShowPianoHints: (state) => set({ showPianoHints: state }),
       togglePianoMute: () =>

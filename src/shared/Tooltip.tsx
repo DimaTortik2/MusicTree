@@ -2,7 +2,7 @@ import React, { useState, useRef, useLayoutEffect, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { cn } from '@/app/utils/cn';
-import { useShortcutStore, type ShortcutAction } from '@/app/store/useShortcutStore'; // Проверь путь к стору
+import { useShortcutStore, type ShortcutAction } from '@/app/store/useShortcutStore';
 import { formatShortcut } from '@/app/utils/formatShortcut';
 
 export interface TooltipProps {
@@ -33,8 +33,11 @@ export const Tooltip: React.FC<TooltipProps> = ({
   const [coords, setCoords] = useState({ x: 0, y: 0 });
   const [placement, setPlacement] = useState(position);
 
-  const triggerRef = useRef<HTMLDivElement>(null);
-  const tooltipRef = useRef<HTMLDivElement>(null);
+  // Состояние мобильного устройства, аналогичное AppLayout
+  const [isMobile, setIsMobile] = useState(false);
+
+  const triggerRef = useRef<HTMLSpanElement | null>(null);
+  const tooltipRef = useRef<HTMLDivElement | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const rawShortcut = useShortcutStore((state) =>
@@ -43,7 +46,16 @@ export const Tooltip: React.FC<TooltipProps> = ({
 
   const formattedShortcut = rawShortcut ? formatShortcut(rawShortcut) : null;
 
+  // Отслеживаем размер экрана
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    handleResize(); // Инициализация при маунте
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const handleMouseEnter = () => {
+    if (isMobile) return; // Игнорируем на мобилках
     timeoutRef.current = setTimeout(() => setRenderState('measuring'), delay);
   };
 
@@ -68,8 +80,9 @@ export const Tooltip: React.FC<TooltipProps> = ({
   }, [renderState]);
 
   // УМНОЕ ПОЗИЦИОНИРОВАНИЕ
-  // Вызывается синхронно до рендера на экране, предотвращая любые скачки
   useLayoutEffect(() => {
+    if (isMobile) return; // На мобилке расчеты не требуются
+
     if (renderState === 'measuring' && tooltipRef.current && triggerRef.current) {
       const trigger = triggerRef.current.getBoundingClientRect();
       const tooltip = tooltipRef.current.getBoundingClientRect();
@@ -90,7 +103,6 @@ export const Tooltip: React.FC<TooltipProps> = ({
           x = trigger.left + trigger.width / 2 - tooltip.width / 2;
           y = trigger.top - tooltip.height - gap;
           if (y < padding) {
-            // Вылез наверх -> кидаем вниз
             finalPlacement = 'bottom';
             y = trigger.bottom + gap;
           }
@@ -99,7 +111,6 @@ export const Tooltip: React.FC<TooltipProps> = ({
           x = trigger.left + trigger.width / 2 - tooltip.width / 2;
           y = trigger.bottom + gap;
           if (y + tooltip.height > viewportHeight - padding) {
-            // Вылез вниз -> кидаем наверх
             finalPlacement = 'top';
             y = trigger.top - tooltip.height - gap;
           }
@@ -108,7 +119,6 @@ export const Tooltip: React.FC<TooltipProps> = ({
           x = trigger.left - tooltip.width - gap;
           y = trigger.top + trigger.height / 2 - tooltip.height / 2;
           if (x < padding) {
-            // Вылез влево -> кидаем вправо
             finalPlacement = 'right';
             x = trigger.right + gap;
           }
@@ -117,7 +127,6 @@ export const Tooltip: React.FC<TooltipProps> = ({
           x = trigger.right + gap;
           y = trigger.top + trigger.height / 2 - tooltip.height / 2;
           if (x + tooltip.width > viewportWidth - padding) {
-            // Вылез вправо -> кидаем влево
             finalPlacement = 'left';
             x = trigger.left - tooltip.width - gap;
           }
@@ -133,18 +142,16 @@ export const Tooltip: React.FC<TooltipProps> = ({
 
       setCoords({ x, y });
       setPlacement(finalPlacement);
-      setRenderState('visible'); // Теперь можно красиво анимировать
+      setRenderState('visible');
     }
-  }, [renderState, position]);
+  }, [renderState, position, isMobile]);
 
-  // Единая верстка внутренностей, чтобы размеры при измерении и отрисовке совпадали на 100%
+  // Единая верстка внутренностей
   const innerContent = (
     <>
-      <span>{content}</span>
+      {content}
       {formattedShortcut && (
-        <span className="flex items-center rounded-[4px] bg-white/10 px-1.5 py-0.5 text-[10px] tracking-wide text-zinc-300">
-          {formattedShortcut}
-        </span>
+        <span className="ml-1.5 text-[10px] opacity-50">{formattedShortcut}</span>
       )}
     </>
   );
@@ -157,21 +164,19 @@ export const Tooltip: React.FC<TooltipProps> = ({
 
   return (
     <>
-      <div
+      <span
         ref={triggerRef}
-        className="relative inline-flex w-fit"
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        onFocus={handleMouseEnter}
-        onBlur={handleMouseLeave}
+        className="inline-block"
       >
         {children}
-      </div>
+      </span>
 
       {typeof document !== 'undefined' &&
+        !isMobile &&
         createPortal(
           <>
-            {/* Невидимый элемент для моментального замера габаритов */}
             {renderState === 'measuring' && (
               <div
                 ref={tooltipRef}
@@ -182,13 +187,12 @@ export const Tooltip: React.FC<TooltipProps> = ({
               </div>
             )}
 
-            {/* Видимый, позиционированный и анимированный элемент */}
             <AnimatePresence>
               {renderState === 'visible' && (
                 <motion.div
                   initial={animationVariants[placement]}
                   animate={{ x: 0, y: 0, opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }} // При выходе просто тает на месте
+                  exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ duration: 0.15, ease: 'easeOut' }}
                   className={baseTooltipClasses}
                   style={{

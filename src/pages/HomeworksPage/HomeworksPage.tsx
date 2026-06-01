@@ -206,18 +206,10 @@ export const HomeworksPage = () => {
             ))}
           </div>
           {(i < data.activeGroups.length - 1 || data.archivedGroups.length > 0) && (
-            <div className="mx-auto my-8 h-[2px] w-24 rounded-full bg-surface" />
+            <div className="mx-auto my-8 h-[3px] w-24 rounded-full bg-text/10" />
           )}
         </div>
       ))}
-
-      {data.archivedGroups.length > 0 && (
-        <div className="mt-8 mb-6 flex items-center gap-4">
-          <hr className="flex-1 border-surface" />
-          <span className="text-sm text-text/40">Архив</span>
-          <hr className="flex-1 border-surface" />
-        </div>
-      )}
 
       {data.archivedGroups.map((group, i) => (
         <div key={`archive-${group.lessonId}`} className="mb-2">
@@ -254,7 +246,7 @@ export const HomeworksPage = () => {
             })}
           </div>
           {i < data.archivedGroups.length - 1 && (
-            <div className="mx-auto my-8 h-[2px] w-24 rounded-full bg-surface" />
+            <div className="mx-auto my-8 h-[3px] w-24 rounded-full bg-text/10" />
           )}
         </div>
       ))}

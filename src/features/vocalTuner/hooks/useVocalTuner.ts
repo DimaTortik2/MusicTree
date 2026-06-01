@@ -3,9 +3,9 @@ import localforage from 'localforage';
 import { create } from 'zustand';
 import { YIN } from 'pitchfinder'; // <-- Подключаем мощный YIN-алгоритм
 import type { Recording } from '@/features/vocalTuner/types';
-import { globalAudioContext } from '@/shared/lib/audioEngine';
 import { useProgressStore } from '@/app/store/useProgressStore';
 import { toast } from '@/app/utils/toast';
+import * as Tone from 'tone';
 
 export type MicErrorType = 'denied' | 'not_found' | 'busy' | null;
 
@@ -213,11 +213,17 @@ export function useVocalTuner() {
         audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
       });
       streamRef.current = stream;
-      audioCtxRef.current = globalAudioContext;
 
-      if (globalAudioContext.state === 'suspended') await globalAudioContext.resume();
+      // ✨ ДОСТАЕМ НАТИВНЫЙ КОНТЕКСТ ИЗ TONE.JS
+      const rawContext = Tone.getContext().rawContext as AudioContext;
+      audioCtxRef.current = rawContext;
 
-      const sr = audioCtxRef.current.sampleRate;
+      // Проверяем и запускаем контекст
+      if (rawContext.state === 'suspended') {
+        await rawContext.resume();
+      }
+
+      const sr = rawContext.sampleRate;
 
       // Инициализация Pitchfinder YIN с актуальным Sample Rate
       pitchDetectorRef.current = YIN({ sampleRate: sr });
@@ -225,18 +231,17 @@ export function useVocalTuner() {
       if (sr < 44100 && !sampleRateWarnedRef.current) {
         toast.error(
           'Вы используете Bluetooth-устройство или iOS. Точность вокального тренажера может быть немного снижена.',
-          {
-            style: { opacity: 0.8 },
-          },
+          { style: { opacity: 0.8 } },
         );
         sampleRateWarnedRef.current = true;
       }
 
-      const src = globalAudioContext.createMediaStreamSource(stream);
+      // Используем rawContext для создания нодов
+      const src = rawContext.createMediaStreamSource(stream);
       sourceNodeRef.current = src;
 
-      const analyser = globalAudioContext.createAnalyser();
-      analyser.fftSize = 2048; // Увеличенный буфер для точности YIN
+      const analyser = rawContext.createAnalyser();
+      analyser.fftSize = 2048;
       src.connect(analyser);
       analyserRef.current = analyser;
 

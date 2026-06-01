@@ -1,5 +1,4 @@
 import * as Tone from 'tone';
-import { globalAudioContext } from './audioEngine';
 import { useActiveKeysStore } from '@/app/store/useActiveKeysStore';
 import { useProgressStore } from '@/app/store/useProgressStore';
 
@@ -102,13 +101,14 @@ class ToneEngine {
 
   public playNote(note: string) {
     if (!this.isInitialized) this.init();
-    if (globalAudioContext.state !== 'running') {
-      globalAudioContext.resume().catch(console.error);
+
+    // ✨ ИСПОЛЬЗУЕМ ВСТРОЕННЫЙ КОНТЕКСТ TONE.JS
+    if (Tone.getContext().state !== 'running') {
+      Tone.getContext().resume().catch(console.error);
     }
 
     const isAcoustic = useProgressStore.getState().pianoSoundType === 'acoustic';
 
-    // БЕСШОВНОСТЬ: Играем сэмплер только если он выбран И успел загрузиться
     if (isAcoustic && this.sampler?.loaded) {
       this.sampler.triggerAttack(note);
     } else {

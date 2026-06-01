@@ -8,6 +8,8 @@ import { ToastContainer } from 'react-toastify';
 
 import './index.css';
 import { ShortcutManager } from '@/shared/hooks/useShortcut';
+import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -27,5 +29,7 @@ createRoot(document.getElementById('root')!).render(
       />
       <ShortcutManager />
     </ThemeProvider>
+    <Analytics />
+    <SpeedInsights />
   </StrictMode>,
 );

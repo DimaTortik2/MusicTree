@@ -24,6 +24,7 @@ import { Modal } from '@/shared/Modal';
 import { Button } from '@/shared/buttons/Button';
 import type { Recording } from '@/features/vocalTuner/types';
 import { toast } from '@/app/utils/toast';
+import { Tooltip } from '@/shared/Tooltip';
 
 export function VocalTunerPage() {
   const {
@@ -50,9 +51,9 @@ export function VocalTunerPage() {
     renameRec,
   } = useVocalTuner();
 
-    const [recToDelete, setRecToDelete] = useState<Recording | null>(null);
-    const [recToRename, setRecToRename] = useState<Recording | null>(null);
-    const [newName, setNewName] = useState('');
+  const [recToDelete, setRecToDelete] = useState<Recording | null>(null);
+  const [recToRename, setRecToRename] = useState<Recording | null>(null);
+  const [newName, setNewName] = useState('');
 
   const isRecording = phase === 'recording';
   const activeRecording = recordings.find((r) => r.id === playingId);
@@ -210,7 +211,7 @@ export function VocalTunerPage() {
   return (
     <div className="flex h-screen w-full overflow-hidden font-sans text-text">
       {/* --- ДЕСКТОПНЫЙ САЙДБАР --- */}
-      <aside className="relative z-10 hidden w-[320px] flex-col border-r-3 border-white/10 bg-background md:flex">
+      <aside className="relative z-10 hidden w-[320px] flex-col border-r-3 border-white/10 md:flex">
         {sidebarContent}
       </aside>
 
@@ -298,15 +299,19 @@ export function VocalTunerPage() {
                   }
                 }}
                 className={cn(
-                  'flex items-center justify-center bg-primary text-white transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer',
+                  'flex cursor-pointer items-center justify-center bg-primary text-white transition-all duration-300 hover:scale-105 active:scale-95',
                   'h-[64px] w-[64px] rounded-[24px] md:h-[72px] md:w-[72px] md:rounded-[28px]',
-                  isRecording && 'animate-pulse bg-primary/90',
+                  isRecording && 'animate-pulse bg-text text-primary',
                 )}
               >
                 {isRecording ? (
-                  <Power size={32} weight="bold" />
+                  <Tooltip content="Стоп" position="right">
+                    <Power size={32} weight="bold" />
+                  </Tooltip>
                 ) : (
-                  <RecordIcon size={36} weight="fill" />
+                  <Tooltip content="Запись" position="right">
+                    <RecordIcon size={36} weight="fill" />
+                  </Tooltip>
                 )}
               </button>
             }

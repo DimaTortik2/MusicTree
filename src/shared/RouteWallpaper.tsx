@@ -19,7 +19,7 @@ export const RouteWallpaper = () => {
     if (pathname.includes('/app/current/lecture')) return LessonWallpaper;
     if (pathname.includes('/app/tests')) return TestsWallpaper;
     if (pathname.includes('/app/settings')) return SettingsWallpaper;
-    if (pathname.includes('/app/vocal')) return VocalWallpaper;
+    if (pathname.includes('/app/mic')) return VocalWallpaper;
   }, [pathname]);
 
   if (!WallpaperIcon) return null;

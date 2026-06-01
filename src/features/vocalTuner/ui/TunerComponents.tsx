@@ -315,7 +315,7 @@ export const TunerVisualizer = memo(({ pitchDataRef, actions }: TunerVisualizerP
         for (let i = 0; i < children.length; i++) {
           const el = children[i];
           const noteMidi = MIN_MIDI + i;
-          
+
           const delta = noteMidi - currentMidi.current;
           const absDelta = Math.abs(delta);
 
@@ -329,7 +329,7 @@ export const TunerVisualizer = memo(({ pitchDataRef, actions }: TunerVisualizerP
           const translateY = delta * -spacing;
           const rotateX = delta * 25;
           // КРАСИВАЯ ФОРМУЛА ЗАТУХАНИЯ: экспоненциальное падение прозрачности (1 -> 0.5 -> 0.25...)
-          const opacity = Math.pow(0.5, absDelta); 
+          const opacity = Math.pow(0.5, absDelta);
           const scale = Math.max(0, 1 - absDelta * 0.1); // Плавное уменьшение размера
 
           el.style.opacity = opacity.toFixed(3);
@@ -348,7 +348,11 @@ export const TunerVisualizer = memo(({ pitchDataRef, actions }: TunerVisualizerP
     <div className="relative mt-[-40px] scale-90 md:mt-0 md:scale-100">
       <div className="flex flex-col items-center gap-6">
         <div className="relative h-[280px] w-[150px] overflow-hidden rounded-[28px] border-2 border-primary bg-transparent md:h-[340px] md:w-[180px] md:rounded-[32px]">
-          <div ref={controllerRef} className="absolute inset-0 h-full w-full bg-primary/40 will-change-transform" style={{ opacity: 0 }} />
+          <div
+            ref={controllerRef}
+            className="absolute inset-0 h-full w-full bg-primary/40 will-change-transform"
+            style={{ opacity: 0 }}
+          />
           <div className="absolute top-1/2 left-0 h-[2px] w-full -translate-y-1/2 bg-primary" />
         </div>
         {actions && (
@@ -358,14 +362,19 @@ export const TunerVisualizer = memo(({ pitchDataRef, actions }: TunerVisualizerP
         )}
       </div>
 
-      <div 
+      <div
         className="pointer-events-none absolute top-0 left-[calc(100%+2.5rem)] h-[280px] w-16 shrink-0 md:left-[calc(100%+4rem)] md:h-[340px] md:w-24"
         style={{
-          WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 20%, black 80%, transparent)',
+          WebkitMaskImage:
+            'linear-gradient(to bottom, transparent, black 20%, black 80%, transparent)',
           maskImage: 'linear-gradient(to bottom, transparent, black 20%, black 80%, transparent)',
         }}
       >
-        <div ref={drumRef} className="relative h-full w-full" style={{ perspective: '300px', transformStyle: 'preserve-3d' }}>
+        <div
+          ref={drumRef}
+          className="relative h-full w-full"
+          style={{ perspective: '300px', transformStyle: 'preserve-3d' }}
+        >
           {DRUM_NOTES.map((n) => (
             <span
               key={n.midi}

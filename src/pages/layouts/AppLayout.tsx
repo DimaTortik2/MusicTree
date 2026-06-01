@@ -12,6 +12,9 @@ import { VisualPiano } from '@/shared/piano/VisualPiano';
 import { AudioUnlockOverlay } from '@/app/providers/AudioUnlockOverlay';
 import { useGlobalPiano } from '@/app/hooks/useGlobalPiano';
 import { useAppShortcuts } from '@/app/hooks/useAppShortcuts';
+import { Tooltip } from '@/shared/Tooltip';
+
+// ПРОПИШИ ПРАВИЛЬНЫЙ ПУТЬ ДО ТУЛТИПА:
 
 const TAB_ROUTES: Record<string, string> = {
   tree: '/app/tree',
@@ -53,16 +56,16 @@ export const AppLayout = () => {
     togglePiano: () => setIsPianoActive((prev) => !prev),
   });
 
-   useEffect(() => {
-     const html = document.documentElement;
-     if (uiSize === 'xs')
-       html.style.fontSize = '12px'; // ~75% от стандарта (очень мелко)
-     else if (uiSize === 'sm')
-       html.style.fontSize = '14px'; // ~87.5% от стандарта
-     else if (uiSize === 'lg')
-       html.style.fontSize = '18px'; // ~112.5% от стандарта
-     else html.style.fontSize = '16px'; // 100% (стандарт)
-   }, [uiSize]);
+  useEffect(() => {
+    const html = document.documentElement;
+    if (uiSize === 'xs')
+      html.style.fontSize = '12px'; // ~75% от стандарта (очень мелко)
+    else if (uiSize === 'sm')
+      html.style.fontSize = '14px'; // ~87.5% от стандарта
+    else if (uiSize === 'lg')
+      html.style.fontSize = '18px'; // ~112.5% от стандарта
+    else html.style.fontSize = '16px'; // 100% (стандарт)
+  }, [uiSize]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -85,59 +88,99 @@ export const AppLayout = () => {
     if (!info) return null;
     const Icon = info.icon;
 
+    // Маппинг для названий тултипов и экшенов шорткатов
+    const TAB_LABELS: Record<string, string> = {
+      piano: 'Пианино',
+      tree: 'Дерево',
+      lesson: 'Текущая лекция',
+      homeworks: 'Домашние задания',
+      chains: 'Цепь распевки',
+      vocal: 'Вокальный тренажер',
+      tests: 'Тесты',
+      exam: 'Экзамен',
+      debug: 'Дебаг',
+      settings: 'Настройки',
+      customize: 'Настроить вкладки',
+    };
+
+    const TAB_SHORTCUTS: Record<string, string> = {
+      piano: 'openPiano',
+      tree: 'navTree',
+      lesson: 'navCurrentLecture',
+      homeworks: 'navHomework',
+      chains: 'navWarmupChain',
+      vocal: 'navVocalTrainer',
+      tests: 'navTests',
+      settings: 'navSettings',
+    };
+
+    // Привязываем тексты и шорткаты
+    const label = (info as any).label || TAB_LABELS[id] || 'Вкладка';
+    const shortcutAction = TAB_SHORTCUTS[id] as any;
+    // Сбоку (десктоп) показываем тултип справа, снизу (мобилки) - сверху
+    const tooltipPosition = isMobile ? 'top' : 'right';
+
     if (id === 'piano') {
       return (
-        <ControlButton
+        <Tooltip
           key={id}
-          icon={<Icon size={isMobile ? 22 : 20} weight="fill" />}
-          isActive={isPianoActive}
-          onClick={() => {
-            handlePianoClick();
-            if (isMobile) setIsOverflowOpen(false);
-          }}
-          className={cn(isMobile ? 'p-1.5' : 'rounded-lg p-1.5 hover:cursor-pointer')}
-          innerClassName="p-1"
-        />
+          content={label}
+          shortcutAction={shortcutAction}
+          position={tooltipPosition}
+        >
+          <ControlButton
+            icon={<Icon size={isMobile ? 22 : 20} weight="fill" />}
+            isActive={isPianoActive}
+            onClick={() => {
+              handlePianoClick();
+              if (isMobile) setIsOverflowOpen(false);
+            }}
+            className={cn(isMobile ? 'p-1.5' : 'rounded-lg p-1.5 hover:cursor-pointer')}
+            innerClassName="p-1"
+          />
+        </Tooltip>
       );
     }
 
     if (id === 'customize') {
       return (
-        <button
-          key={id}
-          type="button"
-          onClick={() => {
-            setIsOverflowOpen(false);
-            setIsCustomizing(true);
-          }}
-          className="flex cursor-pointer items-center justify-center p-1.5 text-text/40 transition-colors duration-150 outline-none hover:text-text"
-        >
-          <Icon size={24} />
-        </button>
+        <Tooltip key={id} content={label} position={tooltipPosition}>
+          <button
+            type="button"
+            onClick={() => {
+              setIsOverflowOpen(false);
+              setIsCustomizing(true);
+            }}
+            className="flex cursor-pointer items-center justify-center p-1.5 text-text/40 transition-colors duration-150 outline-none hover:text-text"
+          >
+            <Icon size={24} />
+          </button>
+        </Tooltip>
       );
     }
 
     const route = TAB_ROUTES[id] || '/app';
 
     return (
-      <NavLink
-        key={id}
-        to={route}
-        onClick={() => setIsOverflowOpen(false)}
-        className={({ isActive }) =>
-          `flex items-center justify-center transition-colors duration-150 ${
-            isMobile ? 'p-1.5' : 'rounded-lg p-2'
-          } ${
-            isActive
-              ? 'text-text'
-              : isMobile
-                ? 'text-text/40 hover:text-text'
-                : 'text-text/40 hover:bg-surface/40 hover:text-text'
-          }`
-        }
-      >
-        <Icon size={isMobile ? 24 : 22} />
-      </NavLink>
+      <Tooltip key={id} content={label} shortcutAction={shortcutAction} position={tooltipPosition}>
+        <NavLink
+          to={route}
+          onClick={() => setIsOverflowOpen(false)}
+          className={({ isActive }) =>
+            `flex items-center justify-center transition-colors duration-150 ${
+              isMobile ? 'p-1.5' : 'rounded-lg p-2'
+            } ${
+              isActive
+                ? 'text-text'
+                : isMobile
+                  ? 'text-text/40 hover:text-text'
+                  : 'text-text/40 hover:bg-surface/40 hover:text-text'
+            }`
+          }
+        >
+          <Icon size={isMobile ? 24 : 22} />
+        </NavLink>
+      </Tooltip>
     );
   };
 
@@ -221,15 +264,17 @@ export const AppLayout = () => {
                 ))}
 
                 <div className="flex flex-1 justify-center">
-                  <button
-                    ref={toggleBtnRef}
-                    onClick={() => setIsOverflowOpen((prev) => !prev)}
-                    className={`flex items-center justify-center p-1.5 transition-colors duration-150 outline-none ${
-                      isOverflowOpen ? 'text-text' : 'text-text/40 hover:text-text'
-                    }`}
-                  >
-                    <DotsThree size={28} weight="bold" />
-                  </button>
+                  <Tooltip content="Дополнительно" position="top">
+                    <button
+                      ref={toggleBtnRef}
+                      onClick={() => setIsOverflowOpen((prev) => !prev)}
+                      className={`flex items-center justify-center p-1.5 transition-colors duration-150 outline-none ${
+                        isOverflowOpen ? 'text-text' : 'text-text/40 hover:text-text'
+                      }`}
+                    >
+                      <DotsThree size={28} weight="bold" />
+                    </button>
+                  </Tooltip>
                 </div>
               </div>
             </div>

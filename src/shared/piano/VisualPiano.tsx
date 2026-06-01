@@ -13,6 +13,8 @@ import { useActiveKeysStore } from '@/app/store/useActiveKeysStore';
 import { ControlButton } from '@/shared/buttons/ControlButton';
 import { toneEngine } from '@/shared/lib/toneEngine';
 import { toast } from '@/app/utils/toast';
+import { Tooltip } from '@/shared/Tooltip';
+
 
 interface PianoKey {
   baseNote: string;
@@ -360,36 +362,56 @@ export const VisualPiano: React.FC<PianoProps> = ({ className, ...props }) => {
       {/* Десктопная версия */}
       <div className="hidden w-full items-center justify-between px-4 py-4 md:flex md:px-6 md:py-5 lg:px-8 lg:py-6">
         <div className="flex flex-col gap-2 lg:gap-3">
-          <ControlButton
-            icon={<Sunglasses weight="regular" size={20} />}
-            isActive={showPianoHints}
-            onClick={() => setShowPianoHints(!showPianoHints)}
-            className="size-10 shrink-0 rounded-xl active:scale-95 md:size-8 lg:size-10"
-            innerClassName="md:p-1.5 lg:p-2"
-          />
-          <ControlButton
-            icon={<Keyboard weight="regular" size={20} />}
-            isActive={isKeyboardPianoActive}
-            onClick={() => setKeyboardPianoActive(!isKeyboardPianoActive)}
-            className="size-10 shrink-0 rounded-xl active:scale-95 md:size-8 lg:size-10"
-            innerClassName="md:p-1.5 lg:p-2"
-          />
+          <Tooltip content="Подсказки на клавишах" shortcutAction="togglePianoHints" position="top">
+            <ControlButton
+              icon={<Sunglasses weight="regular" size={20} />}
+              isActive={showPianoHints}
+              onClick={() => setShowPianoHints(!showPianoHints)}
+              className="size-10 shrink-0 rounded-xl active:scale-95 md:size-8 lg:size-10"
+              innerClassName="md:p-1.5 lg:p-2"
+            />
+          </Tooltip>
+          <Tooltip
+            content="Режим отслеживания клавиш пианино"
+            shortcutAction="togglePianoTracking"
+            position="bottom"
+          >
+            <ControlButton
+              icon={<Keyboard weight="regular" size={20} />}
+              isActive={isKeyboardPianoActive}
+              onClick={() => setKeyboardPianoActive(!isKeyboardPianoActive)}
+              className="size-10 shrink-0 rounded-xl active:scale-95 md:size-8 lg:size-10"
+              innerClassName="md:p-1.5 lg:p-2"
+            />
+          </Tooltip>
         </div>
 
         <div className="flex items-center gap-3 lg:gap-5">
           <div className="flex flex-col gap-1.5 lg:gap-2">
-            <ControlButton
-              icon={<CaretDoubleUp weight="regular" size={18} />}
-              onClick={() => setLeftOctaveShift(Math.min(leftOctaveShift + 1, 3))}
-              className="size-10 shrink-0 rounded-xl active:scale-95 md:size-8 lg:size-10"
-              innerClassName="md:p-1.5 lg:p-2"
-            />
-            <ControlButton
-              icon={<CaretDoubleDown weight="regular" size={18} />}
-              onClick={() => setLeftOctaveShift(Math.max(leftOctaveShift - 1, -3))}
-              className="size-10 shrink-0 rounded-xl active:scale-95 md:size-8 lg:size-10"
-              innerClassName="md:p-1.5 lg:p-2"
-            />
+            <Tooltip
+              content="Октава левого пианино вверх"
+              shortcutAction="leftPianoOctaveUp"
+              position="top"
+            >
+              <ControlButton
+                icon={<CaretDoubleUp weight="regular" size={18} />}
+                onClick={() => setLeftOctaveShift(Math.min(leftOctaveShift + 1, 3))}
+                className="size-10 shrink-0 rounded-xl active:scale-95 md:size-8 lg:size-10"
+                innerClassName="md:p-1.5 lg:p-2"
+              />
+            </Tooltip>
+            <Tooltip
+              content="Октава левого пианино вниз"
+              shortcutAction="leftPianoOctaveDown"
+              position="bottom"
+            >
+              <ControlButton
+                icon={<CaretDoubleDown weight="regular" size={18} />}
+                onClick={() => setLeftOctaveShift(Math.max(leftOctaveShift - 1, -3))}
+                className="size-10 shrink-0 rounded-xl active:scale-95 md:size-8 lg:size-10"
+                innerClassName="md:p-1.5 lg:p-2"
+              />
+            </Tooltip>
           </div>
 
           {/* ИСПРАВЛЕНИЕ 3: добавили items-start для левой октавы */}
@@ -403,18 +425,30 @@ export const VisualPiano: React.FC<PianoProps> = ({ className, ...props }) => {
           </div>
 
           <div className="flex flex-col gap-1.5 lg:gap-2">
-            <ControlButton
-              icon={<CaretDoubleUp weight="regular" size={18} />}
-              onClick={() => setRightOctaveShift(Math.min(rightOctaveShift + 1, 2))}
-              className="size-10 shrink-0 rounded-xl active:scale-95 md:size-8 lg:size-10"
-              innerClassName="md:p-1.5 lg:p-2"
-            />
-            <ControlButton
-              icon={<CaretDoubleDown weight="regular" size={18} />}
-              onClick={() => setRightOctaveShift(Math.max(rightOctaveShift - 1, -4))}
-              className="size-10 shrink-0 rounded-xl active:scale-95 md:size-8 lg:size-10"
-              innerClassName="md:p-1.5 lg:p-2"
-            />
+            <Tooltip
+              content="Октава правого пианино вверх"
+              shortcutAction="rightPianoOctaveUp"
+              position="top"
+            >
+              <ControlButton
+                icon={<CaretDoubleUp weight="regular" size={18} />}
+                onClick={() => setRightOctaveShift(Math.min(rightOctaveShift + 1, 2))}
+                className="size-10 shrink-0 rounded-xl active:scale-95 md:size-8 lg:size-10"
+                innerClassName="md:p-1.5 lg:p-2"
+              />
+            </Tooltip>
+            <Tooltip
+              content="Октава правого пианино вниз"
+              shortcutAction="rightPianoOctaveDown"
+              position="bottom"
+            >
+              <ControlButton
+                icon={<CaretDoubleDown weight="regular" size={18} />}
+                onClick={() => setRightOctaveShift(Math.max(rightOctaveShift - 1, -4))}
+                className="size-10 shrink-0 rounded-xl active:scale-95 md:size-8 lg:size-10"
+                innerClassName="md:p-1.5 lg:p-2"
+              />
+            </Tooltip>
           </div>
         </div>
 
@@ -441,19 +475,21 @@ export const VisualPiano: React.FC<PianoProps> = ({ className, ...props }) => {
             />
           </div>
 
-          <ControlButton
-            icon={
-              isPianoMuted || pianoVolume === 0 ? (
-                <SpeakerSimpleSlash weight="regular" size={20} />
-              ) : (
-                <SpeakerSimpleHigh weight="regular" size={20} />
-              )
-            }
-            isActive={!isPianoMuted && pianoVolume > 0}
-            onClick={togglePianoMute}
-            className="size-10 shrink-0 rounded-xl active:scale-95 md:size-8 lg:size-10"
-            innerClassName="md:p-1.5 lg:p-2"
-          />
+          <Tooltip content="Мьют пианино" shortcutAction="togglePianoMute" position="bottom">
+            <ControlButton
+              icon={
+                isPianoMuted || pianoVolume === 0 ? (
+                  <SpeakerSimpleSlash weight="regular" size={20} />
+                ) : (
+                  <SpeakerSimpleHigh weight="regular" size={20} />
+                )
+              }
+              isActive={!isPianoMuted && pianoVolume > 0}
+              onClick={togglePianoMute}
+              className="size-10 shrink-0 rounded-xl active:scale-95 md:size-8 lg:size-10"
+              innerClassName="md:p-1.5 lg:p-2"
+            />
+          </Tooltip>
         </div>
       </div>
     </div>

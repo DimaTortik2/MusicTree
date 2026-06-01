@@ -298,7 +298,7 @@ export function VocalTunerPage() {
                   }
                 }}
                 className={cn(
-                  'flex items-center justify-center bg-primary text-white transition-all duration-300 hover:scale-105 active:scale-95',
+                  'flex items-center justify-center bg-primary text-white transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer',
                   'h-[64px] w-[64px] rounded-[24px] md:h-[72px] md:w-[72px] md:rounded-[28px]',
                   isRecording && 'animate-pulse bg-primary/90',
                 )}

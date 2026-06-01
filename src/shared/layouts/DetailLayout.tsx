@@ -36,7 +36,7 @@ export const DetailLayout: React.FC<DetailLayoutProps> = ({
       {/* ЛЕВАЯ КОЛОНКА (СПИСОК) */}
       <div
         className={cn(
-          'flex h-full w-full flex-col border-text/18 md:w-[360px] md:border-r-[3px] lg:w-[420px]',
+          'flex h-full w-full flex-col border-text/10 md:w-[360px] md:border-r-[3px] lg:w-[420px]',
           isMobileDetailOpen ? 'hidden md:flex' : 'flex',
         )}
       >

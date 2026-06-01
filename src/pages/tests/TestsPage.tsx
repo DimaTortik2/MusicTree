@@ -1,4 +1,3 @@
-// src/app/pages/tests/TestsPage.tsx
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams, useBlocker } from 'react-router-dom';
 import { GitFork } from '@phosphor-icons/react';
@@ -9,6 +8,32 @@ import { DetailLayout } from '@/shared/layouts/DetailLayout';
 import { useTestsData } from './useTestsData';
 import { TestRunner } from './TestRunner';
 import { useRememberSelection } from '@/shared/hooks/useRememberSelection';
+// ✨ Добавляем framer-motion
+import { AnimatePresence, motion, type Variants } from 'framer-motion';
+
+// ✨ Те же варианты затухания
+const contentTransitionVariants: Variants = {
+  initial: {
+    opacity: 0,
+    scale: 0.98,
+  },
+  animate: {
+    opacity: 1,
+    scale: 1,
+    transition: {
+      duration: 0.3,
+      ease: [0.25, 1, 0.5, 1],
+    },
+  },
+  exit: {
+    opacity: 0,
+    scale: 0.98,
+    transition: {
+      duration: 0.2,
+      ease: [0.25, 0, 0.5, 1],
+    },
+  },
+};
 
 export const TestsPage = () => {
   const navigate = useNavigate();
@@ -19,18 +44,15 @@ export const TestsPage = () => {
   const listRef = useRef<HTMLDivElement>(null);
   const detailRef = useRef<HTMLDivElement>(null);
 
-  // Стейты для защиты от выхода из активного теста
   const [isTestDirty, setIsTestDirty] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
 
-  // Глобальная блокировка смены роутов (навбар, кнопка назад в браузере)
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
       isTestDirty && currentLocation.pathname !== nextLocation.pathname,
   );
 
-  // Обработка блокировщика роутера
   useEffect(() => {
     if (blocker.state === 'blocked') {
       setPendingAction(() => () => blocker.proceed?.());
@@ -38,18 +60,19 @@ export const TestsPage = () => {
     }
   }, [blocker.state]);
 
-  // Защита от перезагрузки страницы или закрытия вкладки (F5)
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (isTestDirty) {
         e.preventDefault();
-        e.returnValue = ''; // Standard для вызова нативного системного алерта
+        e.returnValue = '';
       }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [isTestDirty]);
 
+  const selectedTest = data.allItems.find((t) => t.id === testId);
+  
   useEffect(() => {
     if (detailRef.current) {
       detailRef.current.scrollTop = 0;
@@ -64,17 +87,7 @@ export const TestsPage = () => {
       }, 50);
       return () => clearTimeout(timer);
     }
-  }, [testId]);
-
-  useEffect(() => {
-    if (!testId && !data.isEmpty && data.allItems.length > 0) {
-      const defaultId =
-        data.activeItems.length > 0
-          ? data.activeItems[data.activeItems.length - 1].id
-          : data.archivedItems[data.archivedItems.length - 1].id;
-      navigate(`/app/tests/${defaultId}`, { replace: true });
-    }
-  }, [testId, data, navigate]);
+  }, [testId, selectedTest?.isPassed]);
 
   const getSavedId = useRememberSelection('music-tree-last-test', testId, (id) =>
     data.allItems.some((t) => t.id === id),
@@ -84,7 +97,6 @@ export const TestsPage = () => {
     if (!testId && !data.isEmpty && data.allItems.length > 0) {
       const savedId = getSavedId();
 
-      // Твой оригинальный фоллбек
       const defaultId =
         savedId ||
         (data.activeItems.length > 0
@@ -95,7 +107,6 @@ export const TestsPage = () => {
     }
   }, [testId, data, navigate, getSavedId]);
 
-  const selectedTest = data.allItems.find((t) => t.id === testId);
 
   const confirmLeave = () => {
     setIsTestDirty(false);
@@ -130,7 +141,6 @@ export const TestsPage = () => {
 
   const ListContent = (
     <>
-      {/* АКТИВНЫЕ ТЕСТЫ */}
       {data.activeGroups.map((group, i) => (
         <div key={`active-${group.lessonId}`} className="mb-2">
           <div className="space-y-2">
@@ -172,7 +182,6 @@ export const TestsPage = () => {
         </div>
       ))}
 
-      {/* РАЗДЕЛИТЕЛЬ АРХИВА */}
       {data.archivedGroups.length > 0 && (
         <div className="mt-8 mb-6 flex items-center gap-4">
           <hr className="flex-1 border-surface" />
@@ -181,7 +190,6 @@ export const TestsPage = () => {
         </div>
       )}
 
-      {/* АРХИВНЫЕ ТЕСТЫ */}
       {data.archivedGroups.map((group, i) => (
         <div key={`archive-${group.lessonId}`} className="mb-2">
           <div className="space-y-4">
@@ -234,13 +242,24 @@ export const TestsPage = () => {
     </>
   );
 
+  // ✨ Оборачиваем TestRunner в AnimatePresence и motion.div
   const DetailContent = (
-    <div className="flex h-full w-full flex-1 flex-col">
-      {selectedTest ? (
-        <TestRunner key={selectedTest.id} test={selectedTest} onDirtyStateChange={setIsTestDirty} />
-      ) : null}
+    <>
+      <AnimatePresence mode="wait">
+        {selectedTest && (
+          <motion.div
+            key={selectedTest.id}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            variants={contentTransitionVariants}
+            className="flex flex-1 flex-col"
+          >
+            <TestRunner test={selectedTest} onDirtyStateChange={setIsTestDirty} />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Модалка попытки уйти с активного теста */}
       <Modal
         isOpen={showLeaveModal}
         onClose={cancelLeave}
@@ -275,7 +294,7 @@ export const TestsPage = () => {
           </>
         }
       />
-    </div>
+    </>
   );
 
   return (

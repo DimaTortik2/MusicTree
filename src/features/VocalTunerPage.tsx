@@ -107,7 +107,7 @@ export function VocalTunerPage() {
 
   // --- САЙДБАР С АНИМАЦИЕЙ СПИСКА ЗАПИСЕЙ ---
   const sidebarContent = (
-    <div className="custom-scroll flex-1 space-y-3 overflow-y-auto px-4 py-6">
+    <div className="custom-scroll flex-1 space-y-3 overflow-y-auto px-4 py-6 ">
       <AnimatePresence initial={false}>
         {recordings.map((rec) => {
           const isActive = playingId === rec.id;
@@ -126,7 +126,7 @@ export function VocalTunerPage() {
             >
               <div
                 className={cn(
-                  'flex cursor-pointer items-center justify-between rounded-2xl border-3 p-3 transition-all duration-200',
+                  'flex cursor-pointer items-center justify-between rounded-2xl border-3 p-3 transition-all duration-200 ',
                   isActive
                     ? 'border-primary bg-primary text-white'
                     : 'border-primary bg-transparent text-white hover:bg-primary/10',

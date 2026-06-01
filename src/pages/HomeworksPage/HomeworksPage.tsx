@@ -10,6 +10,8 @@ import { DetailLayout } from '@/shared/layouts/DetailLayout';
 import { MdxSkeleton } from '@/shared/MdxSkeleton';
 import { Modal } from '@/shared/Modal';
 import { useRememberSelection } from '@/shared/hooks/useRememberSelection';
+// ✨ Добавляем импорты framer-motion
+import { AnimatePresence, motion, type Variants } from 'framer-motion';
 
 const mdxFiles = import.meta.glob('/src/content/*.mdx');
 
@@ -19,6 +21,30 @@ for (const path in mdxFiles) {
     mdxFiles[path] as () => Promise<{ default: React.ComponentType<any> }>,
   );
 }
+
+// ✨ Варианты анимации затухания (как в AppLayout)
+const contentTransitionVariants: Variants = {
+  initial: {
+    opacity: 0,
+    scale: 0.98,
+  },
+  animate: {
+    opacity: 1,
+    scale: 1,
+    transition: {
+      duration: 0.3,
+      ease: [0.25, 1, 0.5, 1],
+    },
+  },
+  exit: {
+    opacity: 0,
+    scale: 0.98,
+    transition: {
+      duration: 0.2,
+      ease: [0.25, 0, 0.5, 1],
+    },
+  },
+};
 
 export const HomeworksPage = () => {
   const navigate = useNavigate();
@@ -47,17 +73,6 @@ export const HomeworksPage = () => {
     }
   }, [homeworkId]);
 
-  useEffect(() => {
-    if (!homeworkId && !data.isEmpty && data.allItems.length > 0) {
-      const defaultId =
-        data.activeItems.length > 0
-          ? data.activeItems[data.activeItems.length - 1].id
-          : data.archivedItems[data.archivedItems.length - 1].id;
-
-      navigate(`/app/homeworks/${defaultId}`, { replace: true });
-    }
-  }, [homeworkId, data, navigate]);
-
   const getSavedId = useRememberSelection('music-tree-last-homework', homeworkId, (id) =>
     data.allItems.some((hw) => hw.id === id),
   );
@@ -66,7 +81,6 @@ export const HomeworksPage = () => {
     if (!homeworkId && !data.isEmpty && data.allItems.length > 0) {
       const savedId = getSavedId();
 
-      // Твоя старая логика как фоллбек:
       const defaultId =
         savedId ||
         (data.activeItems.length > 0
@@ -76,6 +90,7 @@ export const HomeworksPage = () => {
       navigate(`/app/homeworks/${defaultId}`, { replace: true });
     }
   }, [homeworkId, data, navigate, getSavedId]);
+
   const selectedHw = data.allItems.find((hw) => hw.id === homeworkId);
   const isSelectedArchived = selectedHw ? passedHomeworks.includes(selectedHw.id) : false;
 
@@ -246,32 +261,48 @@ export const HomeworksPage = () => {
     </>
   );
 
+  // ✨ Оборачиваем в AnimatePresence и motion.div с ключом homeworkId
   const DetailContent = (
-    <div key={homeworkId} className="flex flex-1 flex-col">
-      <div className="prose prose-invert max-w-none flex-1 text-[17px] leading-relaxed text-text">
-        {LazyMdxContent ? (
-          <Suspense fallback={<MdxSkeleton />}>
-            <LazyMdxContent />
-          </Suspense>
-        ) : selectedHw ? (
-          <div className="h-full py-4 font-medium text-primary">
-            Файл не найден. Пожалуйста, добавьте файл по пути: {selectedHw.mdxPath}
-          </div>
-        ) : null}
-      </div>
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={homeworkId || 'empty'}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        variants={contentTransitionVariants}
+        className="flex flex-1 flex-col"
+      >
+        <div className="prose prose-invert max-w-none flex-1 text-[17px] leading-relaxed text-text">
+          {LazyMdxContent ? (
+            <Suspense fallback={<MdxSkeleton />}>
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, ease: 'easeOut' }}
+              >
+                <LazyMdxContent />
+              </motion.div>
+            </Suspense>
+          ) : selectedHw ? (
+            <div className="h-full py-4 font-medium text-primary">
+              Файл не найден. Пожалуйста, добавьте файл по пути: {selectedHw.mdxPath}
+            </div>
+          ) : null}
+        </div>
 
-      <div className="mt-16 flex shrink-0 justify-center">
-        {isSelectedArchived ? (
-          <Button variant="outline" color="homework" size="md" onClick={handleReturnFromArchive}>
-            Вернуть из архива
-          </Button>
-        ) : (
-          <Button variant="outline" color="homework" size="md" onClick={handleComplete}>
-            Выполнить
-          </Button>
-        )}
-      </div>
-    </div>
+        <div className="mt-16 flex shrink-0 justify-center">
+          {isSelectedArchived ? (
+            <Button variant="outline" color="homework" size="md" onClick={handleReturnFromArchive}>
+              Вернуть из архива
+            </Button>
+          ) : (
+            <Button variant="outline" color="homework" size="md" onClick={handleComplete}>
+              Выполнить
+            </Button>
+          )}
+        </div>
+      </motion.div>
+    </AnimatePresence>
   );
 
   return (

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, Suspense, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { GitFork } from '@phosphor-icons/react'; // Поменяли иконку для модалки и фоллбэка
+import { GitFork } from '@phosphor-icons/react';
 import { Button } from '@/shared/buttons/Button';
 import { cn } from '@/app/utils/cn';
 import { DetailLayout } from '@/shared/layouts/DetailLayout';
@@ -8,6 +8,8 @@ import { MdxSkeleton } from '@/shared/MdxSkeleton';
 import { Modal } from '@/shared/Modal';
 import { useChainsData } from './useChainsData';
 import { useRememberSelection } from '@/shared/hooks/useRememberSelection';
+// ✨ Добавляем framer-motion
+import { AnimatePresence, motion, type Variants } from 'framer-motion';
 
 const mdxFiles = import.meta.glob('/src/content/*.mdx');
 
@@ -17,6 +19,30 @@ for (const path in mdxFiles) {
     mdxFiles[path] as () => Promise<{ default: React.ComponentType<any> }>,
   );
 }
+
+// ✨ Те же варианты затухания, что и на странице домашек
+const contentTransitionVariants: Variants = {
+  initial: {
+    opacity: 0,
+    scale: 0.98,
+  },
+  animate: {
+    opacity: 1,
+    scale: 1,
+    transition: {
+      duration: 0.3,
+      ease: [0.25, 1, 0.5, 1],
+    },
+  },
+  exit: {
+    opacity: 0,
+    scale: 0.98,
+    transition: {
+      duration: 0.2,
+      ease: [0.25, 0, 0.5, 1],
+    },
+  },
+};
 
 export const ChainsPage = () => {
   const navigate = useNavigate();
@@ -40,7 +66,7 @@ export const ChainsPage = () => {
         if (item) {
           item.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
-      }, 50); // Небольшая задержка для точного рендера DOM
+      }, 50);
       return () => clearTimeout(timer);
     }
   }, [chainId]);
@@ -70,14 +96,12 @@ export const ChainsPage = () => {
     if (!data.isEmpty && data.chains.length > 0) {
       const isValidId = data.chains.some((c) => c.id === chainId);
       if (!chainId || !isValidId) {
-        // Берем сохраненный ID, либо фоллбечимся на дефолтный (самый первый)
         const fallbackId = getSavedId() || data.chains[0].id;
         navigate(`/app/chains/${fallbackId}`, { replace: true });
       }
     }
   }, [chainId, data, navigate, getSavedId]);
 
-  // Точная реализация модалки, как ты просил
   const EmptyState = (
     <Modal
       inline
@@ -92,27 +116,23 @@ export const ChainsPage = () => {
 
   const ListContent = (
     <div className="flex w-full flex-col items-center px-2">
-      {/* Стартовая линия сверху (цепь "свисает" сверху). Градиент дает эффект растворения */}
+      {/* Стартовая линия сверху */}
       {data.chains.length > 0 && (
         <div className="h-16 w-[3px] bg-gradient-to-t from-text/20 to-transparent sm:h-20" />
       )}
 
       {data.chains.map((chain, index) => {
         const isSelected = chainId === chain.id;
-
-        // Берем иконку из конфига или ставим заглушку, чтобы ничего не ломалось
         const Icon = chain.icon || GitFork;
 
         return (
           <React.Fragment key={chain.id}>
             <Button
               id={`chain-item-${chain.id}`}
-              variant="outline" // Все элементы на макете outline
+              variant="outline"
               color="text"
               className={cn(
-                // Убираем лишние паддинги, делаем квадрат с иконкой
                 '!h-auto !w-auto !p-4 transition-all duration-300 sm:!p-5',
-                // Выделяем активный элемент яркостью, а не заливкой
                 isSelected ? 'border-text opacity-100' : 'opacity-40 hover:opacity-70',
               )}
               onClick={() => handleSelect(chain.id)}
@@ -120,15 +140,9 @@ export const ChainsPage = () => {
               <Icon className="size-8 sm:size-10" weight="regular" />
             </Button>
 
-            {/* Звено-соединитель снизу (рендерим всем, кроме последнего) */}
+            {/* Звено-соединитель снизу */}
             {index < data.chains.length - 1 && (
-              <div
-                className={cn(
-                  'h-8 w-[3px] transition-all duration-300 sm:h-10',
-                  // Линия между элементами
-                  'bg-text/20',
-                )}
-              />
+              <div className={cn('h-8 w-[3px] bg-text/20 transition-all duration-300 sm:h-10')} />
             )}
           </React.Fragment>
         );
@@ -136,20 +150,36 @@ export const ChainsPage = () => {
     </div>
   );
 
+  // ✨ Оборачиваем в AnimatePresence и добавляем анимацию Suspense
   const DetailContent = (
-    <div key={chainId} className="flex flex-1 flex-col">
-      <div className="prose prose-invert max-w-none flex-1 text-[17px] leading-relaxed text-text">
-        {LazyMdxContent ? (
-          <Suspense fallback={<MdxSkeleton />}>
-            <LazyMdxContent />
-          </Suspense>
-        ) : selectedChain ? (
-          <div className="h-full py-4 font-medium text-primary">
-            Файл не найден. Пожалуйста, создайте файл MDX по пути: {selectedChain.mdxPath}
-          </div>
-        ) : null}
-      </div>
-    </div>
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={chainId || 'empty'}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        variants={contentTransitionVariants}
+        className="flex flex-1 flex-col" // Убрали h-full (как и на странице домашек), чтобы скролл работал корректно
+      >
+        <div className="prose prose-invert max-w-none flex-1 text-[17px] leading-relaxed text-text">
+          {LazyMdxContent ? (
+            <Suspense fallback={<MdxSkeleton />}>
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, ease: 'easeOut' }}
+              >
+                <LazyMdxContent />
+              </motion.div>
+            </Suspense>
+          ) : selectedChain ? (
+            <div className="h-full py-4 font-medium text-primary">
+              Файл не найден. Пожалуйста, создайте файл MDX по пути: {selectedChain.mdxPath}
+            </div>
+          ) : null}
+        </div>
+      </motion.div>
+    </AnimatePresence>
   );
 
   return (

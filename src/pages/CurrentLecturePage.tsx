@@ -6,6 +6,7 @@ import { FireSimple } from '@phosphor-icons/react';
 import { Button } from '@/shared/buttons/Button';
 import { MdxSkeleton } from '@/shared/MdxSkeleton';
 import confetti from 'canvas-confetti';
+import { motion } from 'framer-motion'; 
 
 const mdxLectures = import.meta.glob('/src/content/*.mdx');
 
@@ -74,7 +75,6 @@ export const CurrentLecturePage = () => {
 
   return (
     <div className="relative flex min-h-full w-full justify-center font-sans text-text selection:bg-primary/20">
-
       {/* Контейнер с идеальной шириной для чтения */}
       <div className="w-full max-w-[1000px] px-6 py-12 pb-[50vh]">
         <header className="mb-5">
@@ -86,7 +86,14 @@ export const CurrentLecturePage = () => {
         <main className="prose prose-invert prose-p:text-text/85 prose-p:leading-relaxed prose-p:text-[17px] prose-headings:font-normal prose-headings:tracking-tight prose-h2:text-xl sm:prose-h2:text-2xl prose-h2:mt-12 prose-h2:mb-6 prose-hr:border-text/10 prose-hr:my-10 max-w-none">
           {LazyMdxContent ? (
             <Suspense fallback={<MdxSkeleton />}>
-              <LazyMdxContent />
+              {/* ✨ Добавили плавную анимацию появления текста после скелетона */}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, ease: 'easeOut' }}
+              >
+                <LazyMdxContent />
+              </motion.div>
             </Suspense>
           ) : (
             <div className="font-sans text-red-500">
@@ -94,7 +101,7 @@ export const CurrentLecturePage = () => {
             </div>
           )}
 
-          <div className="mt-16 flex justify-center ">
+          <div className="mt-16 flex justify-center">
             {!isPassed ? (
               <Button variant="outline" onClick={handleCompleteClick}>
                 Завершить урок

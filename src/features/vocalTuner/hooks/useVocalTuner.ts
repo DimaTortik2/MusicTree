@@ -292,6 +292,8 @@ export function useVocalTuner() {
           { id: uuid, name: title, time: '', url: URL.createObjectURL(blob), dur, blob, createdAt },
           ...prev,
         ]);
+
+        toast.success('Запись успешно сохранена');
       } catch (e: any) {
         if (e.name === 'QuotaExceededError') {
           toast.error(

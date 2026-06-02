@@ -24,10 +24,13 @@ export const ControlButton: React.FC<ControlButtonProps> = ({
       )}
       {...props}
     >
-      {/* ИСПРАВЛЕНО: Полупрозрачный фон, который мягко реагирует на наведение в обеих темах */}
       <div
         className={cn(
-          'rounded-md bg-text/10 text-text transition-colors hover:bg-text/20',
+          'rounded-md transition-all duration-150',
+          'flex shrink-0 items-center justify-center bg-text p-1.5 text-surface opacity-70 hover:opacity-100',
+          '[.light_&]:block [.light_&]:p-0 [.light_&]:opacity-100',
+          '[.light_&]:bg-text/10 [.light_&]:text-text [.light_&]:hover:bg-text/20',
+
           innerClassName,
         )}
       >

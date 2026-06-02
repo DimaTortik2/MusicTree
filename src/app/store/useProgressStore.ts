@@ -80,6 +80,9 @@ export interface AppState {
   previousPianoVolume: number;
 
   togglePianoMute: () => void;
+
+  lessonScrollPositions: Record<string, number>;
+  setLessonScrollPosition: (id: string, position: number) => void;
 }
 
 // Дефолтная раскладка по ТЗ (q2w3... и zsxd...)
@@ -140,12 +143,23 @@ export const useProgressStore = create<AppState>()(
 
       _hasHydrated: false,
 
+      lessonScrollPositions: {},
+
       // Экшены
       setHasHydrated: (state) => set({ _hasHydrated: state }),
       setUiSize: (size) => set({ uiSize: size }),
       passLesson: (id) =>
         set((state) => ({
           passedLessons: [...new Set([...state.passedLessons, id])],
+        })),
+
+
+      setLessonScrollPosition: (id, position) =>
+        set((state) => ({
+          lessonScrollPositions: {
+            ...(state.lessonScrollPositions || {}), 
+            [id]: position,
+          },
         })),
 
       setCurrentLesson: (id) =>
@@ -212,7 +226,7 @@ export const useProgressStore = create<AppState>()(
 
       wallpaperMouseTracking: true,
       setWallpaperMouseTracking: (state) => set({ wallpaperMouseTracking: state }),
-      
+
       resetPianoBindings: () => set({ pianoBindings: DEFAULT_PIANO_BINDINGS }),
       setShowPianoHints: (state) => set({ showPianoHints: state }),
       togglePianoMute: () =>

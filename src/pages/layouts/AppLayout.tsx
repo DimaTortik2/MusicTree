@@ -275,8 +275,9 @@ export const AppLayout = () => {
       <RouteWallpaper />
 
       {/* 2. Основная рабочая область */}
-      <main className="relative z-10 flex-1 overflow-y-auto bg-transparent transition-all duration-300">
-        <div className="h-full w-full">
+      <main className="relative z-10 flex-1 overflow-hidden bg-transparent transition-all duration-300">
+        {/* Обертка теперь relative для абсолютного позиционирования страниц */}
+        <div className="relative h-full w-full">
           <AudioUnlockOverlay />
 
           {/* ✨ mode="wait" заставляет старую страницу исчезнуть до появления новой */}
@@ -287,7 +288,8 @@ export const AppLayout = () => {
               animate="animate"
               exit="exit"
               variants={pageTransitionVariants}
-              className="h-full w-full"
+              // ✨ Скролл-контейнером теперь является сама анимированная страница
+              className="absolute inset-0 overflow-x-hidden overflow-y-auto"
             >
               {outlet}
             </motion.div>

@@ -14,7 +14,7 @@ const stateStyles: Record<TreeElementState, string> = {
   current: 'border-primary hover:bg-primary',
   completed: 'border-accent hover:bg-accent',
   ordinary: 'border-transparent',
-  locked: 'opacity-40',
+  locked: 'border-text/10 text-text/10',
   current_completed: 'border-accent hover:bg-accent',
 };
 

@@ -4,6 +4,7 @@ import { TreeElement } from '@/shared/TreeElement';
 import type { TreeElementState } from '@/shared/TreeElement';
 import { contentConfig, type LessonConfig } from '@/contentConfig';
 import { useProgressStore } from '@/app/store/useProgressStore';
+import { cn } from '@/app/utils/cn';
 
 const BASE_WIDTH = 1000;
 const ROW_HEIGHT = 200;
@@ -130,7 +131,7 @@ export const TreePage = () => {
               d={line.path}
               fill="none"
               strokeWidth="4"
-              className="stroke-surface"
+              className="stroke-line"
               strokeLinejoin="round"
             />
           ))}
@@ -152,7 +153,12 @@ export const TreePage = () => {
             >
               <TreeElement state={state} onClick={() => handleLessonClick(lesson.id)} />
 
-              <div className="pointer-events-none mt-1 w-17.5 text-center text-[11px] leading-tight font-medium wrap-break-word text-text/80 transition-colors duration-200 group-hover:text-text sm:mt-2 sm:w-30 sm:text-sm">
+              <div
+                className={cn(
+                  'pointer-events-none mt-1 w-17.5 text-center text-[11px] leading-tight font-medium wrap-break-word text-text/80 transition-colors duration-200 group-hover:text-text sm:mt-2 sm:w-30 sm:text-sm',
+                  state === 'locked' && 'text-text/10',
+                )}
+              >
                 {lesson.title}
               </div>
             </div>

@@ -12,6 +12,7 @@ import { VolumeSlider } from '@/shared/VolumeSlider';
 import { toneEngine } from '@/shared/lib/toneEngine';
 import { useNavigate } from 'react-router-dom';
 import { Radio } from '@/shared/buttons/Radio';
+import { toast } from '@/app/utils/toast';
 
 // Форматирование клавиш (убираем Key и Digit + меняем слова на символы)
 const formatKeyName = (code: string | null) => {
@@ -169,6 +170,7 @@ export default function SettingsPage() {
       useProgressStore.setState({ audioRecordIds: [] });
       setStorageText('0 МБ');
       setStoragePercent(0);
+      toast.success('Все аудифайлы очищены');
     } catch (e) {
       console.error('Ошибка очистки аудио:', e);
     }

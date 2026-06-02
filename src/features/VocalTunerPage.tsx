@@ -107,7 +107,7 @@ export function VocalTunerPage() {
 
   // --- САЙДБАР С АНИМАЦИЕЙ СПИСКА ЗАПИСЕЙ ---
   const sidebarContent = (
-    <div className="custom-scroll flex-1 space-y-3 overflow-y-auto px-4 py-6 ">
+    <div className="custom-scroll flex-1 space-y-3 overflow-y-auto px-4 py-6">
       <AnimatePresence initial={false}>
         {recordings.map((rec) => {
           const isActive = playingId === rec.id;
@@ -126,7 +126,7 @@ export function VocalTunerPage() {
             >
               <div
                 className={cn(
-                  'flex cursor-pointer items-center justify-between rounded-2xl border-3 p-3 transition-all duration-200 ',
+                  'flex cursor-pointer items-center justify-between rounded-2xl border-3 p-3 transition-all duration-200',
                   isActive
                     ? 'border-primary bg-primary text-white'
                     : 'border-primary bg-transparent text-white hover:bg-primary/10',
@@ -230,7 +230,10 @@ export function VocalTunerPage() {
       {/* --- МОБИЛЬНЫЙ САЙДБАР --- */}
       <MobileSidebarPortal
         isOpen={isMobileSidebarOpen}
-        onClose={() => setIsMobileSidebarOpen(false)}
+        onClose={() => {
+          setIsMobileSidebarOpen(false);
+          toast.dismiss();
+        }}
       >
         {sidebarContent}
         <AnimatePresence>
@@ -261,7 +264,10 @@ export function VocalTunerPage() {
       <main className="relative flex flex-1 flex-col">
         <div className="absolute top-6 left-5 z-10 md:hidden">
           <button
-            onClick={() => setIsMobileSidebarOpen(true)}
+            onClick={() => {
+              setIsMobileSidebarOpen(true);
+              toast.dismiss();
+            }}
             className="-m-2 p-2 text-white opacity-70 transition-opacity hover:opacity-100"
           >
             <SidebarIcon />
@@ -371,7 +377,7 @@ export function VocalTunerPage() {
                 if (recToDelete) {
                   deleteRec(recToDelete.id);
                   setRecToDelete(null);
-                  toast.success('Запись удалена');
+                  toast.success('Запись удалена', { position: 'bottom-right' });
                 }
               }}
               className="w-full rounded-[16px] border-2 py-3 text-[15px] font-medium sm:w-auto sm:min-w-[140px] md:min-w-[160px]"

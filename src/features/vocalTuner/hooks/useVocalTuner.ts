@@ -166,8 +166,8 @@ export function useVocalTuner() {
         stopMic(); // Глушим процесс PitchFinder
       }
     };
-    navigator.mediaDevices.addEventListener('devicechange', handleDeviceChange);
-    return () => navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange);
+    navigator.mediaDevices?.addEventListener('devicechange', handleDeviceChange);
+    return () => navigator.mediaDevices?.removeEventListener('devicechange', handleDeviceChange);
   }, []);
 
   // --- PITCHFINDER YIN LOOP (Throttled & Ограниченный) ---
@@ -209,6 +209,11 @@ export function useVocalTuner() {
   const startMic = async () => {
     setMicError(null);
     try {
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error('InsecureContext');
+        }
+
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
       });
@@ -248,7 +253,11 @@ export function useVocalTuner() {
       setPhase('listening');
       rafRef.current = requestAnimationFrame(() => tickRef.current());
     } catch (err: any) {
-      if (err.name === 'NotAllowedError') setMicError('denied');
+       if (err.message === 'InsecureContext') {
+         setMicError('denied');
+         toast.error('Микрофон недоступен по HTTP. Запустите Vite с HTTPS.');
+       } 
+      else if (err.name === 'NotAllowedError') setMicError('denied');
       else if (err.name === 'NotFoundError') setMicError('not_found');
       else if (err.name === 'NotReadableError' || err.name === 'TrackStartError')
         setMicError('busy');
@@ -298,7 +307,7 @@ export function useVocalTuner() {
           ...prev,
         ]);
 
-        toast.success('Запись успешно сохранена');
+        toast.success('Запись успешно сохранена', { position: 'bottom-right' });
       } catch (e: any) {
         if (e.name === 'QuotaExceededError') {
           toast.error(

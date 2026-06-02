@@ -57,7 +57,12 @@ export const AmbientGlow = () => {
           animate={{ backgroundColor: activeColors.top }}
           transition={{ duration: 1.5, ease: 'easeInOut' }}
           className="absolute top-0 left-0 size-[800px] -translate-x-1/2 -translate-y-1/2 transform-gpu rounded-full opacity-[0.07] will-change-[background-color] md:size-[1000px]"
-          style={{ maskImage: SCRIM_MASK, WebkitMaskImage: SCRIM_MASK }}
+          style={{
+            maskImage: SCRIM_MASK,
+            WebkitMaskImage: SCRIM_MASK,
+            opacity: 'var(--glow-opacity)',
+            mixBlendMode: 'var(--glow-blend)' as any,
+          }}
         />
 
         {/* Нижнее правое */}
@@ -66,7 +71,12 @@ export const AmbientGlow = () => {
           animate={{ backgroundColor: activeColors.bottom }}
           transition={{ duration: 1.5, ease: 'easeInOut' }}
           className="absolute right-0 bottom-0 size-[1000px] translate-x-1/2 translate-y-1/2 transform-gpu rounded-full opacity-[0.07] will-change-[background-color] md:size-[1200px]"
-          style={{ maskImage: SCRIM_MASK, WebkitMaskImage: SCRIM_MASK }}
+          style={{
+            maskImage: SCRIM_MASK,
+            WebkitMaskImage: SCRIM_MASK,
+            opacity: 'var(--glow-opacity)',
+            mixBlendMode: 'var(--glow-blend)' as any,
+          }}
         />
       </div>
 

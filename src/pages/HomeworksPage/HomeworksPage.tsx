@@ -189,7 +189,7 @@ export const HomeworksPage = () => {
                 <span
                   className={cn(
                     'text-[22px] leading-tight font-normal tracking-wide',
-                    homeworkId === hw.id ? 'text-text' : 'text-text',
+                    homeworkId === hw.id ? 'text-white' : 'text-text',
                   )}
                 >
                   {hw.title}
@@ -197,7 +197,7 @@ export const HomeworksPage = () => {
                 <span
                   className={cn(
                     'text-[15px] font-light',
-                    homeworkId === hw.id ? 'text-text/70' : 'text-text/40',
+                    homeworkId === hw.id ? 'text-white/70' : 'text-text/40',
                   )}
                 >
                   {hw.lessonTitle}
@@ -230,13 +230,18 @@ export const HomeworksPage = () => {
                   )}
                   onClick={() => handleSelect(hw.id)}
                 >
-                  <span className="text-[22px] leading-tight font-normal tracking-wide text-text">
+                  <span
+                    className={cn(
+                      'text-[22px] leading-tight font-normal tracking-wide',
+                      isSelected ? 'text-white' : 'text-text/40',
+                    )}
+                  >
                     {hw.title}
                   </span>
                   <span
                     className={cn(
                       'text-[15px] font-light',
-                      isSelected ? 'text-text/70' : 'text-text/40',
+                      isSelected ? 'text-white/70' : 'text-text/40',
                     )}
                   >
                     {hw.lessonTitle}

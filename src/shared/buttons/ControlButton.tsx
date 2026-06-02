@@ -24,7 +24,15 @@ export const ControlButton: React.FC<ControlButtonProps> = ({
       )}
       {...props}
     >
-      <div className={cn('rounded-md bg-text text-surface', innerClassName)}>{icon}</div>
+      {/* ИСПРАВЛЕНО: Полупрозрачный фон, который мягко реагирует на наведение в обеих темах */}
+      <div
+        className={cn(
+          'rounded-md bg-text/10 text-text transition-colors hover:bg-text/20',
+          innerClassName,
+        )}
+      >
+        {icon}
+      </div>
     </button>
   );
 };

@@ -37,6 +37,9 @@
 
   --toastify-font-family: var(--font-sans);
   --toastify-border-radius: 16px;
+
+   --glow-opacity: 0.08; /* Для темной темы */
+  --glow-blend: screen; /* Свечение осветляет темный фон */
 }
 
 .Toastify__toast {
@@ -94,21 +97,41 @@
     margin-bottom: 12px !important;
   }
 }
-.light {
-  --background: #f9f7fa;
-  --surface: #f1ebf5;
-  --primary: #db2777;
-  --accent: #7c3aed;
-  --text: #1a0b22;
-  --homework: #fef08a;
-  --access: #059669;
 
+.light {
+  /* Базовые цвета фона */
+  --background: #faf8fc; 
+  --surface: #ffffff; 
+
+  /* Акцентные цвета бренда */
+  --primary: #db2777; 
+  --accent: #7c3aed;  
+  
+  /* Текст */
+  --text: #1d1520; 
+
+  /* Семантические цвета */
+  --homework: #d97706; 
+  --access: #059669;   
+
+  /* Линии и разделители */
+  --line: #e9e2ee; 
+
+  /* Свечения */
+  --homework-glow: #f59e0b; 
+  --access-glow: #06b6d4;   
+
+  /* Пианино */
   --piano-white: #f8f9fa;
   --piano-white-hover: #e9ecef;
   --piano-white-active: #dee2e6;
-  --piano-black: #0f0510;
-  --piano-black-hover: #1a0b22;
-  --piano-black-active: #242222;
+  --piano-black: #1a1a1a; 
+  --piano-black-hover: #2c2c2c;
+  --piano-black-active: #404040;
+
+  /* Настройки свечения для светлой темы */
+  --glow-opacity: 0.15; 
+  --glow-blend: multiply; 
 }
 
 @theme {

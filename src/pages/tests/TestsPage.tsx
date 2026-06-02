@@ -159,7 +159,7 @@ export const TestsPage = () => {
                 <span
                   className={cn(
                     'text-[22px] leading-tight font-normal tracking-wide',
-                    testId === test.id ? 'text-text' : 'text-text',
+                    testId === test.id ? 'text-white' : 'text-text',
                   )}
                 >
                   {test.title}
@@ -167,7 +167,7 @@ export const TestsPage = () => {
                 <span
                   className={cn(
                     'text-[15px] font-light',
-                    testId === test.id ? 'text-text/70' : 'text-text/40',
+                    testId === test.id ? 'text-white/70' : 'text-text/40',
                   )}
                 >
                   {test.lessonTitle}
@@ -203,13 +203,18 @@ export const TestsPage = () => {
                 >
                   <div className="flex w-full items-start justify-between">
                     <div className="flex flex-col text-left">
-                      <span className="text-[22px] leading-tight font-normal tracking-wide text-text">
+                      <span
+                        className={cn(
+                          'text-[22px] leading-tight font-normal tracking-wide',
+                          isSelected ? 'text-white' : 'text-text/40',
+                        )}
+                      >
                         {test.title}
                       </span>
                       <span
                         className={cn(
                           'text-[15px] font-light',
-                          isSelected ? 'text-text/70' : 'text-text/40',
+                          isSelected ? 'text-white/70' : 'text-text/40',
                         )}
                       >
                         {test.lessonTitle}

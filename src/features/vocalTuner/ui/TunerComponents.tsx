@@ -1,5 +1,3 @@
-//TunerComponents.tsx
-
 import React, { useEffect, useState, memo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -8,7 +6,8 @@ import { Play, Pause } from '@phosphor-icons/react';
 import { ControlButton } from '@/shared/buttons/ControlButton';
 import { NOTES } from '../utils/audio';
 import type { Recording } from '@/features/vocalTuner/types';
-// --- MINI WAVEFORM ---
+
+// ИСПРАВЛЕНО: active ? bg-white : bg-text/30
 export const MiniWaveform = ({ active }: { active: boolean }) => (
   <div className="flex h-6 flex-1 items-end gap-[3px] px-3">
     {[30, 60, 40, 90, 60, 40, 70, 50, 80, 40].map((h, i) => (
@@ -16,7 +15,7 @@ export const MiniWaveform = ({ active }: { active: boolean }) => (
         key={i}
         className={cn(
           'w-1.5 rounded-full transition-all duration-300',
-          active ? 'bg-white' : 'bg-white/80',
+          active ? 'bg-white' : 'bg-text/30',
         )}
         style={{ height: `${h}%` }}
       />
@@ -24,14 +23,13 @@ export const MiniWaveform = ({ active }: { active: boolean }) => (
   </div>
 );
 
-// --- SIDEBAR ICON ---
+// ИСПРАВЛЕНО: используется currentColor для идеальной адаптации к родителю
 export const SidebarIcon = () => (
-  <div className="flex h-6 w-6 overflow-hidden rounded-[4px] border-2 border-white/40">
-    <div className="h-full w-[30%] border-r-2 border-white/40 bg-white/10" />
+  <div className="flex h-6 w-6 overflow-hidden rounded-[4px] border-2 border-current">
+    <div className="h-full w-[30%] border-r-2 border-current opacity-30" />
   </div>
 );
 
-// --- PORTAL FOR MOBILE SIDEBAR ---
 interface MobileSidebarPortalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -81,7 +79,8 @@ export const MobileSidebarPortal = ({ isOpen, onClose, children }: MobileSidebar
             <div className="flex shrink-0 items-center justify-between p-6 pb-0">
               <button
                 onClick={onClose}
-                className="text-white/60 transition-colors hover:text-white active:scale-95"
+                // ИСПРАВЛЕНО: text-text/40 вместо text-white/60
+                className="text-text/40 transition-colors hover:text-text active:scale-95"
               >
                 <SidebarIcon />
               </button>
@@ -95,7 +94,6 @@ export const MobileSidebarPortal = ({ isOpen, onClose, children }: MobileSidebar
   );
 };
 
-// --- PLAYER WIDGET ---
 interface PlayerWidgetProps {
   recording: Recording;
   isPlaying: boolean;
@@ -119,7 +117,6 @@ export const PlayerWidget = ({
   onSeekEnd,
   className,
 }: PlayerWidgetProps) => {
-  // Защита от NaN, 0 или Infinity (частый баг MediaRecorder с WebM)
   const safeDuration =
     duration > 0 && Number.isFinite(duration) ? duration : recording.dur / 1000 || 1;
 
@@ -138,7 +135,7 @@ export const PlayerWidget = ({
         <PlaybackSlider
           min={0}
           max={safeDuration}
-          step={0.001} // Высокая точность для идеальной плавности
+          step={0.001}
           value={currentTime}
           onChange={onSeek}
           onSeekStart={onSeekStart}
@@ -159,7 +156,6 @@ export const PlayerWidget = ({
   );
 };
 
-// --- PLAYBACK SLIDER ---
 interface PlaybackSliderProps extends Omit<
   React.InputHTMLAttributes<HTMLInputElement>,
   'onChange'
@@ -184,11 +180,7 @@ const PlaybackSlider: React.FC<PlaybackSliderProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [dragValue, setDragValue] = useState(0);
 
-  // КЛЮЧЕВОЙ МОМЕНТ: Никакого useEffect!
-  // Если мы тянем ползунок - берем локальное значение под пальцем.
-  // Если отпустили - берем значение напрямую из плеера (value).
   const displayValue = isDragging ? dragValue : value;
-
   const minNum = Number(min);
   const maxNum = Number(max);
 
@@ -204,7 +196,7 @@ const PlaybackSlider: React.FC<PlaybackSliderProps> = ({
 
   const handlePointerDown = () => {
     setIsDragging(true);
-    setDragValue(value); // Захватываем текущую позицию при касании
+    setDragValue(value);
     onSeekStart?.();
   };
 
@@ -216,16 +208,11 @@ const PlaybackSlider: React.FC<PlaybackSliderProps> = ({
 
   return (
     <div className={cn('group relative flex h-5 w-full items-center', className)}>
-      {/* 1. ФОНОВЫЙ ТРЕК */}
       <div className="absolute left-0 h-[6px] w-full rounded-full bg-text/20 transition-[height] duration-150 group-hover:h-[8px]" />
-
-      {/* 2. ЗАПОЛНЕННЫЙ ТРЕК */}
       <div
         className="absolute left-0 h-[6px] rounded-full bg-text transition-[height] duration-150 group-hover:h-[8px]"
         style={{ width: `${percent}%` }}
       />
-
-      {/* 3. НЕВИДИМЫЙ INPUT */}
       <input
         type="range"
         min={minNum}
@@ -235,7 +222,7 @@ const PlaybackSlider: React.FC<PlaybackSliderProps> = ({
         onChange={handleChange}
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp} // Спасает от залипания, если палец/мышь ушли за край экрана
+        onPointerCancel={handlePointerUp}
         className={cn(
           'absolute inset-0 z-10 h-full w-full cursor-pointer appearance-none bg-transparent outline-none',
 
@@ -257,8 +244,6 @@ const PlaybackSlider: React.FC<PlaybackSliderProps> = ({
     </div>
   );
 };
-
-// --- TUNER VISUALIZER ---
 
 interface TunerVisualizerProps {
   pitchDataRef: React.MutableRefObject<{ active: boolean; midiFloat: number | null }>;
@@ -319,7 +304,6 @@ export const TunerVisualizer = memo(({ pitchDataRef, actions }: TunerVisualizerP
           const delta = noteMidi - currentMidi.current;
           const absDelta = Math.abs(delta);
 
-          // Оптимизация: скрываем ноты, которые за границей 4 полутонов от центра
           if (absDelta > 4.5) {
             el.style.opacity = '0';
             el.style.transform = 'translateY(-50%) scale(0)';
@@ -328,9 +312,8 @@ export const TunerVisualizer = memo(({ pitchDataRef, actions }: TunerVisualizerP
 
           const translateY = delta * -spacing;
           const rotateX = delta * 25;
-          // КРАСИВАЯ ФОРМУЛА ЗАТУХАНИЯ: экспоненциальное падение прозрачности (1 -> 0.5 -> 0.25...)
           const opacity = Math.pow(0.5, absDelta);
-          const scale = Math.max(0, 1 - absDelta * 0.1); // Плавное уменьшение размера
+          const scale = Math.max(0, 1 - absDelta * 0.1);
 
           el.style.opacity = opacity.toFixed(3);
           el.style.transform = `translateY(calc(-50% + ${translateY}px)) rotateX(${rotateX}deg) scale(${scale})`;
@@ -378,7 +361,8 @@ export const TunerVisualizer = memo(({ pitchDataRef, actions }: TunerVisualizerP
           {DRUM_NOTES.map((n) => (
             <span
               key={n.midi}
-              className="absolute left-0 w-full text-left text-3xl font-bold tracking-wider text-white will-change-transform md:text-5xl"
+              // ИСПРАВЛЕНО: text-text вместо text-white, чтобы ноты читались на светлом фоне
+              className="absolute left-0 w-full text-left text-3xl font-bold tracking-wider text-text will-change-transform md:text-5xl"
               style={{ top: '50%', opacity: 0, transform: 'translateY(-50%)' }}
             >
               {n.name}

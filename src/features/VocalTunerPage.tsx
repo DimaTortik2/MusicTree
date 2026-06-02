@@ -58,15 +58,12 @@ export function VocalTunerPage() {
   const isRecording = phase === 'recording';
   const activeRecording = recordings.find((r) => r.id === playingId);
 
-  // --- АВТОСТАРТ МИКРОФОНА ПРИ ЗАХОДЕ НА СТРАНИЦУ ---
   useEffect(() => {
     if (phase === 'idle') {
       startMic();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // --- ОБРАБОТКА ОШИБОК ДОСТУПА (ТЗ) ---
   if (micError) {
     let title = '';
     let desc = '';
@@ -90,7 +87,7 @@ export function VocalTunerPage() {
           title={title}
           description={desc}
           icon={<MicrophoneSlash size={32} weight="fill" />}
-          iconContainerClassName="bg-primary/20 text-primary" // Розовый фон с розовой иконкой
+          iconContainerClassName="bg-primary/20 text-primary"
         >
           <Button
             variant="solid"
@@ -105,7 +102,6 @@ export function VocalTunerPage() {
     );
   }
 
-  // --- САЙДБАР С АНИМАЦИЕЙ СПИСКА ЗАПИСЕЙ ---
   const sidebarContent = (
     <div className="custom-scroll flex-1 space-y-3 overflow-y-auto px-4 py-6">
       <AnimatePresence initial={false}>
@@ -116,7 +112,6 @@ export function VocalTunerPage() {
           return (
             <motion.div
               key={rec.id}
-              // layout="position" плавно двигает соседние карточки при удалении/добавлении
               layout="position"
               initial={{ opacity: 0, y: 15, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -126,17 +121,21 @@ export function VocalTunerPage() {
             >
               <div
                 className={cn(
-                  'flex cursor-pointer items-center justify-between rounded-2xl border-3 p-3 transition-all duration-200',
+                  'group flex cursor-pointer items-center justify-between rounded-2xl border-3 p-3 transition-all duration-300',
                   isActive
-                    ? 'border-primary bg-primary text-white'
-                    : 'border-primary bg-transparent text-white hover:bg-primary/10',
+                    ? 'border-primary bg-primary text-white shadow-md'
+                    : // ИСПРАВЛЕНО: Для темной темы (по умолчанию) — border-primary и bg-transparent.
+                      // Префикс [.light_&]: сработает ТОЛЬКО в светлой теме и переопределит рамку на мягкую, а фон — на белый.
+                      'border-primary bg-transparent text-text hover:bg-primary/10 [.light_&]:border-line [.light_&]:bg-surface [.light_&]:hover:border-primary/40 [.light_&]:hover:bg-primary/5',
                 )}
                 onClick={() => togglePlay(rec)}
               >
                 <div
                   className={cn(
-                    'flex shrink-0 items-center justify-center p-1 transition-colors hover:text-primary',
-                    isActive && 'hover:text-surface',
+                    'flex shrink-0 items-center justify-center p-1 transition-colors',
+                    isActive
+                      ? 'text-white hover:text-white/70'
+                      : 'text-text group-hover:text-primary',
                   )}
                 >
                   {isCurrentlyPlaying ? (
@@ -150,8 +149,8 @@ export function VocalTunerPage() {
 
                 <button
                   className={cn(
-                    'shrink-0 cursor-pointer p-1 opacity-80 transition-colors hover:text-primary hover:opacity-100',
-                    isActive && 'hover:text-surface',
+                    'shrink-0 cursor-pointer p-1 transition-colors outline-none',
+                    isActive ? 'text-white hover:opacity-70' : 'text-text group-hover:text-primary',
                   )}
                   onClick={(e) => handleThreeDotsClick(e, rec)}
                 >
@@ -168,39 +167,30 @@ export function VocalTunerPage() {
                     transition={{ duration: 0.2 }}
                     className="overflow-hidden"
                   >
-                    <div className="mx-1 mt-1 flex items-center justify-between rounded-xl bg-primary px-4 py-2 text-white/90">
+                    <div className="mx-1 mt-1 flex items-center justify-between rounded-xl bg-primary px-4 py-2 text-white">
                       <button
-                        className={cn(
-                          'cursor-pointer p-1 transition-colors hover:text-white',
-                          isActive && 'hover:text-surface',
-                        )}
+                        className="cursor-pointer p-1 transition-opacity hover:opacity-70"
                         title="Удалить"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setRecToDelete(rec); // Открываем модалку удаления
+                          setRecToDelete(rec);
                         }}
                       >
                         <Trash size={18} weight="bold" />
                       </button>
                       <div className="flex gap-4">
                         <button
-                          className={cn(
-                            'cursor-pointer p-1 transition-colors hover:text-white',
-                            isActive && 'hover:text-surface',
-                          )}
+                          className="cursor-pointer p-1 transition-opacity hover:opacity-70"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setRecToRename(rec); // Открываем модалку переименования
-                            setNewName(rec.name); // Подставляем текущее имя
+                            setRecToRename(rec);
+                            setNewName(rec.name);
                           }}
                         >
                           <PencilSimple size={18} weight="bold" />
                         </button>
                         <button
-                          className={cn(
-                            'cursor-pointer p-1 transition-colors hover:text-white',
-                            isActive && 'hover:text-surface',
-                          )}
+                          className="cursor-pointer p-1 transition-opacity hover:opacity-70"
                           onClick={(e) => {
                             e.stopPropagation();
                             downloadRec(rec);
@@ -222,12 +212,10 @@ export function VocalTunerPage() {
 
   return (
     <div className="flex h-screen w-full overflow-hidden font-sans text-text">
-      {/* --- ДЕСКТОПНЫЙ САЙДБАР --- */}
-      <aside className="relative z-10 hidden w-[320px] flex-col border-r-3 border-white/10 md:flex">
+      <aside className="relative z-10 hidden w-[320px] flex-col border-r-3 border-line md:flex">
         {sidebarContent}
       </aside>
 
-      {/* --- МОБИЛЬНЫЙ САЙДБАР --- */}
       <MobileSidebarPortal
         isOpen={isMobileSidebarOpen}
         onClose={() => {
@@ -243,7 +231,7 @@ export function VocalTunerPage() {
               animate={{ height: 'auto', opacity: 1, y: 0 }}
               exit={{ height: 0, opacity: 0, y: 20 }}
               transition={{ duration: 0.2, ease: 'easeInOut' }}
-              className="shrink-0 overflow-hidden border-t border-white/10 bg-background p-4 pb-8 backdrop-blur-md"
+              className="shrink-0 overflow-hidden border-t border-line bg-background p-4 pb-8 backdrop-blur-md"
             >
               <PlayerWidget
                 recording={activeRecording}
@@ -260,7 +248,6 @@ export function VocalTunerPage() {
         </AnimatePresence>
       </MobileSidebarPortal>
 
-      {/* --- ГЛАВНАЯ ОБЛАСТЬ --- */}
       <main className="relative flex flex-1 flex-col">
         <div className="absolute top-6 left-5 z-10 md:hidden">
           <button
@@ -268,13 +255,13 @@ export function VocalTunerPage() {
               setIsMobileSidebarOpen(true);
               toast.dismiss();
             }}
-            className="-m-2 p-2 text-white opacity-70 transition-opacity hover:opacity-100"
+            // ИСПРАВЛЕНО: text-text вместо text-white
+            className="-m-2 p-2 text-text/60 transition-colors hover:text-text"
           >
             <SidebarIcon />
           </button>
         </div>
 
-        {/* --- ДЕСКТОПНЫЙ ПЛЕЕР --- */}
         <AnimatePresence>
           {activeRecording && (
             <motion.div
@@ -298,17 +285,15 @@ export function VocalTunerPage() {
           )}
         </AnimatePresence>
 
-        {/* --- ЦЕНТРАЛЬНЫЙ ТЮНЕР И КНОПКА ЗАПИСИ --- */}
         <div className="flex flex-1 items-center justify-center">
           <TunerVisualizer
-            pitchDataRef={pitchDataRef} // <-- Теперь передаем Ref напрямую!
+            pitchDataRef={pitchDataRef}
             actions={
               <button
                 onClick={() => {
                   if (isRecording) {
-                    stopRec(); // Если пишем — останавливаем
+                    stopRec();
                   } else {
-                    // Страховка: если микрофон почему-то отвалился (idle), стартуем его перед записью
                     if (phase === 'idle') {
                       startMic().then(() => startRec());
                     } else {
@@ -336,21 +321,18 @@ export function VocalTunerPage() {
           />
         </div>
       </main>
-      {/* --- МОДАЛКА ПОДТВЕРЖДЕНИЯ УДАЛЕНИЯ --- */}
+
       <Modal
         isOpen={!!recToDelete}
         onClose={() => setRecToDelete(null)}
         layout="vertical"
-        // Добавлен модификатор "!" перед p-2, чтобы гарантированно сбросить внутренние отступы родителя
-        className="max-w-[700px] rounded-3xl bg-surface p-8"
+        className="max-w-[700px] rounded-3xl bg-surface !p-8"
       >
         <div className="flex flex-col gap-6 text-left">
-          {/* Маленький подзаголовок сверху */}
           <span className="font-normal tracking-wide text-text/40">
             Вы действительно хотите удалить эту запись?
           </span>
 
-          {/* Строка с контурной розовой иконкой мусорки и названием файла */}
           <div className="mt-1.5 flex items-center gap-4">
             <Trash size={32} weight="bold" className="shrink-0 text-primary" />
             <span className="truncate text-2xl font-medium text-text md:text-[26px]">
@@ -358,7 +340,6 @@ export function VocalTunerPage() {
             </span>
           </div>
 
-          {/* Кнопки действий */}
           <div className="mt-8 flex w-full flex-col-reverse gap-3 sm:flex-row sm:justify-end sm:gap-3.5">
             <Button
               variant="outline"
@@ -388,21 +369,17 @@ export function VocalTunerPage() {
         </div>
       </Modal>
 
-      {/* --- МОДАЛКА ПЕРЕИМЕНОВАНИЯ --- */}
       <Modal
         isOpen={!!recToRename}
         onClose={() => setRecToRename(null)}
         layout="vertical"
-        // Убран "border border-white/5", заменены "p-8 md:p-10" на "!p-2" для соответствия первой модалке
-        className="max-w-lg rounded-[32px] bg-surface p-8 shadow-2xl md:max-w-[540px]"
+        className="max-w-lg rounded-[32px] bg-surface !p-8 shadow-2xl md:max-w-[540px]"
       >
         <div className="flex flex-col gap-6 text-left">
-          {/* Маленький подзаголовок сверху */}
           <span className="text-sm font-normal tracking-wide text-text/40">
             Введите новое название для аудиофайла
           </span>
 
-          {/* Прозрачный инпут с фиолетовым нижним подчеркиванием */}
           <div className="mt-2 w-full">
             <input
               type="text"
@@ -420,7 +397,6 @@ export function VocalTunerPage() {
             />
           </div>
 
-          {/* Кнопки действий */}
           <div className="mt-8 flex w-full flex-col-reverse gap-3 sm:flex-row sm:justify-end sm:gap-3.5">
             <Button
               variant="outline"

@@ -117,7 +117,7 @@ export const Modal: React.FC<ModalProps> = ({
               onClick={onIconClick}
               className={cn(
                 'flex size-14 shrink-0 items-center justify-center self-end rounded-2xl transition-transform sm:size-16 sm:self-auto',
-                onIconClick && 'cursor-pointer text-white hover:scale-105 active:scale-95',
+                onIconClick && 'cursor-pointer text-text hover:scale-105 active:scale-95',
                 iconContainerClassName,
               )}
             >

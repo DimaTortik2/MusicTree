@@ -199,7 +199,10 @@ export default function SettingsPage() {
           const isBlackPressed = item.hasBlack && activeKeys.has(item.blackBaseNote!);
 
           return (
-            <div key={item.baseNote} className="relative flex shrink-0 select-none">
+            <div
+              key={item.baseNote}
+              className="relative flex shrink-0 select-none [.light_&]:rounded-[28px] [.light_&]:bg-surface [.light_&]:shadow-[0_24px_64px_rgba(29,21,32,0.06)]"
+            >
               {/* Белая клавиша */}
               <div
                 // ✨ Если клавиша уже слушается - повторный клик отменяет прослушивание
@@ -246,7 +249,7 @@ export default function SettingsPage() {
                   <span
                     className={cn(
                       'pointer-events-none text-center text-[9px] font-semibold select-none lg:text-[11px]',
-                      isListeningBlack ? 'text-white' : 'text-text/40',
+                      isListeningBlack ? 'text-white' : 'text-white/40',
                     )}
                   >
                     {isListeningBlack ? '?' : formatKeyName(pianoBindings[item.blackBaseNote!])}
@@ -265,7 +268,7 @@ export default function SettingsPage() {
       {/* 1. Мобильная кастомизация */}
       <div className="mb-10 md:hidden">
         <h2 className="mb-1 text-2xl">Тап-бар</h2>
-        <p className="mb-4 text-[14px] leading-tight text-white/40">
+        <p className="mb-4 text-[14px] leading-tight text-text/40">
           Вы можете настроить приоритетность кнопок в тап баре. Вы должны увидеть все функции!
         </p>
         <Button
@@ -282,11 +285,11 @@ export default function SettingsPage() {
       <div className="mb-10 hidden overflow-hidden md:block">
         <div className="mb-4 flex items-center gap-4">
           <h2 className="text-2xl">Клавиатура</h2>
-          <span className="text-sm text-white/40">Нажмите на ноту и переназначьте клавишу</span>
+          <span className="text-sm text-text/40">Нажмите на ноту и переназначьте клавишу</span>
           <button
             onClick={resetPianoBindings}
             title="Сбросить раскладку"
-            className="cursor-pointer text-white/40 transition-colors outline-none hover:text-text active:scale-95"
+            className="cursor-pointer text-text/40 transition-colors outline-none hover:text-text active:scale-95"
           >
             <ArrowCounterClockwise size={24} />
           </button>
@@ -306,7 +309,7 @@ export default function SettingsPage() {
 
       <div className="mb-10 hidden md:block">
         <h2 className="mb-1 text-2xl">Горячие клавиши</h2>
-        <p className="mb-4 max-w-sm text-[14px] leading-tight text-white/40">
+        <p className="mb-4 max-w-sm text-[14px] leading-tight text-text/40">
           Настройте глобальные комбинации клавиш для быстрого доступа к функциям сайта из любого
           раздела.
         </p>
@@ -436,7 +439,7 @@ export default function SettingsPage() {
         <div className="mt-8 hidden flex-col gap-4 md:flex">
           <div className="flex flex-col gap-1">
             <h3 className="text-2xl text-text">Параллакс обоев</h3>
-            <p className="text-[14px] leading-tight text-white/40">
+            <p className="text-[14px] leading-tight text-text/40">
               Паттерн на фоне будет плавно смещаться вслед за курсором мыши.
             </p>
           </div>
@@ -486,7 +489,7 @@ export default function SettingsPage() {
             );
           })}
         </div>
-        <p className="mt-4 text-[14px] leading-tight text-white/40">
+        <p className="mt-4 text-[14px] leading-tight text-text/40">
           Изменяет размер шрифтов и отступов. Выберите «Мини» или «Мелкий», если элементы не
           помещаются на экране телефона.
         </p>
@@ -505,7 +508,7 @@ export default function SettingsPage() {
               fill="transparent"
               stroke="currentColor"
               strokeWidth="6"
-              className="text-white/20"
+              className="text-text/20"
             />
             <circle
               cx="50"
@@ -525,7 +528,7 @@ export default function SettingsPage() {
         </div>
 
         <p className="mb-1 text-[16px]">Диаграмма объема памяти, занятого под ваши аудиофайлы</p>
-        <p className="mb-4 text-[14px] leading-tight text-white/40">
+        <p className="mb-4 text-[14px] leading-tight text-text/40">
           Нажав на кнопку ниже, вы удалите только свои аудиозаписи. На остальных данных это никак не
           отразится. Вы не потеряете свой прогресс
         </p>
@@ -544,7 +547,7 @@ export default function SettingsPage() {
             Также вы можете удалить <span className="text-primary">все свои данные</span> с сайта
             (прогресс, тесты и аудиофайлы)
           </p>
-          <p className="mb-4 text-[14px] leading-tight text-white/40">
+          <p className="mb-4 text-[14px] leading-tight text-text/40">
             Будьте внимательны! Данные будут подлежать удалению без возможности восстановления
           </p>
 

@@ -14,7 +14,7 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 
 // Базовые стили: анимации, фокусы, стейты (убрал лишние цвета отсюда)
 const baseStyles =
-  'inline-flex items-center justify-center font-normal transition-all duration-200 select-none active:scale-[0.98] outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background hover:cursor-pointer hover:scale-102';
+  'inline-flex items-center justify-center font-normal transition-all duration-200 select-none active:scale-[0.98] outline-none focus-visible:ring-2 focus-visible:ring-text/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background hover:cursor-pointer hover:scale-102';
 
 // Размеры: бордер задаем ВСЕМ кнопкам, чтобы при переключении solid <-> outline
 // кнопка не дергалась в размерах на 5 пикселей.
@@ -27,6 +27,7 @@ const sizeStyles: Record<ButtonSize, string> = {
 // Матрица цветов и вариантов
 const colorStyles: Record<ButtonVariant, Record<ButtonColor, string>> = {
   solid: {
+    // ИСПРАВЛЕНО: text-text заменен на text-white для цветных подложек
     primary: 'bg-primary border-primary text-white hover:bg-primary hover:border-primary',
     accent: 'bg-accent border-accent text-white hover:bg-accent hover:border-accent',
     homework: 'bg-homework border-homework text-white hover:bg-homework hover:border-homework',
@@ -34,12 +35,12 @@ const colorStyles: Record<ButtonVariant, Record<ButtonColor, string>> = {
     text: 'bg-text border-text text-surface hover:bg-text hover:border-text',
   },
   outline: {
-    // Outline прозрачный, при наведении заливается цветом
-    primary: 'bg-surface border-primary text-white hover:bg-primary',
-    accent: 'bg-surface border-accent text-white hover:bg-accent',
-    homework: 'bg-surface border-homework text-white hover:bg-homework',
-    access: 'bg-surface border-access text-white hover:bg-access',
-    text: 'bg-surface border-text text-white hover:bg-text hover:text-surface',
+    // ИСПРАВЛЕНО: добавлен класс hover:text-white при наведении на контурную кнопку
+    primary: 'bg-surface border-primary text-text hover:bg-primary hover:text-white',
+    accent: 'bg-surface border-accent text-text hover:bg-accent hover:text-white',
+    homework: 'bg-surface border-homework text-text hover:bg-homework hover:text-white',
+    access: 'bg-surface border-access text-text hover:bg-access hover:text-white',
+    text: 'bg-surface border-text text-text hover:bg-text hover:text-surface',
   },
 };
 

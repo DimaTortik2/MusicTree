@@ -318,7 +318,7 @@ export const VisualPiano: React.FC<PianoProps> = ({ className, ...props }) => {
             )}
           >
             {blackHint && (
-              <span className="pointer-events-none text-center text-[11px] font-semibold text-text/40 select-none md:text-[9px] lg:text-[11px]">
+              <span className="pointer-events-none text-center text-[11px] font-semibold text-white/40 select-none md:text-[9px] lg:text-[11px]">
                 {blackHint}
               </span>
             )}
@@ -329,7 +329,14 @@ export const VisualPiano: React.FC<PianoProps> = ({ className, ...props }) => {
   };
 
   return (
-    <div {...props} className={cn('flex w-full flex-col select-none', className)}>
+    <div
+      {...props}
+      className={cn(
+        // ИСПРАВЛЕНО: Для светлой темы добавлена подложка bg-surface, скругление и мягкая тень
+        'flex w-full flex-col select-none [.light_&]:rounded-[28px] [.light_&]:bg-surface [.light_&]:shadow-[0_24px_64px_rgba(29,21,32,0.06)]',
+        className,
+      )}
+    >
       {/* Кастомный скроллбар */}
       <div className="flex w-full items-center justify-center px-4 py-2 md:hidden">
         <input

@@ -5,9 +5,10 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Регулярка ищет теги <audio ...></audio> или самозакрывающиеся <audio ... />
-// Игнорируем <Audio> (с большой буквы), ищем только те, что нужно исправить.
-const regex = /<audio\s+([^>]*?)>\s*(?:<\/audio>)?/g;
+// Регулярка для открывающих тегов: ищет "<img", только если дальше идет пробел, "/" или ">"
+const openRegex = /<img(?=\s|>|\/)/g;
+// Регулярка для закрывающих тегов (на случай, если где-то не самозакрывающийся тег)
+const closeRegex = /<\/img>/g;
 
 function processDirectory(dir) {
   const files = fs.readdirSync(dir);
@@ -16,45 +17,29 @@ function processDirectory(dir) {
     const fullPath = path.join(dir, file);
     const stat = fs.statSync(fullPath);
 
-    // Защита: не лезем в системные папки, если скрипт запущен из корня проекта
+    // Защита: не лезем в системные папки
     if (stat.isDirectory()) {
       if (file === 'node_modules' || file === '.git' || file === 'dist') continue;
       processDirectory(fullPath);
     } else if (file.endsWith('.mdx') || file.endsWith('.md')) {
       let content = fs.readFileSync(fullPath, 'utf8');
-      let hasChanges = false;
 
-      const newContent = content.replace(regex, (match, attrs) => {
-        hasChanges = true;
-
-        // Очищаем атрибуты. Если тег был <audio src="..." />,
-        // в конце мог остаться слэш. Аккуратно его отрезаем.
-        let cleanAttrs = attrs.trim();
-        if (cleanAttrs.endsWith('/')) {
-          cleanAttrs = cleanAttrs.slice(0, -1).trim();
-        }
-
-        // Собираем новый тег компонента с большой буквы
-        return `<Audio ${cleanAttrs} />`;
-      });
+      // Выполняем замены
+      let newContent = content.replace(openRegex, '<Img');
+      newContent = newContent.replace(closeRegex, '</Img>');
 
       // Перезаписываем файл, только если в нём реально были изменения
-      if (hasChanges && newContent !== content) {
+      if (newContent !== content) {
         fs.writeFileSync(fullPath, newContent, 'utf8');
-        console.log(`✅ Исправлен аудио-плеер в: ${file}`);
+        console.log(`✅ Теги img заменены на Img в: ${file}`);
       }
     }
   }
 }
 
-console.log('🚀 Начинаем поиск тегов <audio>...');
+console.log('🚀 Начинаем поиск тегов <img> для замены на <Img>...');
 
-// Если скрипт лежит прямо в папке с проектом,
-// можно явно указать путь до лекций, чтобы он не искал по всем папкам.
-// Если он лежит рядом с лекциями, оставь __dirname.
 const targetDir = path.join(__dirname, 'src', 'content');
-// Если папки src/content нет относительно скрипта,
-// поменяй targetDir на __dirname или другой нужный путь.
 
 if (fs.existsSync(targetDir)) {
   processDirectory(targetDir);
@@ -63,4 +48,4 @@ if (fs.existsSync(targetDir)) {
   processDirectory(__dirname);
 }
 
-console.log('🎉 Готово! Все <audio> заменены на <Audio />.');
+console.log('🎉 Готово! Все <img ...> бережно превращены в <Img ...>.');

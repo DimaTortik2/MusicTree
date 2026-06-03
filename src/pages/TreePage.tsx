@@ -5,6 +5,8 @@ import type { TreeElementState } from '@/shared/TreeElement';
 import { contentConfig, type LessonConfig } from '@/contentConfig';
 import { useProgressStore } from '@/app/store/useProgressStore';
 import { cn } from '@/app/utils/cn';
+// @ts-expect-error
+import { showCongratulationsModal } from '@/app/utils/celebration';
 
 const BASE_WIDTH = 1000;
 const ROW_HEIGHT = 200;
@@ -117,6 +119,29 @@ export const TreePage = () => {
   const maxRow = Math.max(0, ...contentConfig.map((l) => l.position.row));
   const dynamicContainerHeight = getY(maxRow) + ROW_HEIGHT;
 
+ useEffect(() => {
+   if (!_hasHydrated) return;
+
+   const totalLessons = contentConfig.length;
+
+   // Выводим в консоль для дебага:
+   console.log(`[Debug] Пройдено лекций: ${passedLessons.length} из ${totalLessons}`);
+
+   // Используем >= на случай, если в стейте застрял какой-то старый удаленный урок
+   const isAllPassed = totalLessons > 0 && passedLessons.length >= totalLessons;
+
+   if (isAllPassed) {
+     console.log('[Debug] Условие выполнено! Вызываем конфетти...');
+
+     const timer = setTimeout(() => {
+       showCongratulationsModal();
+     }, 600);
+
+     return () => clearTimeout(timer);
+   }
+ }, [_hasHydrated, passedLessons.length]);
+
+ 
   return (
     <div className="flex min-h-screen w-full justify-center overflow-x-hidden py-10 pb-[50vh]">
       <div

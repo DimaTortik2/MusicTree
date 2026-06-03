@@ -8,7 +8,7 @@ import { MdxSkeleton } from '@/shared/MdxSkeleton';
 import confetti from 'canvas-confetti';
 import { motion } from 'framer-motion';
 
-const mdxLectures = import.meta.glob('/src/content/*.mdx');
+const mdxLectures = import.meta.glob('/src/content/**/*.mdx');
 
 const mdxLecturesCache: Record<string, React.LazyExoticComponent<React.ComponentType<any>>> = {};
 for (const path in mdxLectures) {
@@ -35,7 +35,6 @@ const getScrollNode = (element: HTMLElement | null): HTMLElement | Window => {
   }
   return scrollNode;
 };
-
 
 const MdxContentWrapper = ({
   lessonId,
@@ -190,7 +189,7 @@ export const CurrentLecturePage = () => {
           </h1>
         </header>
 
-        <main className="prose prose-invert prose-p:text-text/85 prose-p:leading-relaxed prose-p:text-[17px] prose-headings:font-normal prose-headings:tracking-tight prose-h2:text-xl sm:prose-h2:text-2xl prose-h2:mt-12 prose-h2:mb-6 prose-hr:border-text/10 prose-hr:my-10 max-w-none">
+        <main className="prose max-w-none prose-invert prose-headings:font-normal prose-headings:tracking-tight prose-h2:mt-12 prose-h2:mb-6 prose-h2:text-xl sm:prose-h2:text-2xl prose-p:text-[17px] prose-p:leading-relaxed prose-p:text-text/85 prose-hr:my-10 prose-hr:border-text/10">
           {LazyMdxContent ? (
             <Suspense fallback={<MdxSkeleton />}>
               <MdxContentWrapper key={lesson.id} lessonId={lesson.id}>

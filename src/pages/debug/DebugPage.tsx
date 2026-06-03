@@ -145,52 +145,8 @@ export const DebugPage: React.FC = () => {
                     Разблокировать 4 урока
                   </Button>
 
-                  <Button
-                    onClick={() => fullState.passLesson('lesson_1')}
-                    color="primary"
-                    variant="outline"
-                  >
-                    Пройти только "Урок 1"
-                  </Button>
-
                   <Button onClick={handleClearProgress} color="text" variant="solid">
                     Сбросить прогресс
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="col-md-6">
-            <div className="card h-100 shadow-sm" style={cardStyles}>
-              <div className="card-body">
-                <h5
-                  className="card-title fw-bold border-bottom mb-3 pb-2"
-                  style={{ borderColor: 'var(--text)' }}
-                >
-                  Контент и Тесты
-                </h5>
-                <div className="d-grid gap-3">
-                  <Button
-                    onClick={() => fullState.passHomework('hw_breath_1')}
-                    color="homework"
-                    variant="outline"
-                  >
-                    Сдать ДЗ (hw_breath_1)
-                  </Button>
-
-                  <Button
-                    onClick={() =>
-                      fullState.passTest('test_intro', {
-                        score: 5,
-                        maxScore: 5,
-                        userAnswers: [[0]],
-                      })
-                    }
-                    color="accent"
-                    variant="outline"
-                  >
-                    Засчитать "test_intro" (100%)
                   </Button>
                 </div>
               </div>

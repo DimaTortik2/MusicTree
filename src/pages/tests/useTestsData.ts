@@ -2,7 +2,7 @@
 import { useMemo } from 'react';
 import { useProgressStore } from '@/app/store/useProgressStore';
 import { contentConfig } from '@/contentConfig';
-import { testsData, type TestConfig } from '@/content/testsData';
+import { testsData, type TestConfig } from '@/content/tests/testsData';
 
 export interface MappedTest extends TestConfig {
   lessonId: string;

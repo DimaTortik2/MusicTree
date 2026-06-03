@@ -41,6 +41,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@tailwindcss/typography": "^0.5.19",
     "@types/canvas-confetti": "^1.9.0",
     "@types/jquery": "^4.0.0",
     "@types/jqueryui": "^1.12.24",

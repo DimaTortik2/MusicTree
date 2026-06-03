@@ -11,7 +11,7 @@ import { useRememberSelection } from '@/shared/hooks/useRememberSelection';
 // ✨ Добавляем framer-motion
 import { AnimatePresence, motion, type Variants } from 'framer-motion';
 
-const mdxFiles = import.meta.glob('/src/content/*.mdx');
+const mdxFiles = import.meta.glob('/src/content/**/*.mdx');
 
 const mdxComponentsCache: Record<string, React.LazyExoticComponent<React.ComponentType<any>>> = {};
 for (const path in mdxFiles) {

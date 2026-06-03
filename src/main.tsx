@@ -22,20 +22,21 @@ import { MusicCleaning } from '@/components/MusicCleaning';
 import { MusicStaff } from '@/components/MusicStaff';
 import { PhrasingTrainer } from '@/components/PhrasingTrainer';
 import { TransferRule } from '@/components/TransferRule';
+import { MdxImage } from '@/shared/MdxImage';
 
 const mdxComponents = {
   Metronome,
-  BuildGamma, 
-  ChordTrainer, 
-  DurationMatcher, 
-  IntervalComparisonTrainer, 
+  BuildGamma,
+  ChordTrainer,
+  DurationMatcher,
+  IntervalComparisonTrainer,
   IntervalTrainer,
   MusicCleaning,
   MusicStaff,
   PhrasingTrainer,
   TransferRule,
   Audio: CustomAudioPlayer,
- 
+  Img: MdxImage,
 };
 
 createRoot(document.getElementById('root')!).render(

@@ -16,6 +16,9 @@ export const CustomAudioPlayer: React.FC<CustomAudioPlayerProps> = ({
   const [duration, setDuration] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
 
+  // ✨ ДОБАВЛЕНО: Состояние, чтобы знать, тянет ли пользователь ползунок прямо сейчас
+  const [isDragging, setIsDragging] = useState(false);
+
   // Синхронизируем громкость плеера с твоим глобальным Zustand-стором
   const mediaVolume = useProgressStore((state) => state.mediaVolume);
 
@@ -25,11 +28,9 @@ export const CustomAudioPlayer: React.FC<CustomAudioPlayerProps> = ({
     }
   }, [mediaVolume, isMuted]);
 
-  // 🔥 МАГИЯ ЗДЕСЬ: Останавливаем другие плееры, не трогая пианино Tone.js!
+  // Останавливаем другие плееры
   useEffect(() => {
     const handleGlobalPlay = (e: Event) => {
-      // e.target — это элемент, который только что начал играть.
-      // Если это HTMLAudioElement (наш плеер), а не текущий экземпляр — ставим этот на паузу.
       if (e.target instanceof HTMLAudioElement && e.target !== audioRef.current) {
         if (audioRef.current && !audioRef.current.paused) {
           audioRef.current.pause();
@@ -37,7 +38,6 @@ export const CustomAudioPlayer: React.FC<CustomAudioPlayerProps> = ({
       }
     };
 
-    // Слушаем на этапе перехвата (capture: true), так как media-события не всплывают (no bubble)
     document.addEventListener('play', handleGlobalPlay, true);
 
     return () => {
@@ -55,7 +55,8 @@ export const CustomAudioPlayer: React.FC<CustomAudioPlayerProps> = ({
   };
 
   const handleTimeUpdate = () => {
-    if (audioRef.current) {
+    // ✨ ИЗМЕНЕНО: Обновляем время ТОЛЬКО если пользователь не тянет ползунок
+    if (audioRef.current && !isDragging) {
       setCurrentTime(audioRef.current.currentTime);
     }
   };
@@ -73,9 +74,13 @@ export const CustomAudioPlayer: React.FC<CustomAudioPlayerProps> = ({
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newTime = parseFloat(e.target.value);
+
+    // Сразу меняем стейт, чтобы ползунок двигался за мышкой без задержек
+    setCurrentTime(newTime);
+
+    // Сразу перематываем звук (получаем классный эффект scrubbing-а аудио)
     if (audioRef.current) {
       audioRef.current.currentTime = newTime;
-      setCurrentTime(newTime);
     }
   };
 
@@ -134,7 +139,7 @@ export const CustomAudioPlayer: React.FC<CustomAudioPlayerProps> = ({
             {formatTime(currentTime)}
           </span>
 
-          {/* Интерактивный кастомный слайдер (используем group/slider для изоляции ховера) */}
+          {/* Интерактивный кастомный слайдер */}
           <div className="group/slider relative flex h-5 flex-grow items-center">
             <input
               type="range"
@@ -143,6 +148,13 @@ export const CustomAudioPlayer: React.FC<CustomAudioPlayerProps> = ({
               step="0.01"
               value={currentTime}
               onChange={handleSeek}
+              // ✨ ИЗМЕНЕНО: Добавлены обработчики, чтобы плеер знал, когда ты тянешь ползунок мышкой/пальцем
+              onPointerDown={() => setIsDragging(true)}
+              onPointerUp={() => setIsDragging(false)}
+              onPointerCancel={() => setIsDragging(false)}
+              // А это на случай, если пользователь перематывает стрелочками на клавиатуре
+              onKeyDown={() => setIsDragging(true)}
+              onKeyUp={() => setIsDragging(false)}
               className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
             />
             {/* Трек прогресс-бара */}

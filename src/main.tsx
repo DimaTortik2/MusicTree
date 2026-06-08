@@ -24,7 +24,7 @@ import { PhrasingTrainer } from '@/components/PhrasingTrainer';
 import { TransferRule } from '@/components/TransferRule';
 import { MdxImage } from '@/shared/MdxImage';
 import { useAuthStore } from '@/app/store/authStore';
-
+import { useCloudSync } from '@/shared/hooks/useCloudSync';
 
 const mdxComponents = {
   Metronome,
@@ -44,6 +44,8 @@ const mdxComponents = {
 // Создаем компонент App, чтобы внутри него работал useEffect
 const App = () => {
   const initializeAuth = useAuthStore((state) => state.initialize);
+
+  useCloudSync();
 
   useEffect(() => {
     // Инициализируем сессию Supabase и запускаем слушатель событий

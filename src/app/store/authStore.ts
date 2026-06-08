@@ -1,3 +1,5 @@
+import { useProgressStore } from '@/app/store/useProgressStore';
+import { useShortcutStore } from '@/app/store/useShortcutStore';
 import { supabase } from '@/shared/lib/supabase';
 import type { Session, User } from '@supabase/supabase-js';
 import { create } from 'zustand';
@@ -6,6 +8,7 @@ interface AuthState {
   user: User | null;
   session: Session | null;
   initialized: boolean;
+
   // Указываем, что initialize возвращает функцию очистки (которая в свою очередь возвращает void)
   initialize: () => () => void;
   signOut: () => Promise<void>;
@@ -37,5 +40,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   signOut: async () => {
     await supabase.auth.signOut();
+    useProgressStore.persist.clearStorage();
+    useShortcutStore.persist.clearStorage();
   },
 }));

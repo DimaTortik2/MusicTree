@@ -1,6 +1,6 @@
-import { StrictMode } from 'react';
+import { StrictMode, useEffect } from 'react'; // Добавили useEffect
 import { createRoot } from 'react-dom/client';
-import { RouterProvider } from 'react-router';
+import { RouterProvider } from 'react-router'; // или react-router-dom, в зависимости от твоей версии
 import { router } from './app/routes/router';
 
 import { ThemeProvider } from '@/app/providers/ThemeProvider';
@@ -23,6 +23,8 @@ import { MusicStaff } from '@/components/MusicStaff';
 import { PhrasingTrainer } from '@/components/PhrasingTrainer';
 import { TransferRule } from '@/components/TransferRule';
 import { MdxImage } from '@/shared/MdxImage';
+import { useAuthStore } from '@/app/store/authStore';
+
 
 const mdxComponents = {
   Metronome,
@@ -39,8 +41,23 @@ const mdxComponents = {
   Img: MdxImage,
 };
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
+// Создаем компонент App, чтобы внутри него работал useEffect
+const App = () => {
+  const initializeAuth = useAuthStore((state) => state.initialize);
+
+  useEffect(() => {
+    // Инициализируем сессию Supabase и запускаем слушатель событий
+    const unsubscribe = initializeAuth();
+
+    // Отписываемся при размонтировании компонента (полезно при HMR в Vite)
+    return () => {
+      if (typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
+    };
+  }, [initializeAuth]);
+
+  return (
     <MDXProvider components={mdxComponents}>
       <ThemeProvider>
         <RouterProvider router={router} />
@@ -59,6 +76,12 @@ createRoot(document.getElementById('root')!).render(
         <ShortcutManager />
       </ThemeProvider>
     </MDXProvider>
+  );
+};
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <App />
     <Analytics />
     <SpeedInsights />
   </StrictMode>,

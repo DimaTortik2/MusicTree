@@ -12,6 +12,8 @@ import { TestsPage } from '@/pages/tests/TestsPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import ShortcutsPage from '@/pages/ShortcutsPage';
 import { VocalTunerPage } from '@/features/VocalTunerPage';
+import { ProtectedRoute, PublicRoute } from '@/app/providers/ProtectedRoute';
+import { AuthPage } from '@/pages/Auth/AuthPage';
 
 export const router = createBrowserRouter([
   {
@@ -19,8 +21,20 @@ export const router = createBrowserRouter([
     element: <LandingPage />,
   },
   {
+    path: '/auth',
+    element: (
+      <PublicRoute>
+        <AuthPage />
+      </PublicRoute>
+    ),
+  },
+  {
     path: '/app',
-    element: <AppLayout />,
+    element: (
+      <ProtectedRoute>
+        <AppLayout />
+      </ProtectedRoute>
+    ),
     children: [
       {
         index: true,

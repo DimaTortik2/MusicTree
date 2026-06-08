@@ -64,6 +64,8 @@ const pageTransitionVariants: Variants = {
 };
 
 export const AppLayout = () => {
+
+
   const [isPianoActive, setIsPianoActive] = useState(false);
   const [isOverflowOpen, setIsOverflowOpen] = useState(false);
   const [isCustomizing, setIsCustomizing] = useState(false);

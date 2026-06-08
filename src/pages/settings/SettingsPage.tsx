@@ -13,6 +13,7 @@ import { toneEngine } from '@/shared/lib/toneEngine';
 import { useNavigate } from 'react-router-dom';
 import { Radio } from '@/shared/buttons/Radio';
 import { toast } from '@/app/utils/toast';
+import { UserProfileMenu } from '@/shared/UserProfileMenu';
 
 // Форматирование клавиш (убираем Key и Digit + меняем слова на символы)
 const formatKeyName = (code: string | null) => {
@@ -265,6 +266,8 @@ export default function SettingsPage() {
 
   return (
     <div className="relative min-h-screen w-full p-6 pb-[50vh] text-text md:p-10 md:pb-[50vh]">
+      <UserProfileMenu />
+
       {/* 1. Мобильная кастомизация */}
       <div className="mb-10 md:hidden">
         <h2 className="mb-1 text-2xl">Тап-бар</h2>

@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { GithubLogo, GoogleLogo, EnvelopeOpen } from '@phosphor-icons/react'; // Добавили EnvelopeOpen
+import { GithubLogo, GoogleLogo, EnvelopeOpen } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Turnstile } from '@marsidev/react-turnstile'; // Импортируем капчу
 import { supabase } from '@/shared/lib/supabase';
 import { Button } from '@/shared/buttons/Button';
 import { Input } from '@/shared/Input';
 import { toast } from '@/app/utils/toast';
 import { cn } from '@/app/utils/cn';
 
-// Твой обновленный и чистый маппинг ошибок
 const getFriendlyErrorMessage = (message: string): string => {
   const msg = message.toLowerCase();
 
@@ -32,6 +32,10 @@ const getFriendlyErrorMessage = (message: string): string => {
   if (msg.includes('network error') || msg.includes('failed to fetch')) {
     return 'Проблема с сетью. Проверьте интернет-соединение.';
   }
+  // Ошибка от самого Supabase, если капчу забыли отправить или она невалидна
+  if (msg.includes('captcha') || msg.includes('bot detection')) {
+    return 'Пожалуйста, подтвердите, что вы человек (капча не пройдена).';
+  }
 
   return 'Что-то пошло не так. Пожалуйста, попробуйте позже.';
 };
@@ -42,23 +46,31 @@ export const RegisterForm = () => {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Новые стейты для логичного флоу подтверждения почты
+  // Стейты для капчи и отправки писем
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [isEmailSent, setIsEmailSent] = useState(false);
   const [cooldown, setCooldown] = useState(0);
 
-  // Обратный отсчет для кнопки повторной отправки письма
   useEffect(() => {
     if (cooldown <= 0) return;
     const timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
     return () => clearTimeout(timer);
   }, [cooldown]);
 
-  // Валидация
+  // Сбрасываем токен капчи при переключении табов Вход / Регистрация
+  useEffect(() => {
+    setCaptchaToken(null);
+  }, [isLogin]);
+
+  // Валидация полей
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const isPasswordValid = password.length >= 6;
   const isFormValid = isEmailValid && isPasswordValid;
 
-  const isSubmitDisabled = !isFormValid || isLoading;
+  // Кнопка заблокирована, если:
+  // 1. Поля не валидны или идет загрузка
+  // 2. Или мы регистрируемся (не вошли) и капча еще не пройдена
+  const isSubmitDisabled = !isFormValid || isLoading || (!isLogin && !captchaToken);
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,11 +86,18 @@ export const RegisterForm = () => {
         toast.success('Рады видеть вас снова!', { position: 'bottom-right' });
       }
     } else {
-      const { data, error } = await supabase.auth.signUp({ email, password });
+      // Регистрируем пользователя и прикрепляем токен капчи
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          captchaToken: captchaToken || undefined, // Передаем полученный токен в Supabase
+        },
+      });
+
       if (error) {
         toast.error(getFriendlyErrorMessage(error.message), { position: 'bottom-right' });
       } else {
-        // Если Supabase возвращает user, но нет активной сессии — значит, включена проверка почты (Email Confirmation)
         if (data.user && !data.session) {
           setIsEmailSent(true);
           toast.success('Письмо отправлено!', { position: 'bottom-right' });
@@ -91,7 +110,6 @@ export const RegisterForm = () => {
     setIsLoading(false);
   };
 
-  // Повторная отправка ссылки для подтверждения
   const handleResendEmail = async () => {
     if (cooldown > 0) return;
 
@@ -104,7 +122,7 @@ export const RegisterForm = () => {
       toast.error(getFriendlyErrorMessage(error.message), { position: 'bottom-right' });
     } else {
       toast.success('Письмо отправлено повторно!', { position: 'bottom-right' });
-      setCooldown(60); // Кулдаун на 60 секунд
+      setCooldown(60);
     }
   };
 
@@ -122,7 +140,7 @@ export const RegisterForm = () => {
     }
   };
 
-  // 🌲 ЭКРАН 3: Если письмо отправлено, показываем эту красивую и понятную заглушку
+  // Экран ожидания подтверждения почты
   if (isEmailSent) {
     return (
       <motion.div
@@ -151,7 +169,7 @@ export const RegisterForm = () => {
             className="w-full"
             onClick={() => {
               setIsEmailSent(false);
-              setIsLogin(true); // Сразу переключаем в режим «Войти», чтобы пользователь мог залогиниться
+              setIsLogin(true);
             }}
           >
             Вернуться ко входу
@@ -175,7 +193,6 @@ export const RegisterForm = () => {
     );
   }
 
-  // СТАНДАРТНЫЙ ФЛОУ: Вход и Регистрация
   return (
     <div className="flex h-full w-full flex-col items-center">
       {/* Переключатель вкладок */}
@@ -268,6 +285,17 @@ export const RegisterForm = () => {
             Войти через Github
           </Button>
         </div>
+        {!isLogin && (
+          <div className="mt-8 flex min-h-[65px] w-full justify-center">
+            <Turnstile
+              // ⚠️ ВСТАВЬ СЮДА СВОЙ "SITE KEY" ИЗ CLOUDFLARE
+              siteKey="0x4AAAAAADhan7iwbBXBvP5v"
+              onSuccess={(token) => setCaptchaToken(token)}
+              onExpire={() => setCaptchaToken(null)}
+              onError={() => setCaptchaToken(null)}
+            />
+          </div>
+        )}
 
         {/* Кнопка сабмита */}
         <div className="mt-auto pt-12">

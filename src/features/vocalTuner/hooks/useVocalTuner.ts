@@ -23,6 +23,8 @@ interface VocalState {
   recordings: Recording[];
   hasLoaded: boolean;
   isCloudMode: boolean; // <-- НОВЫЙ ФЛАГ
+  isSaving: boolean; // <-- НОВОЕ
+  deletingIds: string[]; // <-- НОВОЕ
   setIsCloudMode: (v: boolean) => void;
   setRecordings: (updater: Recording[] | ((prev: Recording[]) => Recording[])) => void;
   setHasLoaded: (v: boolean) => void;
@@ -34,6 +36,8 @@ interface VocalState {
   setIsPlaying: (playing: boolean) => void;
   setCurrentTime: (t: number) => void;
   setDuration: (d: number) => void;
+  setDeletingIds: (updater: string[] | ((prev: string[]) => string[])) => void;
+  setIsSaving: (v: boolean) => void;
 }
 
 export const useVocalGlobalStore = create<VocalState>((set) => ({
@@ -54,6 +58,13 @@ export const useVocalGlobalStore = create<VocalState>((set) => ({
   setIsPlaying: (isPlaying) => set({ isPlaying }),
   setCurrentTime: (currentTime) => set({ currentTime }),
   setDuration: (duration) => set({ duration }),
+  isSaving: false, // <-- НОВОЕ
+  deletingIds: [], // <-- НОВОЕ
+  setIsSaving: (v) => set({ isSaving: v }), // <-- НОВОЕ
+  setDeletingIds: (updater) =>
+    set((state) => ({
+      deletingIds: typeof updater === 'function' ? updater(state.deletingIds) : updater,
+    })),
 }));
 
 globalAudioPlayer.addEventListener('timeupdate', () => {
@@ -87,6 +98,8 @@ export function useVocalTuner() {
     currentTime,
     setCurrentTime,
     duration,
+    isSaving,
+    deletingIds,
   } = useVocalGlobalStore();
 
   const pitchDataRef = useRef<{ active: boolean; midiFloat: number | null }>({
@@ -335,7 +348,7 @@ export function useVocalTuner() {
 
     mr.onstop = async () => {
       if (recordTimerRef.current) clearTimeout(recordTimerRef.current);
-
+      useVocalGlobalStore.getState().setIsSaving(true);
       const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
       const dur = Date.now() - recStartRef.current;
       const uuid =
@@ -383,9 +396,11 @@ export function useVocalTuner() {
           ]);
           toast.dismiss(toastId);
           toast.success('Запись сохранена в облако!', { position: 'bottom-right' });
+          useVocalGlobalStore.getState().setIsSaving(false);
         } catch (e: any) {
           toast.dismiss(toastId);
           toast.error('Ошибка облачного сохранения: ' + e.message);
+          useVocalGlobalStore.getState().setIsSaving(false);
         }
       } else {
         // --- ЛОКАЛЬНОЕ СОХРАНЕНИЕ ---
@@ -476,23 +491,31 @@ export function useVocalTuner() {
       setIsPlaying(false);
     }
 
-    if (isCloudMode) {
-      const user = useAuthStore.getState().user;
-      if (user) {
-        await supabase.from('audio_tracks').delete().eq('id', id);
-        await supabase.storage.from('audio_records').remove([`${user.id}/${id}.webm`]);
-      }
-    } else {
-      await localforage.removeItem(id);
-      const stateIds = useProgressStore.getState().audioRecordIds || [];
-      useProgressStore.setState({ audioRecordIds: stateIds.filter((x) => x !== id) });
-    }
+    // ВКЛЮЧАЕМ СКЕЛЕТОН УДАЛЕНИЯ ДЛЯ КОНКРЕТНОГО ID
+    useVocalGlobalStore.getState().setDeletingIds((prev) => [...prev, id]);
 
-    setRecordings((prev) => {
-      const rec = prev.find((x) => x.id === id);
-      if (!isCloudMode && rec?.url) URL.revokeObjectURL(rec.url);
-      return prev.filter((x) => x.id !== id);
-    });
+    try {
+      if (isCloudMode) {
+        const user = useAuthStore.getState().user;
+        if (user) {
+          await supabase.from('audio_tracks').delete().eq('id', id);
+          await supabase.storage.from('audio_records').remove([`${user.id}/${id}.webm`]);
+        }
+      } else {
+        await localforage.removeItem(id);
+        const stateIds = useProgressStore.getState().audioRecordIds || [];
+        useProgressStore.setState({ audioRecordIds: stateIds.filter((x) => x !== id) });
+      }
+
+      setRecordings((prev) => {
+        const rec = prev.find((x) => x.id === id);
+        if (!isCloudMode && rec?.url) URL.revokeObjectURL(rec.url);
+        return prev.filter((x) => x.id !== id);
+      });
+    } finally {
+      // ВЫКЛЮЧАЕМ СКЕЛЕТОН
+      useVocalGlobalStore.getState().setDeletingIds((prev) => prev.filter((x) => x !== id));
+    }
   };
 
   const downloadRec = async (rec: Recording) => {
@@ -600,5 +623,7 @@ export function useVocalTuner() {
     handleSeekStart,
     handleSeekEnd,
     renameRec,
+    isSaving, 
+    deletingIds,
   };
 }

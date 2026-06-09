@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { create } from 'zustand';
+import localforage from 'localforage';
 import { YIN } from 'pitchfinder';
 import type { Recording } from '@/features/vocalTuner/types';
 import { useProgressStore } from '@/app/store/useProgressStore';
@@ -21,6 +22,8 @@ useProgressStore.subscribe((state) => {
 interface VocalState {
   recordings: Recording[];
   hasLoaded: boolean;
+  isCloudMode: boolean; // <-- НОВЫЙ ФЛАГ
+  setIsCloudMode: (v: boolean) => void;
   setRecordings: (updater: Recording[] | ((prev: Recording[]) => Recording[])) => void;
   setHasLoaded: (v: boolean) => void;
   playingId: string | null;
@@ -36,6 +39,8 @@ interface VocalState {
 export const useVocalGlobalStore = create<VocalState>((set) => ({
   recordings: [],
   hasLoaded: false,
+  isCloudMode: false,
+  setIsCloudMode: (v) => set({ isCloudMode: v }),
   setRecordings: (updater) =>
     set((state) => ({
       recordings: typeof updater === 'function' ? updater(state.recordings) : updater,
@@ -73,6 +78,8 @@ export function useVocalTuner() {
     setRecordings,
     hasLoaded,
     setHasLoaded,
+    isCloudMode,
+    setIsCloudMode,
     playingId,
     setPlayingId,
     isPlaying,
@@ -107,45 +114,79 @@ export function useVocalTuner() {
     phaseRef.current = phase;
   }, [phase]);
 
-  // Загрузка аудио из защищенного БД
+  // --- ИНИЦИАЛИЗАЦИЯ И ЗАГРУЗКА (ГИБРИДНАЯ) ---
   useEffect(() => {
     if (hasLoaded) return;
+
     const loadRecordings = async () => {
       const user = useAuthStore.getState().user;
-      if (!user) return;
+      let userHasCloudAccess = false;
 
-      const { data, error } = await supabase
-        .from('audio_tracks')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (data && !error && data.length > 0) {
-        // Достаем из БД пути к файлам
-        const paths = data.map((track) => track.url);
-
-        // Массово просим у Supabase сгенерировать защищенные ссылки на 24 часа
-        const { data: signedUrlsData } = await supabase.storage
-          .from('audio_records')
-          .createSignedUrls(paths, 86400);
-
-        const loaded: Recording[] = data.map((track, index) => ({
-          id: track.id,
-          name: track.title,
-          time: new Date(track.created_at).toLocaleDateString(),
-          url: signedUrlsData?.[index]?.signedUrl || '', // Временная защищенная ссылка
-          dur: track.dur,
-          blob: new Blob(), // Пустая заглушка
-          createdAt: track.created_at,
-        }));
-        setRecordings(loaded);
-      } else {
-        setRecordings([]);
+      // 1. Проверяем вайтлист, если юзер авторизован
+      if (user) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('can_cloud_audio')
+          .eq('id', user.id)
+          .single();
+        userHasCloudAccess = !!data?.can_cloud_audio;
       }
+
+      setIsCloudMode(userHasCloudAccess);
+
+      if (userHasCloudAccess && user) {
+        // --- ЗАГРУЗКА ИЗ ОБЛАКА ---
+        const { data, error } = await supabase
+          .from('audio_tracks')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (data && !error && data.length > 0) {
+          const paths = data.map((track) => track.url);
+          const { data: signedUrlsData } = await supabase.storage
+            .from('audio_records')
+            .createSignedUrls(paths, 86400);
+
+          const loaded: Recording[] = data.map((track, index) => ({
+            id: track.id,
+            name: track.title,
+            time: new Date(track.created_at).toLocaleDateString(),
+            url: signedUrlsData?.[index]?.signedUrl || '',
+            dur: track.dur,
+            blob: new Blob(),
+            createdAt: track.created_at,
+          }));
+          setRecordings(loaded);
+        } else {
+          setRecordings([]);
+        }
+      } else {
+        // --- ЗАГРУЗКА ЛОКАЛЬНО (localforage) ---
+        const ids = useProgressStore.getState().audioRecordIds || [];
+        const loaded: Recording[] = [];
+        for (const id of ids) {
+          const data = await localforage.getItem<any>(id);
+          if (data && data.blob) {
+            loaded.push({
+              id: data.id,
+              name: data.title,
+              time: new Date(data.createdAt).toLocaleDateString(),
+              url: URL.createObjectURL(data.blob),
+              dur: data.dur,
+              blob: data.blob,
+              createdAt: data.createdAt,
+            });
+          }
+        }
+        setRecordings(loaded.sort((a, b) => b.createdAt - a.createdAt));
+      }
+
       setHasLoaded(true);
     };
+
     loadRecordings();
-  }, [hasLoaded, setRecordings, setHasLoaded]);
+  }, [hasLoaded, setRecordings, setHasLoaded, setIsCloudMode]);
 
   // Очистка при размонтировании
   useEffect(() => {
@@ -157,6 +198,14 @@ export function useVocalTuner() {
       globalAudioPlayer.pause();
       globalAudioPlayer.currentTime = 0;
       useVocalGlobalStore.getState().setIsPlaying(false);
+
+      // Очищаем ObjectURL только если мы работали локально
+      if (!useVocalGlobalStore.getState().isCloudMode) {
+        const currentRecordings = useVocalGlobalStore.getState().recordings;
+        currentRecordings.forEach((r) => {
+          if (r.url && r.url.startsWith('blob:')) URL.revokeObjectURL(r.url);
+        });
+      }
 
       useVocalGlobalStore.getState().setRecordings([]);
       useVocalGlobalStore.getState().setHasLoaded(false);
@@ -177,7 +226,6 @@ export function useVocalTuner() {
     };
     navigator.mediaDevices?.addEventListener('devicechange', handleDeviceChange);
     return () => navigator.mediaDevices?.removeEventListener('devicechange', handleDeviceChange);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // PITCHFINDER YIN LOOP
@@ -288,68 +336,84 @@ export function useVocalTuner() {
     mr.onstop = async () => {
       if (recordTimerRef.current) clearTimeout(recordTimerRef.current);
 
-      const user = useAuthStore.getState().user;
-      if (!user) {
-        toast.error('Ошибка: вы не авторизованы');
-        return;
-      }
-
       const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
       const dur = Date.now() - recStartRef.current;
       const uuid =
         'randomUUID' in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2);
       const createdAt = Date.now();
       const title = `Запись от ${new Date().toLocaleDateString()}`;
-      const filePath = `${user.id}/${uuid}.webm`;
 
-      const toastId = toast.info('Сохранение...', { autoClose: false });
-      try {
+      if (isCloudMode) {
+        // --- СОХРАНЕНИЕ В ОБЛАКО ---
+        const user = useAuthStore.getState().user;
+        if (!user) return;
+        const filePath = `${user.id}/${uuid}.webm`;
+        const toastId = toast.info('Синхронизация с облаком...', { autoClose: false });
 
-        // 1. Загружаем файл
-        const { error: uploadError } = await supabase.storage
-          .from('audio_records')
-          .upload(filePath, blob, { contentType: 'audio/webm' });
+        try {
+          const { error: uploadError } = await supabase.storage
+            .from('audio_records')
+            .upload(filePath, blob, { contentType: 'audio/webm' });
 
-        if (uploadError) throw uploadError;
+          if (uploadError) throw uploadError;
 
-        // 2. Получаем ссылку для немедленного прослушивания
-        const { data: signedData } = await supabase.storage
-          .from('audio_records')
-          .createSignedUrl(filePath, 86400);
+          const { data: signedData } = await supabase.storage
+            .from('audio_records')
+            .createSignedUrl(filePath, 86400);
 
-        const secureUrl = signedData?.signedUrl || '';
+          const { error: dbError } = await supabase
+            .from('audio_tracks')
+            .insert([
+              { id: uuid, user_id: user.id, title, dur, url: filePath, created_at: createdAt },
+            ]);
 
-        // 3. Сохраняем информацию в базу данных
-        const { error: dbError } = await supabase.from('audio_tracks').insert([
-          {
-            id: uuid,
-            user_id: user.id,
-            title,
-            dur,
-            url: filePath, // Сохраняем путь
-            created_at: createdAt,
-          },
-        ]);
+          if (dbError) throw dbError;
 
-        if (dbError) throw dbError;
+          setRecordings((prev) => [
+            {
+              id: uuid,
+              name: title,
+              time: new Date().toLocaleDateString(),
+              url: signedData?.signedUrl || '',
+              dur,
+              blob,
+              createdAt,
+            },
+            ...prev,
+          ]);
+          toast.dismiss(toastId);
+          toast.success('Запись сохранена в облако!', { position: 'bottom-right' });
+        } catch (e: any) {
+          toast.dismiss(toastId);
+          toast.error('Ошибка облачного сохранения: ' + e.message);
+        }
+      } else {
+        // --- ЛОКАЛЬНОЕ СОХРАНЕНИЕ ---
+        const recData = { id: uuid, blob, title, dur, createdAt };
+        try {
+          await localforage.setItem(uuid, recData);
+          const currentIds = useProgressStore.getState().audioRecordIds || [];
+          useProgressStore.setState({ audioRecordIds: [uuid, ...currentIds] });
 
-        setRecordings((prev) => [
-          {
-            id: uuid,
-            name: title,
-            time: new Date().toLocaleDateString(),
-            url: secureUrl,
-            dur,
-            blob,
-            createdAt,
-          },
-          ...prev,
-        ]);
-        toast.dismiss(toastId);
-        toast.success('Запись сохранена!', { position: 'bottom-right' });
-      } catch (e: any) {
-        toast.dismiss(toastId);
-        toast.error('Ошибка сохранения: ' + e.message);
+          setRecordings((prev) => [
+            {
+              id: uuid,
+              name: title,
+              time: new Date().toLocaleDateString(),
+              url: URL.createObjectURL(blob),
+              dur,
+              blob,
+              createdAt,
+            },
+            ...prev,
+          ]);
+
+          toast.success('Запись сохранена на устройстве', { position: 'bottom-right' });
+        } catch (e: any) {
+          if (e.name === 'QuotaExceededError') {
+            toast.error('Недостаточно памяти устройства для сохранения записи.');
+          }
+        }
       }
     };
 
@@ -359,7 +423,7 @@ export function useVocalTuner() {
 
     recordTimerRef.current = setTimeout(
       () => {
-        toast.error('Достигнут лимит времени записи (10 минут). Аудиофайл сохранен автоматически.');
+        toast.error('Лимит 10 минут. Файл сохранен.');
         stopRec();
       },
       10 * 60 * 1000,
@@ -376,6 +440,16 @@ export function useVocalTuner() {
     const now = Date.now();
     if (now - lastActionTimeRef.current < 150) return;
     lastActionTimeRef.current = now;
+
+    // Проверка рассинхрона для локальных записей
+    if (!isCloudMode) {
+      const exists = await localforage.getItem(rec.id);
+      if (!exists) {
+        toast.error('Аудиофайл был очищен системой устройства');
+        deleteRec(rec.id);
+        return;
+      }
+    }
 
     if (playingId === rec.id) {
       if (isPlaying) {
@@ -395,7 +469,6 @@ export function useVocalTuner() {
 
   const deleteRec = async (id: string) => {
     lastActionTimeRef.current = Date.now();
-    const user = useAuthStore.getState().user;
 
     if (playingId === id) {
       globalAudioPlayer.pause();
@@ -403,33 +476,47 @@ export function useVocalTuner() {
       setIsPlaying(false);
     }
 
-    setRecordings((prev) => prev.filter((x) => x.id !== id));
+    if (isCloudMode) {
+      const user = useAuthStore.getState().user;
+      if (user) {
+        await supabase.from('audio_tracks').delete().eq('id', id);
+        await supabase.storage.from('audio_records').remove([`${user.id}/${id}.webm`]);
+      }
+    } else {
+      await localforage.removeItem(id);
+      const stateIds = useProgressStore.getState().audioRecordIds || [];
+      useProgressStore.setState({ audioRecordIds: stateIds.filter((x) => x !== id) });
+    }
 
-    if (!user) return;
-
-    await supabase.from('audio_tracks').delete().eq('id', id);
-    await supabase.storage.from('audio_records').remove([`${user.id}/${id}.webm`]);
+    setRecordings((prev) => {
+      const rec = prev.find((x) => x.id === id);
+      if (!isCloudMode && rec?.url) URL.revokeObjectURL(rec.url);
+      return prev.filter((x) => x.id !== id);
+    });
   };
 
   const downloadRec = async (rec: Recording) => {
     lastActionTimeRef.current = Date.now();
-    toast.success('Подготовка к скачиванию...', { autoClose: 1500 });
 
     try {
-      // Запрашиваем файл как blob, чтобы обойти CORS при скачивании
-      const response = await fetch(rec.url);
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
+      let downloadUrl = rec.url;
+
+      if (isCloudMode) {
+        toast.success('Подготовка к скачиванию...', { autoClose: 1500 });
+        const response = await fetch(rec.url);
+        const blob = await response.blob();
+        downloadUrl = URL.createObjectURL(blob);
+      }
 
       const a = document.createElement('a');
-      a.href = blobUrl;
+      a.href = downloadUrl;
       a.download = `${rec.name.replace(/\s+/g, '_')}.webm`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(blobUrl);
 
-      toast.success('Загрузка началась');
+      if (isCloudMode) URL.revokeObjectURL(downloadUrl);
+      if (!isCloudMode) toast.success('Загрузка аудиофайла началась');
     } catch (e) {
       toast.error('Произошла ошибка при скачивании');
     }
@@ -461,25 +548,28 @@ export function useVocalTuner() {
     const newTime = Number(e.target.value);
     setCurrentTime(newTime);
     globalAudioPlayer.currentTime = newTime;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const renameRec = async (id: string, newName: string) => {
     if (!newName.trim()) return;
-    try {
-      const { error } = await supabase
-        .from('audio_tracks')
-        .update({ title: newName.trim() })
-        .eq('id', id);
 
-      if (!error) {
-        setRecordings((prev) =>
-          prev.map((r) => (r.id === id ? { ...r, name: newName.trim() } : r)),
-        );
-        toast.success('Запись переименована');
+    try {
+      if (isCloudMode) {
+        const { error } = await supabase
+          .from('audio_tracks')
+          .update({ title: newName.trim() })
+          .eq('id', id);
+        if (error) throw error;
       } else {
-        toast.error('Произошла ошибка при переименовании');
+        const data = await localforage.getItem<any>(id);
+        if (data) {
+          data.title = newName.trim();
+          await localforage.setItem(id, data);
+        }
       }
+
+      setRecordings((prev) => prev.map((r) => (r.id === id ? { ...r, name: newName.trim() } : r)));
+      toast.success('Запись переименована');
     } catch (e) {
       toast.error('Произошла ошибка при переименовании');
     }
@@ -497,6 +587,7 @@ export function useVocalTuner() {
     setIsMobileSidebarOpen,
     currentTime,
     duration,
+    isCloudMode,
     startMic,
     stopMic,
     startRec,

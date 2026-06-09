@@ -15,6 +15,7 @@ import { toast } from '@/app/utils/toast';
 import { UserProfileMenu } from '@/shared/UserProfileMenu';
 import { useAuthStore } from '@/app/store/authStore';
 import { supabase } from '@/shared/lib/supabase';
+import localforage from 'localforage';
 
 // Форматирование клавиш
 const formatKeyName = (code: string | null) => {
@@ -83,40 +84,77 @@ export default function SettingsPage() {
   const [listeningNote, setListeningNote] = useState<string | null>(null);
   const [storageText, setStorageText] = useState('0 МБ');
   const [storagePercent, setStoragePercent] = useState(0);
+  const [isCloud, setIsCloud] = useState(false);
   const navigate = useNavigate();
 
   // --- Оценка занимаемой памяти в облаке Supabase ---
+  // --- ГИБРИДНАЯ ОЦЕНКА ПАМЯТИ ---
   useEffect(() => {
-    async function checkCloudStorage() {
+    async function checkStorage() {
       const user = useAuthStore.getState().user;
-      if (!user) return;
+      let cloudAccess = false;
 
-      try {
-        // Получаем список всех файлов в папке юзера
-        const { data, error } = await supabase.storage.from('audio_records').list(user.id);
+      // 1. Проверяем вайтлист пользователя (если авторизован)
+      if (user) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('can_cloud_audio')
+          .eq('id', user.id)
+          .single();
+        cloudAccess = !!data?.can_cloud_audio;
+      }
 
-        if (data && !error) {
-          // Суммируем вес всех файлов
-          const totalBytes = data.reduce((acc, file) => acc + (file.metadata?.size || 0), 0);
-          const mb = totalBytes / (1024 * 1024);
+      setIsCloud(cloudAccess);
 
-          if (mb > 1024) {
-            setStorageText(`${(mb / 1024).toFixed(1)} ГБ`);
-          } else {
-            setStorageText(`${mb > 0 && mb < 1 ? '<1' : Math.round(mb)} МБ`);
+      if (cloudAccess && user) {
+        // --- ОБЛАЧНЫЙ РЕЖИМ (Supabase) ---
+        try {
+          const { data, error } = await supabase.storage.from('audio_records').list(user.id);
+
+          if (data && !error) {
+            const totalBytes = data.reduce((acc, file) => acc + (file.metadata?.size || 0), 0);
+            const mb = totalBytes / (1024 * 1024);
+
+            if (mb > 1024) {
+              setStorageText(`${(mb / 1024).toFixed(1)} ГБ`);
+            } else {
+              setStorageText(`${mb > 0 && mb < 1 ? '<1' : Math.round(mb)} МБ`);
+            }
+
+            let percent = (mb / 1024) * 100;
+            if (mb > 0 && percent < 2) percent = 2; // минимальная дуга
+            setStoragePercent(Math.min(percent, 100));
           }
-
-          // Считаем процент от бесплатного 1 ГБ (1024 МБ) в Supabase
-          let percent = (mb / 1024) * 100;
-          if (mb > 0 && percent < 2) percent = 2; // минимальная дуга
-          setStoragePercent(Math.min(percent, 100));
+        } catch (e) {
+          console.error('Ошибка получения данных о хранилище:', e);
         }
-      } catch (e) {
-        console.error('Ошибка получения данных о хранилище:', e);
+      } else {
+        // --- ЛОКАЛЬНЫЙ РЕЖИМ (Storage API) ---
+        if (navigator.storage && navigator.storage.estimate) {
+          try {
+            const { usage, quota } = await navigator.storage.estimate();
+            if (usage !== undefined && quota !== undefined) {
+              const mb = usage / (1024 * 1024);
+              if (mb > 1024) {
+                setStorageText(`${(mb / 1024).toFixed(1)} ГБ`);
+              } else {
+                setStorageText(`${mb > 0 && mb < 1 ? '<1' : Math.round(mb)} МБ`);
+              }
+
+              let percent = quota > 0 ? (usage / quota) * 100 : 0;
+              if (usage > 0 && percent < 2) percent = 2;
+              setStoragePercent(Math.min(percent, 100));
+            }
+          } catch (e) {
+            console.error('Ошибка оценки локальной памяти:', e);
+          }
+        }
       }
     }
 
-    checkCloudStorage();
+    checkStorage();
+    window.addEventListener('focus', checkStorage);
+    return () => window.removeEventListener('focus', checkStorage);
   }, []);
 
   // Логика переназначения клавиш с защитой системных кнопок
@@ -173,40 +211,40 @@ export default function SettingsPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [listeningNote, updatePianoBinding]);
 
-  // --- Очистка аудио из облака ---
+  // --- ГИБРИДНАЯ ОЧИСТКА АУДИО ---
   const handleClearAudio = async () => {
     try {
-      const user = useAuthStore.getState().user;
-      if (!user) return;
-
-      // 1. Узнаем, какие файлы есть в папке
-      const { data: files } = await supabase.storage.from('audio_records').list(user.id);
-
-      // 2. Удаляем файлы с жесткого диска облака
-      if (files && files.length > 0) {
-        const filePaths = files.map((f) => `${user.id}/${f.name}`);
-        await supabase.storage.from('audio_records').remove(filePaths);
+      if (isCloud) {
+        const user = useAuthStore.getState().user;
+        if (user) {
+          const { data: files } = await supabase.storage.from('audio_records').list(user.id);
+          if (files && files.length > 0) {
+            const filePaths = files.map((f) => `${user.id}/${f.name}`);
+            await supabase.storage.from('audio_records').remove(filePaths);
+          }
+          await supabase.from('audio_tracks').delete().eq('user_id', user.id);
+        }
+      } else {
+        await localforage.clear();
+        useProgressStore.setState({ audioRecordIds: [] });
       }
 
-      // 3. Удаляем записи о файлах из базы данных
-      await supabase.from('audio_tracks').delete().eq('user_id', user.id);
-
-      // 4. Обновляем UI
       setStorageText('0 МБ');
       setStoragePercent(0);
-      toast.success('Аудиофайлы удалены');
+      toast.success(isCloud ? 'Аудиофайлы удалены из облака' : 'Локальные аудиофайлы очищены');
     } catch (e) {
       console.error('Ошибка очистки аудио:', e);
       toast.error('Произошла ошибка при удалении');
     }
   };
 
-  // --- Полный сброс (Аудио + Прогресс) ---
+  // --- ГИБРИДНЫЙ ПОЛНЫЙ СБРОС ---
   const handleClearAll = async () => {
     try {
       const user = useAuthStore.getState().user;
+
       if (user) {
-        // 1. Чистим файлы
+        // Чистим облако, если есть авторизация
         const { data: files } = await supabase.storage.from('audio_records').list(user.id);
         if (files && files.length > 0) {
           const filePaths = files.map((f) => `${user.id}/${f.name}`);
@@ -214,7 +252,6 @@ export default function SettingsPage() {
         }
         await supabase.from('audio_tracks').delete().eq('user_id', user.id);
 
-        // 2. Сбрасываем прогресс в БД до пустого объекта
         await supabase
           .from('profiles')
           .update({
@@ -224,7 +261,8 @@ export default function SettingsPage() {
           .eq('id', user.id);
       }
 
-      // 3. Чистим локальные данные и перезагружаем приложение
+      // Всегда чистим локалку для надежности
+      await localforage.clear();
       localStorage.clear();
       window.location.href = '/';
     } catch (e) {
@@ -525,7 +563,7 @@ export default function SettingsPage() {
       </div>
 
       <div className="mb-10 max-w-lg">
-        <h2 className="mb-6 text-2xl">Данные облака (Supabase)</h2>
+        <h2 className="mb-6 text-2xl">Данные хранилища</h2>
 
         <div className="relative mb-6 h-48 w-48">
           <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90 transform">
@@ -555,16 +593,18 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        <p className="mb-1 text-[16px]">Лимит хранилища (1 ГБ)</p>
+        <p className="mb-1 text-[16px]">
+          Лимит хранилища: {isCloud ? '1 ГБ в облаке' : 'локально'}
+        </p>
         <p className="mb-4 text-[14px] leading-tight text-text/40">
-          Нажав на кнопку ниже, вы удалите свои аудиозаписи из базы данных. Прогресс уроков
-          останется нетронутым.
+          Нажав на кнопку ниже, вы удалите свои аудиозаписи{' '}
+          {isCloud ? 'из базы данных' : 'с этого устройства'}. Прогресс уроков останется нетронутым.
         </p>
 
         <DeleteDialog
           triggerText="Удалить все аудиофайлы"
           title="Удалить все аудиозаписи?"
-          description="Они будут стерты из облака без возможности восстановления."
+          description={`Они будут стерты ${isCloud ? 'из облака' : 'с устройства'} без возможности восстановления.`}
           confirmText="Очистить аудиофайлы"
           onConfirm={handleClearAudio}
           isSecondary
@@ -572,8 +612,8 @@ export default function SettingsPage() {
 
         <div className="mt-8">
           <p className="mb-1 text-[16px]">
-            Также вы можете удалить <span className="text-primary">все свои данные</span> с серверов
-            (прогресс, тесты и аудиофайлы)
+            Также вы можете удалить <span className="text-primary">все свои данные</span>{' '}
+            {isCloud ? 'с серверов' : 'из браузера'} (прогресс, тесты и аудиофайлы)
           </p>
           <p className="mb-4 text-[14px] leading-tight text-text/40">
             Данные будут подлежать удалению без возможности восстановления

@@ -39,7 +39,7 @@
   --toastify-font-family: var(--font-sans);
   --toastify-border-radius: 16px;
 
-   --glow-opacity: 0.08; /* Для темной темы */
+  --glow-opacity: 0.08; /* Для темной темы */
   --glow-blend: screen; /* Свечение осветляет темный фон */
 }
 
@@ -53,6 +53,19 @@
   display: flex !important;
   align-items: center !important;
   gap: 16px !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+.Toastify__progress-bar {
+  position: absolute !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  height: 4px !important;
+  width: 100% !important;
+  border-radius: 0 !important; /* Убираем кастомные скругления, overflow родителя сделает всё сам */
+  background: var(--primary) !important;
+  z-index: 10 !important; /* Чтобы она точно лежала поверх фона */
 }
 
 .Toastify__toast--success {
@@ -104,38 +117,38 @@
 
 .light {
   /* Базовые цвета фона */
-  --background: #faf8fc; 
-  --surface: #ffffff; 
+  --background: #faf8fc;
+  --surface: #ffffff;
 
   /* Акцентные цвета бренда */
-  --primary: #db2777; 
-  --accent: #7c3aed;  
-  
+  --primary: #db2777;
+  --accent: #7c3aed;
+
   /* Текст */
-  --text: #1d1520; 
+  --text: #1d1520;
 
   /* Семантические цвета */
-  --homework: #d97706; 
-  --access: #059669;   
+  --homework: #d97706;
+  --access: #059669;
 
   /* Линии и разделители */
-  --line: #e9e2ee; 
+  --line: #e9e2ee;
 
   /* Свечения */
-  --homework-glow: #f59e0b; 
-  --access-glow: #06b6d4;   
+  --homework-glow: #f59e0b;
+  --access-glow: #06b6d4;
 
   /* Пианино */
   --piano-white: #f8f9fa;
   --piano-white-hover: #e9ecef;
   --piano-white-active: #dee2e6;
-  --piano-black: #1a1a1a; 
+  --piano-black: #1a1a1a;
   --piano-black-hover: #2c2c2c;
   --piano-black-active: #404040;
 
   /* Настройки свечения для светлой темы */
-  --glow-opacity: 0.15; 
-  --glow-blend: multiply; 
+  --glow-opacity: 0.15;
+  --glow-blend: multiply;
 }
 
 @theme {
@@ -171,10 +184,13 @@
   display: none;
 }
 
-html, body {
+html,
+body {
   background-color: var(--background);
   color: var(--text);
-  transition: background-color 0.3s ease, color 0.3s ease; 
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
 }
 
 /* Фикс для @tailwindcss/typography в светлой теме */

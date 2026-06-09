@@ -8,6 +8,7 @@ import { toast } from '@/app/utils/toast';
 import * as Tone from 'tone';
 import { supabase } from '@/shared/lib/supabase';
 import { useAuthStore } from '@/app/store/authStore';
+import { Button } from '@/shared/buttons/Button';
 
 export type MicErrorType = 'denied' | 'not_found' | 'busy' | null;
 
@@ -83,7 +84,7 @@ export function useVocalTuner() {
   const [phase, setPhase] = useState<'idle' | 'listening' | 'recording'>('idle');
   const [micError, setMicError] = useState<MicErrorType>(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-
+  const undoneDeletionsRef = useRef<Set<string>>(new Set());
   const {
     recordings,
     setRecordings,
@@ -232,7 +233,7 @@ export function useVocalTuner() {
       if (!streamRef.current) return;
       const tracks = streamRef.current.getAudioTracks();
       if (tracks.length === 0 || tracks[0].readyState === 'ended') {
-        toast.error('Микрофон был отключен. Пожалуйста, проверьте подключение.');
+        toast.error('Микрофон был отключен. Пожалуйста, проверьте подключение.', { position: 'bottom-right' });
         if (phaseRef.current === 'recording') stopRec();
         stopMic();
       }
@@ -299,7 +300,7 @@ export function useVocalTuner() {
       if (sr < 44100 && !sampleRateWarnedRef.current) {
         toast.error(
           'Вы используете Bluetooth-устройство или iOS. Точность вокального тренажера может быть немного снижена.',
-          { style: { opacity: 0.8 } },
+          { style: { opacity: 0.8 }, position: 'bottom-right'  },
         );
         sampleRateWarnedRef.current = true;
       }
@@ -361,7 +362,7 @@ export function useVocalTuner() {
         const user = useAuthStore.getState().user;
         if (!user) return;
         const filePath = `${user.id}/${uuid}.webm`;
-        const toastId = toast.info('Синхронизация с облаком...', { autoClose: false });
+        const toastId = toast.info('Синхронизация с облаком...', { autoClose: false , position: 'bottom-right' });
 
         try {
           const { error: uploadError } = await supabase.storage
@@ -399,7 +400,7 @@ export function useVocalTuner() {
           useVocalGlobalStore.getState().setIsSaving(false);
         } catch (e: any) {
           toast.dismiss(toastId);
-          toast.error('Ошибка облачного сохранения: ' + e.message);
+          toast.error('Ошибка облачного сохранения: ' + e.message, { position: 'bottom-right' });
           useVocalGlobalStore.getState().setIsSaving(false);
         }
       } else {
@@ -426,7 +427,9 @@ export function useVocalTuner() {
           toast.success('Запись сохранена на устройстве', { position: 'bottom-right' });
         } catch (e: any) {
           if (e.name === 'QuotaExceededError') {
-            toast.error('Недостаточно памяти устройства для сохранения записи.');
+            toast.error('Недостаточно памяти устройства для сохранения записи.', {
+              position: 'bottom-right',
+            });
           }
         }
       }
@@ -438,7 +441,7 @@ export function useVocalTuner() {
 
     recordTimerRef.current = setTimeout(
       () => {
-        toast.error('Лимит 10 минут. Файл сохранен.');
+        toast.error('Лимит 10 минут. Файл сохранен.', { position: 'bottom-right' });
         stopRec();
       },
       10 * 60 * 1000,
@@ -456,12 +459,13 @@ export function useVocalTuner() {
     if (now - lastActionTimeRef.current < 150) return;
     lastActionTimeRef.current = now;
 
-    // Проверка рассинхрона для локальных записей
     if (!isCloudMode) {
       const exists = await localforage.getItem(rec.id);
       if (!exists) {
-        toast.error('Аудиофайл был очищен системой устройства');
-        deleteRec(rec.id);
+        toast.error('Аудиофайл был очищен системой устройства', { position: 'bottom-right' });
+        // Оптимистично убираем из стейта и жестко удаляем
+        setRecordings((prev) => prev.filter((x) => x.id !== rec.id));
+        hardDeleteRec(rec);
         return;
       }
     }
@@ -482,42 +486,87 @@ export function useVocalTuner() {
     }
   };
 
-  const deleteRec = async (id: string) => {
-    lastActionTimeRef.current = Date.now();
-
-    if (playingId === id) {
-      globalAudioPlayer.pause();
-      setPlayingId(null);
-      setIsPlaying(false);
-    }
-
-    // ВКЛЮЧАЕМ СКЕЛЕТОН УДАЛЕНИЯ ДЛЯ КОНКРЕТНОГО ID
-    useVocalGlobalStore.getState().setDeletingIds((prev) => [...prev, id]);
+  // --- ФИЗИЧЕСКОЕ (ЖЕСТКОЕ) УДАЛЕНИЕ ---
+  const hardDeleteRec = async (rec: Recording) => {
+    useVocalGlobalStore.getState().setDeletingIds((prev) => [...prev, rec.id]);
 
     try {
       if (isCloudMode) {
         const user = useAuthStore.getState().user;
         if (user) {
-          await supabase.from('audio_tracks').delete().eq('id', id);
-          await supabase.storage.from('audio_records').remove([`${user.id}/${id}.webm`]);
+          await supabase.from('audio_tracks').delete().eq('id', rec.id);
+          await supabase.storage.from('audio_records').remove([`${user.id}/${rec.id}.webm`]);
         }
       } else {
-        await localforage.removeItem(id);
+        await localforage.removeItem(rec.id);
         const stateIds = useProgressStore.getState().audioRecordIds || [];
-        useProgressStore.setState({ audioRecordIds: stateIds.filter((x) => x !== id) });
+        useProgressStore.setState({ audioRecordIds: stateIds.filter((x) => x !== rec.id) });
       }
 
-      setRecordings((prev) => {
-        const rec = prev.find((x) => x.id === id);
-        if (!isCloudMode && rec?.url) URL.revokeObjectURL(rec.url);
-        return prev.filter((x) => x.id !== id);
-      });
+      // Очищаем ссылку только если она не удалена из UI окончательно
+      if (!isCloudMode && rec.url) URL.revokeObjectURL(rec.url);
     } finally {
-      // ВЫКЛЮЧАЕМ СКЕЛЕТОН
-      useVocalGlobalStore.getState().setDeletingIds((prev) => prev.filter((x) => x !== id));
+      useVocalGlobalStore.getState().setDeletingIds((prev) => prev.filter((x) => x !== rec.id));
     }
   };
 
+ // --- МЯГКОЕ УДАЛЕНИЕ (GMAIL STYLE) ---
+  const deleteRec = (rec: Recording) => {
+    lastActionTimeRef.current = Date.now();
+
+    // 1. Сразу стопаем плеер
+    if (playingId === rec.id) {
+      globalAudioPlayer.pause();
+      setPlayingId(null);
+      setIsPlaying(false);
+    }
+
+    // 2. Оптимистично убираем запись из списка (мгновенно)
+    setRecordings((prev) => prev.filter((x) => x.id !== rec.id));
+
+    // 3. Вызываем тост с кнопкой отмены
+    const toastId = toast.undo(
+      <div className="flex w-full items-center justify-between gap-3">
+        <span className="truncate">Запись удалена</span>
+        <Button
+          variant="solid"
+          size="mini"
+          color="primary"
+          className="shrink-0"
+          onClick={(e) => {
+            e.stopPropagation();
+            // Записываем, что мы отменили удаление
+            undoneDeletionsRef.current.add(rec.id);
+            toast.dismiss(toastId);
+
+            // Возвращаем запись в стейт и восстанавливаем сортировку по дате
+            setRecordings((prev) => {
+              const restored = [...prev, rec];
+              return restored.sort((a, b) => b.createdAt - a.createdAt);
+            });
+          }}
+        >
+          Отменить
+        </Button>
+      </div>,
+      {
+        autoClose: 5000, // Даем 5 секунд на раздумья
+        closeOnClick: false, // Запрещаем закрывать кликом по фону тоста, чтобы не сбить кнопку
+        position: 'bottom-right' ,
+        onClose: () => {
+          // Вызывается, когда тост исчезает (по таймауту или по свайпу/крестику)
+          if (undoneDeletionsRef.current.has(rec.id)) {
+            // Если была отмена - просто чистим Set
+            undoneDeletionsRef.current.delete(rec.id);
+          } else {
+            // Если отмены не было - удаляем навсегда
+            hardDeleteRec(rec);
+          }
+        },
+      },
+    );
+  };
+  
   const downloadRec = async (rec: Recording) => {
     lastActionTimeRef.current = Date.now();
 
@@ -525,7 +574,7 @@ export function useVocalTuner() {
       let downloadUrl = rec.url;
 
       if (isCloudMode) {
-        toast.success('Подготовка к скачиванию...', { autoClose: 1500 });
+        toast.success('Подготовка к скачиванию...', { autoClose: 1500,position: 'bottom-right' });
         const response = await fetch(rec.url);
         const blob = await response.blob();
         downloadUrl = URL.createObjectURL(blob);
@@ -539,9 +588,9 @@ export function useVocalTuner() {
       document.body.removeChild(a);
 
       if (isCloudMode) URL.revokeObjectURL(downloadUrl);
-      if (!isCloudMode) toast.success('Загрузка аудиофайла началась');
+      if (!isCloudMode) toast.success('Загрузка аудиофайла началась', { position: 'bottom-right' });
     } catch (e) {
-      toast.error('Произошла ошибка при скачивании');
+      toast.error('Произошла ошибка при скачивании', { position: 'bottom-right' });
     }
   };
 
@@ -592,9 +641,9 @@ export function useVocalTuner() {
       }
 
       setRecordings((prev) => prev.map((r) => (r.id === id ? { ...r, name: newName.trim() } : r)));
-      toast.success('Запись переименована');
+      toast.success('Запись переименована', { position: 'bottom-right' });
     } catch (e) {
-      toast.error('Произошла ошибка при переименовании');
+      toast.error('Произошла ошибка при переименовании', { position: 'bottom-right' });
     }
   };
 
@@ -623,7 +672,7 @@ export function useVocalTuner() {
     handleSeekStart,
     handleSeekEnd,
     renameRec,
-    isSaving, 
+    isSaving,
     deletingIds,
   };
 }

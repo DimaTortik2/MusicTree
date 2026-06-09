@@ -132,222 +132,215 @@ export function VocalTunerPage() {
     );
   }
 
- const sidebarContent = (
-   <div className="flex h-full w-full flex-col p-4 md:w-80 md:border-r md:border-line md:bg-background/50">
-     <div className="mb-5 flex h-7 items-center justify-end pl-1">
-       {hasLoaded && (
-         <button
-           onClick={() => setIsModeInfoOpen(true)}
-           className="flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-medium text-text transition-colors"
-         >
-           {isCloudMode ? (
-             <Cloud
-               size={16}
-               weight="fill"
-               className="text-text/40 transition-colors hover:text-primary"
-             />
-           ) : (
-             <HardDrives
-               size={16}
-               weight="fill"
-               className="text-text/40 transition-colors hover:text-primary"
-             />
-           )}
-         </button>
-       )}
-     </div>
+  const sidebarContent = (
+    // ВАЖНО: Добавлен min-h-0 для фикса бага с флексбоксами!
+    <div className="flex min-h-0 w-full flex-1 flex-col p-4 pb-0 md:h-full md:w-80 md:flex-none md:border-r md:border-line md:bg-background/50">
+      <div className="mb-5 flex h-7 shrink-0 items-center justify-end pl-1">
+        {hasLoaded && (
+          <button
+            onClick={() => setIsModeInfoOpen(true)}
+            className="flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-medium text-text transition-colors"
+          >
+            {isCloudMode ? (
+              <Cloud
+                size={16}
+                weight="fill"
+                className="text-text/40 transition-colors hover:text-primary"
+              />
+            ) : (
+              <HardDrives
+                size={16}
+                weight="fill"
+                className="text-text/40 transition-colors hover:text-primary"
+              />
+            )}
+          </button>
+        )}
+      </div>
 
-     <div className="flex-1 overflow-y-auto pr-2 pb-24">
-       <AnimatePresence mode="wait">
-         {!hasLoaded ? (
-           // 1. НАЧАЛЬНАЯ ЗАГРУЗКА
-           <motion.div
-             key="loading-skeletons"
-             initial={{ opacity: 0 }}
-             animate={{ opacity: 1 }}
-             exit={{ opacity: 0, scale: 0.98, filter: 'blur(4px)' }}
-             transition={{ duration: 0.3, ease: 'easeOut' }}
-             className="flex flex-col gap-3"
-           >
-             {[1, 2, 3, 4].map((i) => (
-               <RecordingSkeleton key={`load-${i}`} />
-             ))}
-           </motion.div>
-         ) : (
-           <motion.div
-             key="recordings-list"
-             initial={{ opacity: 0 }}
-             animate={{ opacity: 1 }}
-             transition={{ duration: 0.3 }}
-             className="flex flex-col gap-3"
-           >
-             {/* Сообщение, если пусто (и при этом мы ничего не сохраняем В ОБЛАКО) */}
-             {recordings.length === 0 && !(isSaving && isCloudMode) && (
-               <motion.div
-                 initial={{ opacity: 0, y: 10 }}
-                 animate={{ opacity: 1, y: 0 }}
-                 className="mt-10 text-center text-sm text-text/40"
-               >
-                 Записей пока нет
-               </motion.div>
-             )}
+      <div className="custom-scroll flex-1 overflow-y-auto pr-2 pb-24">
+        <AnimatePresence mode="wait">
+          {!hasLoaded ? (
+            <motion.div
+              key="loading-skeletons"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0, scale: 0.98, filter: 'blur(4px)' }}
+              transition={{ duration: 0.3, ease: 'easeOut' }}
+              className="flex flex-col gap-3"
+            >
+              {[1, 2, 3, 4].map((i) => (
+                <RecordingSkeleton key={`load-${i}`} />
+              ))}
+            </motion.div>
+          ) : (
+            <motion.div
+              key="recordings-list"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.3 }}
+              className="flex flex-col gap-3"
+            >
+              {recordings.length === 0 && !(isSaving && isCloudMode) && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-10 text-center text-sm text-text/40"
+                >
+                  Записей пока нет
+                </motion.div>
+              )}
 
-             {/* ЕДИНЫЙ AnimatePresence ДЛЯ ПРАВИЛЬНОГО РАСЧЕТА LAYOUT БЕЗ ПРЫЖКОВ */}
-             <AnimatePresence mode="popLayout" initial={false}>
-               {/* 1. ОПТИМИСТИЧНОЕ ДОБАВЛЕНИЕ (ТОЛЬКО ОБЛАКО) */}
-               {isSaving && isCloudMode && (
-                 <motion.div
-                   key="saving-skeleton"
-                   layout="position"
-                   initial={{ opacity: 0, y: -15, scale: 0.96 }}
-                   animate={{ opacity: 1, y: 0, scale: 1 }}
-                   exit={{ opacity: 0, scale: 0.96, y: -15 }}
-                   transition={{ type: 'spring', stiffness: 450, damping: 35 }}
-                 >
-                   <RecordingSkeleton />
-                 </motion.div>
-               )}
+              <AnimatePresence mode="popLayout" initial={false}>
+                {isSaving && isCloudMode && (
+                  <motion.div
+                    key="saving-skeleton"
+                    layout="position"
+                    initial={{ opacity: 0, y: -15, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.96, y: -15 }}
+                    transition={{ type: 'spring', stiffness: 450, damping: 35 }}
+                  >
+                    <RecordingSkeleton />
+                  </motion.div>
+                )}
 
-               {/* 2. СПИСОК РЕАЛЬНЫХ ЗАПИСЕЙ И ОПТИМИСТИЧНОЕ УДАЛЕНИЕ */}
-               {recordings.map((rec) => {
-                 const isActive = playingId === rec.id;
-                 const isCurrentlyPlaying = isActive && isPlaying;
+                {recordings.map((rec) => {
+                  const isActive = playingId === rec.id;
+                  const isCurrentlyPlaying = isActive && isPlaying;
+                  const showDeletingSkeleton = deletingIds.includes(rec.id) && isCloudMode;
 
-                 // Показываем скелетон удаления ТОЛЬКО если это облачный режим
-                 const showDeletingSkeleton = deletingIds.includes(rec.id) && isCloudMode;
+                  return (
+                    <motion.div
+                      key={rec.id}
+                      layout="position"
+                      initial={{ opacity: 0, y: 15, scale: 0.96 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.96, y: -15, transition: { duration: 0.15 } }}
+                      transition={{ type: 'spring', stiffness: 450, damping: 35 }}
+                    >
+                      <AnimatePresence mode="popLayout" initial={false}>
+                        {showDeletingSkeleton ? (
+                          <motion.div
+                            key="skeleton"
+                            initial={{ opacity: 0, filter: 'blur(4px)' }}
+                            animate={{ opacity: 0.5, filter: 'blur(0px)' }}
+                            exit={{ opacity: 0, filter: 'blur(4px)' }}
+                            transition={{ duration: 0.2 }}
+                            className="pointer-events-none grayscale"
+                          >
+                            <RecordingSkeleton />
+                          </motion.div>
+                        ) : (
+                          <motion.div
+                            key="content"
+                            initial={{ opacity: 0, filter: 'blur(4px)' }}
+                            animate={{ opacity: 1, filter: 'blur(0px)' }}
+                            exit={{ opacity: 0, filter: 'blur(4px)' }}
+                            transition={{ duration: 0.2 }}
+                            className="flex flex-col gap-1"
+                          >
+                            <div
+                              className={cn(
+                                'group flex cursor-pointer items-center justify-between rounded-2xl border-3 p-3 transition-all duration-300',
+                                isActive
+                                  ? 'border-primary bg-primary text-white shadow-md'
+                                  : 'border-primary bg-transparent text-text hover:bg-primary/10 [.light_&]:border-line [.light_&]:bg-surface [.light_&]:hover:border-primary/40 [.light_&]:hover:bg-primary/5',
+                              )}
+                              onClick={() => togglePlay(rec)}
+                            >
+                              <div
+                                className={cn(
+                                  'flex shrink-0 items-center justify-center p-1 transition-colors',
+                                  isActive
+                                    ? 'text-white hover:text-white/70'
+                                    : 'text-text group-hover:text-primary',
+                                )}
+                              >
+                                {isCurrentlyPlaying ? (
+                                  <Pause weight="fill" size={20} />
+                                ) : (
+                                  <Play weight="fill" size={20} />
+                                )}
+                              </div>
 
-                 return (
-                   <motion.div
-                     key={rec.id}
-                     layout="position"
-                     initial={{ opacity: 0, y: 15, scale: 0.96 }}
-                     animate={{ opacity: 1, y: 0, scale: 1 }}
-                     exit={{ opacity: 0, scale: 0.96, y: -15, transition: { duration: 0.15 } }}
-                     transition={{ type: 'spring', stiffness: 450, damping: 35 }}
-                   >
-                     {/* ВНУТРЕННИЙ AnimatePresence ДЛЯ БЕСШОВНОЙ ПОДМЕНЫ КОНТЕНТА */}
-                     <AnimatePresence mode="popLayout" initial={false}>
-                       {showDeletingSkeleton ? (
-                         <motion.div
-                           key="skeleton"
-                           initial={{ opacity: 0, filter: 'blur(4px)' }}
-                           animate={{ opacity: 0.5, filter: 'blur(0px)' }}
-                           exit={{ opacity: 0, filter: 'blur(4px)' }}
-                           transition={{ duration: 0.2 }}
-                           className="pointer-events-none grayscale"
-                         >
-                           <RecordingSkeleton />
-                         </motion.div>
-                       ) : (
-                         <motion.div
-                           key="content"
-                           initial={{ opacity: 0, filter: 'blur(4px)' }}
-                           animate={{ opacity: 1, filter: 'blur(0px)' }}
-                           exit={{ opacity: 0, filter: 'blur(4px)' }}
-                           transition={{ duration: 0.2 }}
-                           className="flex flex-col gap-1"
-                         >
-                           <div
-                             className={cn(
-                               'group flex cursor-pointer items-center justify-between rounded-2xl border-3 p-3 transition-all duration-300',
-                               isActive
-                                 ? 'border-primary bg-primary text-white shadow-md'
-                                 : 'border-primary bg-transparent text-text hover:bg-primary/10 [.light_&]:border-line [.light_&]:bg-surface [.light_&]:hover:border-primary/40 [.light_&]:hover:bg-primary/5',
-                             )}
-                             onClick={() => togglePlay(rec)}
-                           >
-                             <div
-                               className={cn(
-                                 'flex shrink-0 items-center justify-center p-1 transition-colors',
-                                 isActive
-                                   ? 'text-white hover:text-white/70'
-                                   : 'text-text group-hover:text-primary',
-                               )}
-                             >
-                               {isCurrentlyPlaying ? (
-                                 <Pause weight="fill" size={20} />
-                               ) : (
-                                 <Play weight="fill" size={20} />
-                               )}
-                             </div>
+                              <MiniWaveform active={isActive} />
 
-                             <MiniWaveform active={isActive} />
+                              <button
+                                className={cn(
+                                  'shrink-0 cursor-pointer p-1 transition-colors outline-none',
+                                  isActive
+                                    ? 'text-white hover:opacity-70'
+                                    : 'text-text group-hover:text-primary',
+                                )}
+                                onClick={(e) => handleThreeDotsClick(e, rec)}
+                              >
+                                <DotsThreeVertical weight="bold" size={24} />
+                              </button>
+                            </div>
 
-                             <button
-                               className={cn(
-                                 'shrink-0 cursor-pointer p-1 transition-colors outline-none',
-                                 isActive
-                                   ? 'text-white hover:opacity-70'
-                                   : 'text-text group-hover:text-primary',
-                               )}
-                               onClick={(e) => handleThreeDotsClick(e, rec)}
-                             >
-                               <DotsThreeVertical weight="bold" size={24} />
-                             </button>
-                           </div>
-
-                           <AnimatePresence initial={false}>
-                             {isActive && (
-                               <motion.div
-                                 initial={{ height: 0, opacity: 0 }}
-                                 animate={{ height: 'auto', opacity: 1 }}
-                                 exit={{ height: 0, opacity: 0 }}
-                                 transition={{ duration: 0.2 }}
-                                 className="overflow-hidden"
-                               >
-                                 <div className="mx-1 mt-1 flex items-center justify-between rounded-xl bg-primary px-4 py-2 text-white">
-                                   <button
-                                     className="cursor-pointer p-1 transition-opacity hover:opacity-70"
-                                     title="Удалить"
-                                     onClick={(e) => {
-                                       e.stopPropagation();
-                                       setRecToDelete(rec);
-                                     }}
-                                   >
-                                     <Trash size={18} weight="bold" />
-                                   </button>
-                                   <div className="flex gap-4">
-                                     <button
-                                       className="cursor-pointer p-1 transition-opacity hover:opacity-70"
-                                       onClick={(e) => {
-                                         e.stopPropagation();
-                                         setRecToRename(rec);
-                                         setNewName(rec.name);
-                                       }}
-                                     >
-                                       <PencilSimple size={18} weight="bold" />
-                                     </button>
-                                     <button
-                                       className="cursor-pointer p-1 transition-opacity hover:opacity-70"
-                                       onClick={(e) => {
-                                         e.stopPropagation();
-                                         downloadRec(rec);
-                                       }}
-                                     >
-                                       <DownloadSimple size={18} weight="bold" />
-                                     </button>
-                                   </div>
-                                 </div>
-                               </motion.div>
-                             )}
-                           </AnimatePresence>
-                         </motion.div>
-                       )}
-                     </AnimatePresence>
-                   </motion.div>
-                 );
-               })}
-             </AnimatePresence>
-           </motion.div>
-         )}
-       </AnimatePresence>
-     </div>
-   </div>
- );
+                            <AnimatePresence initial={false}>
+                              {isActive && (
+                                <motion.div
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: 'auto', opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  transition={{ duration: 0.2 }}
+                                  className="overflow-hidden"
+                                >
+                                  <div className="mx-1 mt-1 flex items-center justify-between rounded-xl bg-primary px-4 py-2 text-white">
+                                    <button
+                                      className="cursor-pointer p-1 transition-opacity hover:opacity-70"
+                                      title="Удалить"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setRecToDelete(rec);
+                                      }}
+                                    >
+                                      <Trash size={18} weight="bold" />
+                                    </button>
+                                    <div className="flex gap-4">
+                                      <button
+                                        className="cursor-pointer p-1 transition-opacity hover:opacity-70"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setRecToRename(rec);
+                                          setNewName(rec.name);
+                                        }}
+                                      >
+                                        <PencilSimple size={18} weight="bold" />
+                                      </button>
+                                      <button
+                                        className="cursor-pointer p-1 transition-opacity hover:opacity-70"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          downloadRec(rec);
+                                        }}
+                                      >
+                                        <DownloadSimple size={18} weight="bold" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="flex h-screen w-full overflow-hidden text-text">
-      <aside className="hidden h-full shrink-0 md:block">{sidebarContent}</aside>
+    <div className="flex h-screen w-full overflow-hidden font-sans text-text">
+      <aside className="hidden h-full shrink-0 flex-col md:flex">{sidebarContent}</aside>
 
       <MobileSidebarPortal
         isOpen={isMobileSidebarOpen}
@@ -454,7 +447,6 @@ export function VocalTunerPage() {
         </div>
       </main>
 
-      {/* Модалка с информацией о режиме */}
       <Modal
         isOpen={isModeInfoOpen}
         onClose={() => setIsModeInfoOpen(false)}
@@ -463,12 +455,12 @@ export function VocalTunerPage() {
         description={
           isCloudMode
             ? 'Ваши аудиозаписи автоматически синхронизируются с облаком. Они надежно защищены и доступны с любого устройства при входе в аккаунт.'
-            : 'Ваши аудиозаписи сохраняются только на этом устройстве в этом браузере. Если вы очистите кэш браузера или поменяете устройство, они не перенесутся. У нас просто нет денег, чтобы обеспечить облачный доступ всем :('
+            : 'Ваши аудиозаписи сохраняются только на этом устройстве в этом браузере. Если вы очистите кэш браузера или поменяете устройство, они не перенесутся.'
         }
         icon={
           isCloudMode ? <Cloud size={32} weight="fill" /> : <HardDrives size={32} weight="fill" />
         }
-        iconContainerClassName={'bg-primary text-text'}
+        iconContainerClassName={'bg-primary text-white'}
         actions={
           <Button
             variant="solid"
@@ -515,9 +507,8 @@ export function VocalTunerPage() {
               color="primary"
               onClick={() => {
                 if (recToDelete) {
-                  deleteRec(recToDelete.id);
+                  deleteRec(recToDelete);
                   setRecToDelete(null);
-                  toast.success('Запись удалена', { position: 'bottom-right' });
                 }
               }}
               className="w-full rounded-[16px] border-2 py-3 text-[15px] font-medium sm:w-auto sm:min-w-[140px] md:min-w-[160px]"

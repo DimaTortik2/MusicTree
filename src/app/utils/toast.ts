@@ -1,17 +1,13 @@
 import { toast as rtToast, type ToastOptions, type ToastPosition } from 'react-toastify';
-import { Check, X, HourglassHigh } from '@phosphor-icons/react';
+import { Check, X, HourglassHigh, Trash } from '@phosphor-icons/react';
 import React from 'react';
 
-// Функция динамически определяет позицию в зависимости от ширины экрана
 const getResponsivePosition = (customPosition?: ToastPosition): ToastPosition => {
-  // Если позиция передана вручную в объекте параметров, используем её
   if (customPosition) return customPosition;
-
-  // Если ширина экрана <= 767px, показываем сверху, иначе — снизу
   if (typeof window !== 'undefined' && window.innerWidth <= 767) {
-    return 'top-right'; // На телефоне дефолт сверху
+    return 'top-right';
   }
-  return 'bottom-right'; // На ПК дефолт снизу
+  return 'bottom-right';
 };
 
 const defaultOptions: Omit<ToastOptions, 'position'> = {
@@ -24,10 +20,9 @@ const defaultOptions: Omit<ToastOptions, 'position'> = {
 };
 
 export const toast = {
-  success: (message: string, options?: ToastOptions) =>
+  success: (message: React.ReactNode, options?: ToastOptions) =>
     rtToast.success(message, {
       ...defaultOptions,
-      // Вычисляем позицию динамически
       position: getResponsivePosition(options?.position),
       ...options,
       icon: (() =>
@@ -38,7 +33,7 @@ export const toast = {
         } as any)) as any,
     }),
 
-  error: (message: string, options?: ToastOptions) =>
+  error: (message: React.ReactNode, options?: ToastOptions) =>
     rtToast.error(message, {
       ...defaultOptions,
       position: getResponsivePosition(options?.position),
@@ -51,7 +46,7 @@ export const toast = {
         } as any)) as any,
     }),
 
-  info: (message: string, options?: ToastOptions) =>
+  info: (message: React.ReactNode, options?: ToastOptions) =>
     rtToast.info(message, {
       ...defaultOptions,
       position: getResponsivePosition(options?.position),
@@ -63,5 +58,22 @@ export const toast = {
           weight: 'bold',
         } as any)) as any,
     }),
+
+  // НОВЫЙ МЕТОД ДЛЯ SOFT-DELETE
+  undo: (message: React.ReactNode, options?: ToastOptions) =>
+    rtToast(message, {
+      ...defaultOptions,
+      hideProgressBar: false,
+      position: getResponsivePosition(options?.position),
+      ...options,
+      icon: (() =>
+        React.createElement(Trash, {
+          size: 24,
+          className: 'text-primary',
+          weight: 'bold',
+        } as any)) as any,
+      // Делаем рамку нейтральной для темной/светлой темы
+    }),
+
   dismiss: (id?: string | number) => rtToast.dismiss(id),
 };

@@ -29,7 +29,8 @@ export const RegisterForm = () => {
   };
 
   const handleOAuthLogin = async (provider: 'google' | 'github') => {
-    const redirectUrl = window.location.origin;
+     const redirectUrl = `${window.location.origin}/app/tree`;
+
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider,

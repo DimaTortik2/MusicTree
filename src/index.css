@@ -61,6 +61,9 @@
 .Toastify__toast--error {
   border: 3px solid color-mix(in srgb, var(--primary) 38%, transparent) !important;
 }
+.Toastify__toast--info {
+  border: 3px solid color-mix(in srgb, var(--access-glow) 38%, transparent) !important;
+}
 
 .Toastify__toast-body {
   padding: 0 !important;

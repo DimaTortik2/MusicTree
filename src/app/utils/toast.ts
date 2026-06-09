@@ -1,5 +1,5 @@
 import { toast as rtToast, type ToastOptions, type ToastPosition } from 'react-toastify';
-import { Check, X } from '@phosphor-icons/react';
+import { Check, X, HourglassHigh } from '@phosphor-icons/react';
 import React from 'react';
 
 // Функция динамически определяет позицию в зависимости от ширины экрана
@@ -47,6 +47,19 @@ export const toast = {
         React.createElement(X, {
           size: 24,
           className: 'text-primary',
+          weight: 'bold',
+        } as any)) as any,
+    }),
+
+  info: (message: string, options?: ToastOptions) =>
+    rtToast.info(message, {
+      ...defaultOptions,
+      position: getResponsivePosition(options?.position),
+      ...options,
+      icon: (() =>
+        React.createElement(HourglassHigh, {
+          size: 24,
+          className: 'text-access-glow',
           weight: 'bold',
         } as any)) as any,
     }),

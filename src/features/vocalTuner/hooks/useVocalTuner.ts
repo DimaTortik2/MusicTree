@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import localforage from 'localforage';
 import { create } from 'zustand';
-import { YIN } from 'pitchfinder'; // <-- Подключаем мощный YIN-алгоритм
+import { YIN } from 'pitchfinder';
 import type { Recording } from '@/features/vocalTuner/types';
 import { useProgressStore } from '@/app/store/useProgressStore';
 import { toast } from '@/app/utils/toast';
 import * as Tone from 'tone';
+import { supabase } from '@/shared/lib/supabase';
+import { useAuthStore } from '@/app/store/authStore';
 
 export type MicErrorType = 'denied' | 'not_found' | 'busy' | null;
 
@@ -106,71 +107,80 @@ export function useVocalTuner() {
     phaseRef.current = phase;
   }, [phase]);
 
-  // Загрузка аудио из БД
+  // Загрузка аудио из защищенного БД
   useEffect(() => {
     if (hasLoaded) return;
     const loadRecordings = async () => {
-      const ids = useProgressStore.getState().audioRecordIds;
-      const loaded: Recording[] = [];
-      for (const id of ids) {
-        const data = await localforage.getItem<any>(id);
-        if (data && data.blob) {
-          loaded.push({
-            id: data.id,
-            name: data.title,
-            time: new Date(data.createdAt).toLocaleDateString(),
-            url: URL.createObjectURL(data.blob),
-            dur: data.dur,
-            blob: data.blob,
-            createdAt: data.createdAt,
-          });
-        }
+      const user = useAuthStore.getState().user;
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('audio_tracks')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (data && !error && data.length > 0) {
+        // Достаем из БД пути к файлам
+        const paths = data.map((track) => track.url);
+
+        // Массово просим у Supabase сгенерировать защищенные ссылки на 24 часа
+        const { data: signedUrlsData } = await supabase.storage
+          .from('audio_records')
+          .createSignedUrls(paths, 86400);
+
+        const loaded: Recording[] = data.map((track, index) => ({
+          id: track.id,
+          name: track.title,
+          time: new Date(track.created_at).toLocaleDateString(),
+          url: signedUrlsData?.[index]?.signedUrl || '', // Временная защищенная ссылка
+          dur: track.dur,
+          blob: new Blob(), // Пустая заглушка
+          createdAt: track.created_at,
+        }));
+        setRecordings(loaded);
+      } else {
+        setRecordings([]);
       }
-      setRecordings(loaded.sort((a, b) => b.createdAt - a.createdAt));
       setHasLoaded(true);
     };
     loadRecordings();
-  }, [hasLoaded]);
+  }, [hasLoaded, setRecordings, setHasLoaded]);
 
-  // --- ОЧИСТКА ПРИ РАЗМОНТИРОВАНИИ (Решение проблем с фоновым звуком и утечками) ---
+  // Очистка при размонтировании
   useEffect(() => {
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       if (mrRef.current?.state === 'recording') mrRef.current.stop();
       streamRef.current?.getTracks().forEach((t) => t.stop());
 
-      // Глушим проигрыватель, если юзер ушел на другую страницу (Дерево)
       globalAudioPlayer.pause();
       globalAudioPlayer.currentTime = 0;
       useVocalGlobalStore.getState().setIsPlaying(false);
 
-      // Удаляем ObjectURLs для предотвращения Out Of Memory
-      const currentRecordings = useVocalGlobalStore.getState().recordings;
-      currentRecordings.forEach((r) => {
-        if (r.url) URL.revokeObjectURL(r.url);
-      });
       useVocalGlobalStore.getState().setRecordings([]);
-      useVocalGlobalStore.getState().setHasLoaded(false); // Заставит загрузить заново при возврате
+      useVocalGlobalStore.getState().setHasLoaded(false);
       useVocalGlobalStore.getState().setPlayingId(null);
     };
   }, []);
 
-  // --- ОБРАБОТКА ФИЗИЧЕСКОГО ОТКЛЮЧЕНИЯ МИКРОФОНА ---
+  // ОБРАБОТКА ФИЗИЧЕСКОГО ОТКЛЮЧЕНИЯ МИКРОФОНА
   useEffect(() => {
     const handleDeviceChange = () => {
       if (!streamRef.current) return;
       const tracks = streamRef.current.getAudioTracks();
       if (tracks.length === 0 || tracks[0].readyState === 'ended') {
         toast.error('Микрофон был отключен. Пожалуйста, проверьте подключение.');
-        if (phaseRef.current === 'recording') stopRec(); // Сохраняем кусок записи
-        stopMic(); // Глушим процесс PitchFinder
+        if (phaseRef.current === 'recording') stopRec();
+        stopMic();
       }
     };
     navigator.mediaDevices?.addEventListener('devicechange', handleDeviceChange);
     return () => navigator.mediaDevices?.removeEventListener('devicechange', handleDeviceChange);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // --- PITCHFINDER YIN LOOP (Throttled & Ограниченный) ---
+  // PITCHFINDER YIN LOOP
   const tickRef = useRef<() => void>(() => {});
   useEffect(() => {
     tickRef.current = () => {
@@ -180,19 +190,16 @@ export function useVocalTuner() {
       analyserRef.current.getFloatTimeDomainData(buf);
 
       const now = Date.now();
-      // Ограничиваем вызовы тяжелого алгоритма (Throttling ~40ms)
       if (now - lastNoteUpdateRef.current > 40) {
         let rms = 0;
         for (let i = 0; i < buf.length; i++) rms += buf[i] * buf[i];
         rms = Math.sqrt(rms / buf.length);
 
-        // Порог тишины (около -50dB): спасает от реакции UI на кулер и дыхание
         if (rms < 0.00316) {
           pitchDataRef.current = { active: false, midiFloat: pitchDataRef.current.midiFloat };
         } else {
           const freq = pitchDetectorRef.current ? pitchDetectorRef.current(buf) : null;
 
-          // Жесткие лимиты: от C2 (65Hz) до C6 (1046Hz)
           if (freq && freq >= 65 && freq <= 1046) {
             const midi = 12 * Math.log2(freq / 440) + 69;
             pitchDataRef.current = { active: true, midiFloat: midi };
@@ -209,28 +216,23 @@ export function useVocalTuner() {
   const startMic = async () => {
     setMicError(null);
     try {
-
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          throw new Error('InsecureContext');
-        }
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('InsecureContext');
+      }
 
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
       });
       streamRef.current = stream;
 
-      // ✨ ДОСТАЕМ НАТИВНЫЙ КОНТЕКСТ ИЗ TONE.JS
       const rawContext = Tone.getContext().rawContext as AudioContext;
       audioCtxRef.current = rawContext;
 
-      // Проверяем и запускаем контекст
       if (rawContext.state === 'suspended') {
         await rawContext.resume();
       }
 
       const sr = rawContext.sampleRate;
-
-      // Инициализация Pitchfinder YIN с актуальным Sample Rate
       pitchDetectorRef.current = YIN({ sampleRate: sr });
 
       if (sr < 44100 && !sampleRateWarnedRef.current) {
@@ -241,7 +243,6 @@ export function useVocalTuner() {
         sampleRateWarnedRef.current = true;
       }
 
-      // Используем rawContext для создания нодов
       const src = rawContext.createMediaStreamSource(stream);
       sourceNodeRef.current = src;
 
@@ -253,11 +254,10 @@ export function useVocalTuner() {
       setPhase('listening');
       rafRef.current = requestAnimationFrame(() => tickRef.current());
     } catch (err: any) {
-       if (err.message === 'InsecureContext') {
-         setMicError('denied');
-         toast.error('Микрофон недоступен по HTTP. Запустите Vite с HTTPS.');
-       } 
-      else if (err.name === 'NotAllowedError') setMicError('denied');
+      if (err.message === 'InsecureContext') {
+        setMicError('denied');
+        toast.error('Микрофон недоступен по HTTP. Запустите Vite с HTTPS.');
+      } else if (err.name === 'NotAllowedError') setMicError('denied');
       else if (err.name === 'NotFoundError') setMicError('not_found');
       else if (err.name === 'NotReadableError' || err.name === 'TrackStartError')
         setMicError('busy');
@@ -288,32 +288,68 @@ export function useVocalTuner() {
     mr.onstop = async () => {
       if (recordTimerRef.current) clearTimeout(recordTimerRef.current);
 
+      const user = useAuthStore.getState().user;
+      if (!user) {
+        toast.error('Ошибка: вы не авторизованы');
+        return;
+      }
+
       const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
       const dur = Date.now() - recStartRef.current;
       const uuid =
         'randomUUID' in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2);
       const createdAt = Date.now();
       const title = `Запись от ${new Date().toLocaleDateString()}`;
+      const filePath = `${user.id}/${uuid}.webm`;
 
-      const recData = { id: uuid, blob, title, dur, createdAt };
-
+      const toastId = toast.info('Сохранение...', { autoClose: false });
       try {
-        await localforage.setItem(uuid, recData);
-        const currentIds = useProgressStore.getState().audioRecordIds;
-        useProgressStore.setState({ audioRecordIds: [uuid, ...currentIds] });
 
-        setRecordings((prev) => [
-          { id: uuid, name: title, time: '', url: URL.createObjectURL(blob), dur, blob, createdAt },
-          ...prev,
+        // 1. Загружаем файл
+        const { error: uploadError } = await supabase.storage
+          .from('audio_records')
+          .upload(filePath, blob, { contentType: 'audio/webm' });
+
+        if (uploadError) throw uploadError;
+
+        // 2. Получаем ссылку для немедленного прослушивания
+        const { data: signedData } = await supabase.storage
+          .from('audio_records')
+          .createSignedUrl(filePath, 86400);
+
+        const secureUrl = signedData?.signedUrl || '';
+
+        // 3. Сохраняем информацию в базу данных
+        const { error: dbError } = await supabase.from('audio_tracks').insert([
+          {
+            id: uuid,
+            user_id: user.id,
+            title,
+            dur,
+            url: filePath, // Сохраняем путь
+            created_at: createdAt,
+          },
         ]);
 
-        toast.success('Запись успешно сохранена', { position: 'bottom-right' });
+        if (dbError) throw dbError;
+
+        setRecordings((prev) => [
+          {
+            id: uuid,
+            name: title,
+            time: new Date().toLocaleDateString(),
+            url: secureUrl,
+            dur,
+            blob,
+            createdAt,
+          },
+          ...prev,
+        ]);
+        toast.dismiss(toastId);
+        toast.success('Запись сохранена!', { position: 'bottom-right' });
       } catch (e: any) {
-        if (e.name === 'QuotaExceededError') {
-          toast.error(
-            'Недостаточно памяти для сохранения записи. Пожалуйста, удалите старые аудиофайлы в настройках или освободите место на устройстве',
-          );
-        }
+        toast.dismiss(toastId);
+        toast.error('Ошибка сохранения: ' + e.message);
       }
     };
 
@@ -321,7 +357,6 @@ export function useVocalTuner() {
     mrRef.current = mr;
     setPhase('recording');
 
-    // Ограничение записи ровно в 10 минут
     recordTimerRef.current = setTimeout(
       () => {
         toast.error('Достигнут лимит времени записи (10 минут). Аудиофайл сохранен автоматически.');
@@ -342,14 +377,6 @@ export function useVocalTuner() {
     if (now - lastActionTimeRef.current < 150) return;
     lastActionTimeRef.current = now;
 
-    // Проверка рассинхрона (если кэш очищен ОС)
-    const exists = await localforage.getItem(rec.id);
-    if (!exists) {
-      toast.error('Аудиофайл был очищен системой устройства');
-      deleteRec(rec.id);
-      return;
-    }
-
     if (playingId === rec.id) {
       if (isPlaying) {
         globalAudioPlayer.pause();
@@ -368,34 +395,44 @@ export function useVocalTuner() {
 
   const deleteRec = async (id: string) => {
     lastActionTimeRef.current = Date.now();
+    const user = useAuthStore.getState().user;
+
     if (playingId === id) {
       globalAudioPlayer.pause();
       setPlayingId(null);
       setIsPlaying(false);
     }
 
-    await localforage.removeItem(id);
-    const stateIds = useProgressStore.getState().audioRecordIds;
-    useProgressStore.setState({ audioRecordIds: stateIds.filter((x) => x !== id) });
+    setRecordings((prev) => prev.filter((x) => x.id !== id));
 
-    setRecordings((prev) => {
-      const rec = prev.find((x) => x.id === id);
-      // Очистка объекта из RAM
-      if (rec?.url) URL.revokeObjectURL(rec.url);
-      return prev.filter((x) => x.id !== id);
-    });
+    if (!user) return;
+
+    await supabase.from('audio_tracks').delete().eq('id', id);
+    await supabase.storage.from('audio_records').remove([`${user.id}/${id}.webm`]);
   };
 
-  const downloadRec = (rec: Recording) => {
+  const downloadRec = async (rec: Recording) => {
     lastActionTimeRef.current = Date.now();
-    const a = document.createElement('a');
-    a.href = rec.url;
-    a.download = `${rec.name.replace(/\s+/g, '_')}.webm`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    toast.success('Подготовка к скачиванию...', { autoClose: 1500 });
 
-    toast.success('Загрузка аудиофайла началась');
+    try {
+      // Запрашиваем файл как blob, чтобы обойти CORS при скачивании
+      const response = await fetch(rec.url);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = `${rec.name.replace(/\s+/g, '_')}.webm`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+
+      toast.success('Загрузка началась');
+    } catch (e) {
+      toast.error('Произошла ошибка при скачивании');
+    }
   };
 
   const handleThreeDotsClick = (e: React.MouseEvent, rec: Recording) => {
@@ -424,18 +461,25 @@ export function useVocalTuner() {
     const newTime = Number(e.target.value);
     setCurrentTime(newTime);
     globalAudioPlayer.currentTime = newTime;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const renameRec = async (id: string, newName: string) => {
     if (!newName.trim()) return;
     try {
-      const data = await localforage.getItem<any>(id);
-      if (data) {
-        data.title = newName.trim();
-        await localforage.setItem(id, data);
+      const { error } = await supabase
+        .from('audio_tracks')
+        .update({ title: newName.trim() })
+        .eq('id', id);
+
+      if (!error) {
+        setRecordings((prev) =>
+          prev.map((r) => (r.id === id ? { ...r, name: newName.trim() } : r)),
+        );
+        toast.success('Запись переименована');
+      } else {
+        toast.error('Произошла ошибка при переименовании');
       }
-      setRecordings((prev) => prev.map((r) => (r.id === id ? { ...r, name: newName.trim() } : r)));
-      toast.success('Запись успешно переименована');
     } catch (e) {
       toast.error('Произошла ошибка при переименовании');
     }

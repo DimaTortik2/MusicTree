@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { SpeakerHigh, PianoKeys, ArrowCounterClockwise } from '@phosphor-icons/react';
-import localforage from 'localforage';
 import { useProgressStore } from '@/app/store/useProgressStore';
 import { useActiveKeysStore } from '@/app/store/useActiveKeysStore';
 import { useTheme } from '@/app/providers/ThemeProvider';
@@ -14,8 +13,10 @@ import { useNavigate } from 'react-router-dom';
 import { Radio } from '@/shared/buttons/Radio';
 import { toast } from '@/app/utils/toast';
 import { UserProfileMenu } from '@/shared/UserProfileMenu';
+import { useAuthStore } from '@/app/store/authStore';
+import { supabase } from '@/shared/lib/supabase';
 
-// Форматирование клавиш (убираем Key и Digit + меняем слова на символы)
+// Форматирование клавиш
 const formatKeyName = (code: string | null) => {
   if (!code) return '—';
   let text = code.replace('Key', '').replace('Digit', '');
@@ -84,31 +85,38 @@ export default function SettingsPage() {
   const [storagePercent, setStoragePercent] = useState(0);
   const navigate = useNavigate();
 
-  // Оценка занимаемой памяти (Storage API)
+  // --- Оценка занимаемой памяти в облаке Supabase ---
   useEffect(() => {
-    async function checkStorage() {
-      if (navigator.storage && navigator.storage.estimate) {
-        try {
-          const { usage, quota } = await navigator.storage.estimate();
-          if (usage !== undefined && quota !== undefined) {
-            const mb = usage / (1024 * 1024);
-            if (mb > 1024) {
-              setStorageText(`${(mb / 1024).toFixed(1)} ГБ`);
-            } else {
-              setStorageText(`${mb > 0 && mb < 1 ? '<1' : Math.round(mb)} МБ`);
-            }
-            let percent = quota > 0 ? (usage / quota) * 100 : 0;
-            if (usage > 0 && percent < 2) percent = 2;
-            setStoragePercent(Math.min(percent, 100));
+    async function checkCloudStorage() {
+      const user = useAuthStore.getState().user;
+      if (!user) return;
+
+      try {
+        // Получаем список всех файлов в папке юзера
+        const { data, error } = await supabase.storage.from('audio_records').list(user.id);
+
+        if (data && !error) {
+          // Суммируем вес всех файлов
+          const totalBytes = data.reduce((acc, file) => acc + (file.metadata?.size || 0), 0);
+          const mb = totalBytes / (1024 * 1024);
+
+          if (mb > 1024) {
+            setStorageText(`${(mb / 1024).toFixed(1)} ГБ`);
+          } else {
+            setStorageText(`${mb > 0 && mb < 1 ? '<1' : Math.round(mb)} МБ`);
           }
-        } catch (e) {
-          console.error('Ошибка оценки памяти:', e);
+
+          // Считаем процент от бесплатного 1 ГБ (1024 МБ) в Supabase
+          let percent = (mb / 1024) * 100;
+          if (mb > 0 && percent < 2) percent = 2; // минимальная дуга
+          setStoragePercent(Math.min(percent, 100));
         }
+      } catch (e) {
+        console.error('Ошибка получения данных о хранилище:', e);
       }
     }
-    checkStorage();
-    window.addEventListener('focus', checkStorage);
-    return () => window.removeEventListener('focus', checkStorage);
+
+    checkCloudStorage();
   }, []);
 
   // Логика переназначения клавиш с защитой системных кнопок
@@ -165,25 +173,63 @@ export default function SettingsPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [listeningNote, updatePianoBinding]);
 
+  // --- Очистка аудио из облака ---
   const handleClearAudio = async () => {
     try {
-      await localforage.clear();
-      useProgressStore.setState({ audioRecordIds: [] });
+      const user = useAuthStore.getState().user;
+      if (!user) return;
+
+      // 1. Узнаем, какие файлы есть в папке
+      const { data: files } = await supabase.storage.from('audio_records').list(user.id);
+
+      // 2. Удаляем файлы с жесткого диска облака
+      if (files && files.length > 0) {
+        const filePaths = files.map((f) => `${user.id}/${f.name}`);
+        await supabase.storage.from('audio_records').remove(filePaths);
+      }
+
+      // 3. Удаляем записи о файлах из базы данных
+      await supabase.from('audio_tracks').delete().eq('user_id', user.id);
+
+      // 4. Обновляем UI
       setStorageText('0 МБ');
       setStoragePercent(0);
-      toast.success('Все аудифайлы очищены');
+      toast.success('Аудиофайлы удалены');
     } catch (e) {
       console.error('Ошибка очистки аудио:', e);
+      toast.error('Произошла ошибка при удалении');
     }
   };
 
+  // --- Полный сброс (Аудио + Прогресс) ---
   const handleClearAll = async () => {
     try {
-      await localforage.clear();
+      const user = useAuthStore.getState().user;
+      if (user) {
+        // 1. Чистим файлы
+        const { data: files } = await supabase.storage.from('audio_records').list(user.id);
+        if (files && files.length > 0) {
+          const filePaths = files.map((f) => `${user.id}/${f.name}`);
+          await supabase.storage.from('audio_records').remove(filePaths);
+        }
+        await supabase.from('audio_tracks').delete().eq('user_id', user.id);
+
+        // 2. Сбрасываем прогресс в БД до пустого объекта
+        await supabase
+          .from('profiles')
+          .update({
+            progress_state: {},
+            shortcut_state: {},
+          })
+          .eq('id', user.id);
+      }
+
+      // 3. Чистим локальные данные и перезагружаем приложение
       localStorage.clear();
       window.location.href = '/';
     } catch (e) {
       console.error('Ошибка полного сброса:', e);
+      toast.error('Произошла ошибка при удалении данных');
     }
   };
 
@@ -195,7 +241,6 @@ export default function SettingsPage() {
         {keys.map((item) => {
           const isListeningWhite = listeningNote === item.baseNote;
           const isListeningBlack = item.hasBlack && listeningNote === item.blackBaseNote;
-
           const isWhitePressed = activeKeys.has(item.baseNote);
           const isBlackPressed = item.hasBlack && activeKeys.has(item.blackBaseNote!);
 
@@ -206,11 +251,9 @@ export default function SettingsPage() {
             >
               {/* Белая клавиша */}
               <div
-                // ✨ Если клавиша уже слушается - повторный клик отменяет прослушивание
                 onClick={() => setListeningNote(isListeningWhite ? null : item.baseNote)}
                 className={cn(
-                  'relative flex cursor-pointer flex-col justify-end pb-3 transition-colors duration-100 ease-in-out',
-                  'h-[140px] w-[32px] rounded-b-[6px] lg:h-[180px] lg:w-[46px]',
+                  'relative flex h-[140px] w-[32px] cursor-pointer flex-col justify-end rounded-b-[6px] pb-3 transition-colors duration-100 ease-in-out lg:h-[180px] lg:w-[46px]',
                   isListeningWhite
                     ? 'bg-primary'
                     : isWhitePressed
@@ -231,15 +274,12 @@ export default function SettingsPage() {
               {/* Черная клавиша */}
               {item.hasBlack && (
                 <div
-                  // ✨ Если клавиша уже слушается - повторный клик отменяет прослушивание
                   onClick={(e) => {
                     e.stopPropagation();
                     setListeningNote(isListeningBlack ? null : item.blackBaseNote!);
                   }}
                   className={cn(
-                    'absolute top-0 z-10 flex cursor-pointer flex-col justify-end pb-2 transition-colors duration-100 ease-in-out',
-                    'h-[85px] w-[20px] rounded-b-[4px] lg:h-[110px] lg:w-[28px]',
-                    '-right-[11px] lg:-right-[16px]',
+                    'absolute top-0 -right-[11px] z-10 flex h-[85px] w-[20px] cursor-pointer flex-col justify-end rounded-b-[4px] pb-2 transition-colors duration-100 ease-in-out lg:-right-[16px] lg:h-[110px] lg:w-[28px]',
                     isListeningBlack
                       ? 'bg-primary'
                       : isBlackPressed
@@ -268,7 +308,6 @@ export default function SettingsPage() {
     <div className="relative min-h-screen w-full p-6 pb-[50vh] text-text md:p-10 md:pb-[50vh]">
       <UserProfileMenu />
 
-      {/* 1. Мобильная кастомизация */}
       <div className="mb-10 md:hidden">
         <h2 className="mb-1 text-2xl">Тап-бар</h2>
         <p className="mb-4 text-[14px] leading-tight text-text/40">
@@ -284,7 +323,6 @@ export default function SettingsPage() {
         </Button>
       </div>
 
-      {/* 2. Кастомизация Пианино */}
       <div className="mb-10 hidden overflow-hidden md:block">
         <div className="mb-4 flex items-center gap-4">
           <h2 className="text-2xl">Клавиатура</h2>
@@ -297,13 +335,11 @@ export default function SettingsPage() {
             <ArrowCounterClockwise size={24} />
           </button>
         </div>
-
         {listeningNote && (
           <div className="mb-4 animate-pulse text-sm text-primary">
             Нажмите любую доступную клавишу для ноты {listeningNote}...
           </div>
         )}
-
         <div className="flex items-start gap-1">
           {renderKeyboardLayout(4)}
           {renderKeyboardLayout(5)}
@@ -321,10 +357,8 @@ export default function SettingsPage() {
         </Button>
       </div>
 
-      {/* 3. Громкость */}
       <div className="mb-10 max-w-sm">
         <h2 className="mb-4 text-2xl">Громкость</h2>
-
         <div className="group mb-6 flex items-center gap-4">
           <SpeakerHigh size={24} className="shrink-0 text-text/80" />
           <VolumeSlider
@@ -332,7 +366,6 @@ export default function SettingsPage() {
             onChange={(e) => setMediaVolume(Number(e.target.value))}
           />
         </div>
-
         <div className="group flex items-center gap-4">
           <div className="flex shrink-0 items-center justify-center rounded-md bg-text p-1.5 text-surface opacity-70">
             <PianoKeys size={20} weight="fill" />
@@ -344,7 +377,6 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* 4. ЗВУЧАНИЕ ПИАНИНО */}
       <div className="mb-10 max-w-sm">
         <h2 className="mb-4 text-2xl">Звучание пианино</h2>
         <div className="flex flex-col gap-5">
@@ -359,7 +391,6 @@ export default function SettingsPage() {
             label="Синтезатор"
             description="Электронный звук. Работает моментально и не тратит интернет."
           />
-
           <Radio
             name="soundType"
             checked={pianoSoundType === 'acoustic'}
@@ -389,7 +420,6 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* 5. Тема */}
       <div className="mb-10">
         <h2 className="mb-4 text-2xl">Тема</h2>
         <div className="flex items-center gap-6">
@@ -414,7 +444,6 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* --- ВИЗУАЛЬНЫЕ ЭФФЕКТЫ --- */}
       <div className="mb-10 max-w-sm">
         <h2 className="mb-4 text-2xl">Свечение фона</h2>
         <div className="flex items-center gap-6">
@@ -437,8 +466,6 @@ export default function SettingsPage() {
             label="Выключено"
           />
         </div>
-
-        {/* Опция движения мыши для обоев — ПК-онли (скрыта на мобилках) */}
         <div className="mt-8 hidden flex-col gap-4 md:flex">
           <div className="flex flex-col gap-1">
             <h3 className="text-2xl text-text">Параллакс обоев</h3>
@@ -446,7 +473,6 @@ export default function SettingsPage() {
               Паттерн на фоне будет плавно смещаться вслед за курсором мыши.
             </p>
           </div>
-
           <div className="flex items-center gap-6">
             <Radio
               name="wallpaperTracking"
@@ -498,9 +524,8 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      {/* 6. Данные */}
       <div className="mb-10 max-w-lg">
-        <h2 className="mb-6 text-2xl">Данные</h2>
+        <h2 className="mb-6 text-2xl">Данные облака (Supabase)</h2>
 
         <div className="relative mb-6 h-48 w-48">
           <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90 transform">
@@ -530,16 +555,16 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        <p className="mb-1 text-[16px]">Диаграмма объема памяти, занятого под ваши аудиофайлы</p>
+        <p className="mb-1 text-[16px]">Лимит хранилища (1 ГБ)</p>
         <p className="mb-4 text-[14px] leading-tight text-text/40">
-          Нажав на кнопку ниже, вы удалите только свои аудиозаписи. На остальных данных это никак не
-          отразится. Вы не потеряете свой прогресс
+          Нажав на кнопку ниже, вы удалите свои аудиозаписи из базы данных. Прогресс уроков
+          останется нетронутым.
         </p>
 
         <DeleteDialog
-          triggerText="Удалить все ваши аудиофайлы"
-          title="Вы действительно хотите удалить все аудиозаписи с этого сайта?"
-          description="Вы потеряете все свои записи без возможности восстановления, но прогресс останется нетронутым"
+          triggerText="Удалить все аудиофайлы"
+          title="Удалить все аудиозаписи?"
+          description="Они будут стерты из облака без возможности восстановления."
           confirmText="Очистить аудиофайлы"
           onConfirm={handleClearAudio}
           isSecondary
@@ -547,22 +572,20 @@ export default function SettingsPage() {
 
         <div className="mt-8">
           <p className="mb-1 text-[16px]">
-            Также вы можете удалить <span className="text-primary">все свои данные</span> с сайта
+            Также вы можете удалить <span className="text-primary">все свои данные</span> с серверов
             (прогресс, тесты и аудиофайлы)
           </p>
           <p className="mb-4 text-[14px] leading-tight text-text/40">
-            Будьте внимательны! Данные будут подлежать удалению без возможности восстановления
+            Данные будут подлежать удалению без возможности восстановления
           </p>
-
           <DeleteDialog
             triggerText="Удалить все свои данные"
             title={
               <>
-                Вы действительно хотите удалить <span className="text-primary">все данные</span> с
-                этого сайта?
+                Удалить <span className="text-primary">абсолютно всё</span>?
               </>
             }
-            description="Вы потеряете все свои записи и прогресс без возможности восстановления"
+            description="Вы потеряете все свои записи и прогресс."
             confirmText="Очистить всё"
             onConfirm={handleClearAll}
           />

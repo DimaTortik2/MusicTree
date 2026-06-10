@@ -23,9 +23,9 @@ useProgressStore.subscribe((state) => {
 interface VocalState {
   recordings: Recording[];
   hasLoaded: boolean;
-  isCloudMode: boolean; // <-- НОВЫЙ ФЛАГ
-  isSaving: boolean; // <-- НОВОЕ
-  deletingIds: string[]; // <-- НОВОЕ
+  isCloudMode: boolean;
+  isSaving: boolean;
+  deletingIds: string[];
   setIsCloudMode: (v: boolean) => void;
   setRecordings: (updater: Recording[] | ((prev: Recording[]) => Recording[])) => void;
   setHasLoaded: (v: boolean) => void;
@@ -59,9 +59,9 @@ export const useVocalGlobalStore = create<VocalState>((set) => ({
   setIsPlaying: (isPlaying) => set({ isPlaying }),
   setCurrentTime: (currentTime) => set({ currentTime }),
   setDuration: (duration) => set({ duration }),
-  isSaving: false, // <-- НОВОЕ
-  deletingIds: [], // <-- НОВОЕ
-  setIsSaving: (v) => set({ isSaving: v }), // <-- НОВОЕ
+  isSaving: false,
+  deletingIds: [],
+  setIsSaving: (v) => set({ isSaving: v }),
   setDeletingIds: (updater) =>
     set((state) => ({
       deletingIds: typeof updater === 'function' ? updater(state.deletingIds) : updater,
@@ -128,7 +128,6 @@ export function useVocalTuner() {
     phaseRef.current = phase;
   }, [phase]);
 
-  // --- ИНИЦИАЛИЗАЦИЯ И ЗАГРУЗКА (ГИБРИДНАЯ) ---
   useEffect(() => {
     if (hasLoaded) return;
 
@@ -136,7 +135,6 @@ export function useVocalTuner() {
       const user = useAuthStore.getState().user;
       let userHasCloudAccess = false;
 
-      // 1. Проверяем вайтлист, если юзер авторизован
       if (user) {
         const { data } = await supabase
           .from('profiles')
@@ -149,7 +147,6 @@ export function useVocalTuner() {
       setIsCloudMode(userHasCloudAccess);
 
       if (userHasCloudAccess && user) {
-        // --- ЗАГРУЗКА ИЗ ОБЛАКА ---
         const { data, error } = await supabase
           .from('audio_tracks')
           .select('*')
@@ -176,7 +173,6 @@ export function useVocalTuner() {
           setRecordings([]);
         }
       } else {
-        // --- ЗАГРУЗКА ЛОКАЛЬНО (localforage) ---
         const ids = useProgressStore.getState().audioRecordIds || [];
         const loaded: Recording[] = [];
         for (const id of ids) {
@@ -202,7 +198,6 @@ export function useVocalTuner() {
     loadRecordings();
   }, [hasLoaded, setRecordings, setHasLoaded, setIsCloudMode]);
 
-  // Очистка при размонтировании
   useEffect(() => {
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -213,7 +208,6 @@ export function useVocalTuner() {
       globalAudioPlayer.currentTime = 0;
       useVocalGlobalStore.getState().setIsPlaying(false);
 
-      // Очищаем ObjectURL только если мы работали локально
       if (!useVocalGlobalStore.getState().isCloudMode) {
         const currentRecordings = useVocalGlobalStore.getState().recordings;
         currentRecordings.forEach((r) => {
@@ -227,13 +221,14 @@ export function useVocalTuner() {
     };
   }, []);
 
-  // ОБРАБОТКА ФИЗИЧЕСКОГО ОТКЛЮЧЕНИЯ МИКРОФОНА
   useEffect(() => {
     const handleDeviceChange = () => {
       if (!streamRef.current) return;
       const tracks = streamRef.current.getAudioTracks();
       if (tracks.length === 0 || tracks[0].readyState === 'ended') {
-        toast.error('Микрофон был отключен. Пожалуйста, проверьте подключение.', { position: 'bottom-right' });
+        toast.error('Микрофон был отключен. Пожалуйста, проверьте подключение.', {
+          position: 'bottom-right',
+        });
         if (phaseRef.current === 'recording') stopRec();
         stopMic();
       }
@@ -242,7 +237,6 @@ export function useVocalTuner() {
     return () => navigator.mediaDevices?.removeEventListener('devicechange', handleDeviceChange);
   }, []);
 
-  // PITCHFINDER YIN LOOP
   const tickRef = useRef<() => void>(() => {});
   useEffect(() => {
     tickRef.current = () => {
@@ -282,11 +276,18 @@ export function useVocalTuner() {
         throw new Error('InsecureContext');
       }
 
+      // ФИКС 1: Включаем echoCancellation и autoGainControl
+      // Это заставляет iOS использовать правильный микрофон с нормальной громкостью
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: false,
+          autoGainControl: true,
+        },
       });
       streamRef.current = stream;
 
+      // Оригинальная инициализация Tone (не трогаем!)
       const rawContext = Tone.getContext().rawContext as AudioContext;
       audioCtxRef.current = rawContext;
 
@@ -300,7 +301,7 @@ export function useVocalTuner() {
       if (sr < 44100 && !sampleRateWarnedRef.current) {
         toast.error(
           'Вы используете Bluetooth-устройство или iOS. Точность вокального тренажера может быть немного снижена.',
-          { style: { opacity: 0.8 }, position: 'bottom-right'  },
+          { style: { opacity: 0.8 }, position: 'bottom-right' },
         );
         sampleRateWarnedRef.current = true;
       }
@@ -342,7 +343,25 @@ export function useVocalTuner() {
     chunksRef.current = [];
     recStartRef.current = Date.now();
 
-    const mr = new MediaRecorder(streamRef.current);
+    // ФИКС 2: Динамический выбор формата записи
+    let mimeType = '';
+    let ext = 'webm';
+
+    // Сначала проверяем mp4 (Для iOS Safari)
+    if (MediaRecorder.isTypeSupported('audio/mp4')) {
+      mimeType = 'audio/mp4';
+      ext = 'm4a';
+    } else if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+      mimeType = 'audio/webm;codecs=opus';
+      ext = 'webm';
+    } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+      mimeType = 'audio/webm';
+      ext = 'webm';
+    }
+
+    const options = mimeType ? { mimeType } : undefined;
+    const mr = new MediaRecorder(streamRef.current, options);
+
     mr.ondataavailable = (e) => {
       if (e.data.size > 0) chunksRef.current.push(e.data);
     };
@@ -350,7 +369,10 @@ export function useVocalTuner() {
     mr.onstop = async () => {
       if (recordTimerRef.current) clearTimeout(recordTimerRef.current);
       useVocalGlobalStore.getState().setIsSaving(true);
-      const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+
+      const finalMime = mr.mimeType || mimeType || 'audio/webm';
+
+      const blob = new Blob(chunksRef.current, { type: finalMime });
       const dur = Date.now() - recStartRef.current;
       const uuid =
         'randomUUID' in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2);
@@ -358,16 +380,20 @@ export function useVocalTuner() {
       const title = `Запись от ${new Date().toLocaleDateString()}`;
 
       if (isCloudMode) {
-        // --- СОХРАНЕНИЕ В ОБЛАКО ---
         const user = useAuthStore.getState().user;
         if (!user) return;
-        const filePath = `${user.id}/${uuid}.webm`;
-        const toastId = toast.info('Синхронизация с облаком...', { autoClose: false , position: 'bottom-right' });
+
+        // ФИКС 3: Имя файла в Storage будет зависеть от поддерживаемого формата
+        const filePath = `${user.id}/${uuid}.${ext}`;
+        const toastId = toast.info('Синхронизация с облаком...', {
+          autoClose: false,
+          position: 'bottom-right',
+        });
 
         try {
           const { error: uploadError } = await supabase.storage
             .from('audio_records')
-            .upload(filePath, blob, { contentType: 'audio/webm' });
+            .upload(filePath, blob, { contentType: finalMime });
 
           if (uploadError) throw uploadError;
 
@@ -404,7 +430,6 @@ export function useVocalTuner() {
           useVocalGlobalStore.getState().setIsSaving(false);
         }
       } else {
-        // --- ЛОКАЛЬНОЕ СОХРАНЕНИЕ ---
         const recData = { id: uuid, blob, title, dur, createdAt };
         try {
           await localforage.setItem(uuid, recData);
@@ -435,7 +460,8 @@ export function useVocalTuner() {
       }
     };
 
-    mr.start(50);
+    // ФИКС 4: Убрали `(50)` из start. Это ломало iOS
+    mr.start();
     mrRef.current = mr;
     setPhase('recording');
 
@@ -463,7 +489,6 @@ export function useVocalTuner() {
       const exists = await localforage.getItem(rec.id);
       if (!exists) {
         toast.error('Аудиофайл был очищен системой устройства', { position: 'bottom-right' });
-        // Оптимистично убираем из стейта и жестко удаляем
         setRecordings((prev) => prev.filter((x) => x.id !== rec.id));
         hardDeleteRec(rec);
         return;
@@ -486,7 +511,6 @@ export function useVocalTuner() {
     }
   };
 
-  // --- ФИЗИЧЕСКОЕ (ЖЕСТКОЕ) УДАЛЕНИЕ ---
   const hardDeleteRec = async (rec: Recording) => {
     useVocalGlobalStore.getState().setDeletingIds((prev) => [...prev, rec.id]);
 
@@ -495,7 +519,10 @@ export function useVocalTuner() {
         const user = useAuthStore.getState().user;
         if (user) {
           await supabase.from('audio_tracks').delete().eq('id', rec.id);
-          await supabase.storage.from('audio_records').remove([`${user.id}/${rec.id}.webm`]);
+          // Извлекаем правильное расширение, чтобы удалить файл из storage
+          const urlParts = rec.url.split('?')[0].split('/');
+          const fileName = urlParts[urlParts.length - 1];
+          await supabase.storage.from('audio_records').remove([`${user.id}/${fileName}`]);
         }
       } else {
         await localforage.removeItem(rec.id);
@@ -503,28 +530,23 @@ export function useVocalTuner() {
         useProgressStore.setState({ audioRecordIds: stateIds.filter((x) => x !== rec.id) });
       }
 
-      // Очищаем ссылку только если она не удалена из UI окончательно
       if (!isCloudMode && rec.url) URL.revokeObjectURL(rec.url);
     } finally {
       useVocalGlobalStore.getState().setDeletingIds((prev) => prev.filter((x) => x !== rec.id));
     }
   };
 
- // --- МЯГКОЕ УДАЛЕНИЕ (GMAIL STYLE) ---
   const deleteRec = (rec: Recording) => {
     lastActionTimeRef.current = Date.now();
 
-    // 1. Сразу стопаем плеер
     if (playingId === rec.id) {
       globalAudioPlayer.pause();
       setPlayingId(null);
       setIsPlaying(false);
     }
 
-    // 2. Оптимистично убираем запись из списка (мгновенно)
     setRecordings((prev) => prev.filter((x) => x.id !== rec.id));
 
-    // 3. Вызываем тост с кнопкой отмены
     const toastId = toast.undo(
       <div className="flex w-full items-center justify-between gap-3">
         <span className="truncate">Запись удалена</span>
@@ -535,11 +557,9 @@ export function useVocalTuner() {
           className="shrink-0"
           onClick={(e) => {
             e.stopPropagation();
-            // Записываем, что мы отменили удаление
             undoneDeletionsRef.current.add(rec.id);
             toast.dismiss(toastId);
 
-            // Возвращаем запись в стейт и восстанавливаем сортировку по дате
             setRecordings((prev) => {
               const restored = [...prev, rec];
               return restored.sort((a, b) => b.createdAt - a.createdAt);
@@ -550,23 +570,20 @@ export function useVocalTuner() {
         </Button>
       </div>,
       {
-        autoClose: 5000, // Даем 5 секунд на раздумья
-        closeOnClick: false, // Запрещаем закрывать кликом по фону тоста, чтобы не сбить кнопку
-        position: 'bottom-right' ,
+        autoClose: 5000,
+        closeOnClick: false,
+        position: 'bottom-right',
         onClose: () => {
-          // Вызывается, когда тост исчезает (по таймауту или по свайпу/крестику)
           if (undoneDeletionsRef.current.has(rec.id)) {
-            // Если была отмена - просто чистим Set
             undoneDeletionsRef.current.delete(rec.id);
           } else {
-            // Если отмены не было - удаляем навсегда
             hardDeleteRec(rec);
           }
         },
       },
     );
   };
-  
+
   const downloadRec = async (rec: Recording) => {
     lastActionTimeRef.current = Date.now();
 
@@ -574,7 +591,7 @@ export function useVocalTuner() {
       let downloadUrl = rec.url;
 
       if (isCloudMode) {
-        toast.success('Подготовка к скачиванию...', { autoClose: 1500,position: 'bottom-right' });
+        toast.success('Подготовка к скачиванию...', { autoClose: 1500, position: 'bottom-right' });
         const response = await fetch(rec.url);
         const blob = await response.blob();
         downloadUrl = URL.createObjectURL(blob);
@@ -582,7 +599,18 @@ export function useVocalTuner() {
 
       const a = document.createElement('a');
       a.href = downloadUrl;
-      a.download = `${rec.name.replace(/\s+/g, '_')}.webm`;
+
+      // ФИКС 5: Динамическое расширение файла для скачивания
+      let ext = 'webm';
+      if (rec.blob && rec.blob.type) {
+        if (rec.blob.type.includes('mp4') || rec.blob.type.includes('m4a')) ext = 'm4a';
+        else if (rec.blob.type.includes('ogg')) ext = 'ogg';
+      } else if (rec.url) {
+        const urlExt = rec.url.split('?')[0].split('.').pop();
+        if (urlExt && ['webm', 'mp4', 'm4a', 'ogg'].includes(urlExt)) ext = urlExt;
+      }
+
+      a.download = `${rec.name.replace(/\s+/g, '_')}.${ext}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

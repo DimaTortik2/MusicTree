@@ -23,7 +23,14 @@ export const Avatar: React.FC<AvatarProps> = ({
   const initial = getInitial(name);
 
   const [isTyping, setIsTyping] = useState(false);
+  const [imgLoaded, setImgLoaded] = useState(false); // Следим за реальной загрузкой картинки
   const isFirstMount = useRef(true);
+  const prevNameRef = useRef<string | undefined>(undefined);
+
+  // Сбрасываем статус загрузки при изменении src
+  useEffect(() => {
+    setImgLoaded(false);
+  }, [src]);
 
   useEffect(() => {
     if (!enableTypingEffect) return;
@@ -33,20 +40,33 @@ export const Avatar: React.FC<AvatarProps> = ({
       return;
     }
 
-    setIsTyping(true);
+    if (prevNameRef.current === undefined) {
+      prevNameRef.current = name;
+      return;
+    }
+
+    if (prevNameRef.current !== name) {
+      prevNameRef.current = name;
+      setIsTyping(true);
+    }
 
     const timer = setTimeout(() => {
       setIsTyping(false);
-    }, 500);
+    }, 450);
 
     return () => clearTimeout(timer);
   }, [name, enableTypingEffect]);
 
   const mergedStyle: React.CSSProperties = {
-    backgroundColor: bgColor,
+    // ВАЖНО: Если картинка загрузилась, делаем фон прозрачным.
+    // Это полностью убирает цветной микро-зазор по краям круга.
+    backgroundColor: src && imgLoaded ? 'transparent' : bgColor,
     transition: isTyping
       ? 'background-color 200ms ease-out, transform 200ms ease-out'
       : 'background-color 1000ms cubic-bezier(0.4, 0, 0.2, 1), transform 200ms ease-out',
+    transform: 'translateZ(0)',
+    backfaceVisibility: 'hidden',
+    WebkitBackfaceVisibility: 'hidden',
     ...style,
   };
 
@@ -54,6 +74,8 @@ export const Avatar: React.FC<AvatarProps> = ({
     <div
       className={cn(
         'relative flex shrink-0 items-center justify-center overflow-hidden rounded-full text-white',
+        // Трюк для Safari
+        'mask-image-gpu [mask-image:radial-gradient(circle,white_100%,transparent_100%)]',
         className,
       )}
       style={mergedStyle}
@@ -62,19 +84,11 @@ export const Avatar: React.FC<AvatarProps> = ({
         <div
           className={cn(
             'pointer-events-none absolute inset-0 overflow-hidden rounded-full transition-opacity ease-in-out',
-            // ДИНАМИЧЕСКИЕ ТАЙМИНГИ:
-            isTyping
-              ? 'opacity-100 duration-200' // Быстрый вход (200ms)
-              : 'opacity-0 duration-1000', // Очень плавное "таяние" градиента (1 секунда!)
+            isTyping ? 'opacity-100 duration-200' : 'opacity-0 duration-1000',
           )}
         >
-          {/* Вращающийся градиент */}
           <div className="absolute inset-[-50%] translate-z-0 animate-[spin_5s_linear_infinite] bg-gradient-to-tr from-primary/70 via-accent/70 to-access-glow opacity-95 blur-xl will-change-transform" />
-
-          {/* Центральный белый блик */}
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.65)_0%,transparent_70%)] mix-blend-overlay" />
-
-          {/* Легкая подложка */}
           <div className="absolute inset-0 bg-white/15 mix-blend-overlay" />
         </div>
       )}
@@ -83,14 +97,20 @@ export const Avatar: React.FC<AvatarProps> = ({
         <img
           src={src}
           alt={name}
-          className="animate-in fade-in absolute inset-0 h-full w-full object-cover duration-200"
+          onLoad={() => setImgLoaded(true)}
+          className={cn(
+            'absolute inset-0 h-full w-full rounded-full object-cover',
+            '[transform:translate3d(0,0,0)] [backface-visibility:hidden] backface-hidden',
+            // Картинка плавно проявится, когда полностью загрузится
+            'transition-opacity duration-300 ease-in-out',
+            imgLoaded ? 'opacity-100' : 'opacity-0',
+          )}
         />
       ) : (
         <span
           key={initial}
           className={cn(
             'ease-out-quint z-10 font-medium transition-all',
-            // Буква возвращается в исходное состояние так же мягко (600ms)
             isTyping && enableTypingEffect
               ? 'scale-[0.96] text-white/90 opacity-85 duration-200'
               : 'scale-100 opacity-100 duration-600',

@@ -57,8 +57,8 @@ export const UpdatePasswordPage = () => {
         className="w-full max-w-md rounded-3xl bg-surface p-8 shadow-xl"
       >
         <div className="mb-8 flex flex-col items-center text-center">
-          <div className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-            <LockKey weight="duotone" className="size-8" />
+          <div className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-primary text-text">
+            <LockKey  className="size-8" />
           </div>
           <h1 className="text-2xl font-medium text-text">Новый пароль</h1>
           <p className="mt-2 text-sm text-text/60">

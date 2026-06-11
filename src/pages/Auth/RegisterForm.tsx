@@ -386,7 +386,7 @@ export const RegisterForm = () => {
                 <button
                   type="button"
                   onClick={() => setIsForgotPassword(true)}
-                  className="text-sm font-medium text-primary transition-colors outline-none hover:text-accent"
+                  className="text-sm font-medium text-primary transition-colors outline-none hover:text-primary/70 cursor-pointer"
                 >
                   Забыли пароль?
                 </button>

@@ -2,7 +2,8 @@ import { useAuthStore } from '@/app/store/authStore';
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 
-const AuthLoader = () => {
+// Вытащили лоадер отдельно, чтобы можно было переиспользовать
+export const AuthLoader = () => {
   return (
     <div
       className="flex h-[100dvh] h-[100vh] w-screen flex-col items-center justify-center bg-[#0f0510]"
@@ -10,19 +11,10 @@ const AuthLoader = () => {
     >
       <style>{`
         @keyframes rotate-coin {
-          0% {
-            transform: rotateX(0deg) rotateY(0deg);
-          }
-          45% {
-            transform: rotateX(70deg) rotateY(50deg);
-          }
-          50%,
-          52% {
-            transform: rotateX(75deg) rotateY(55deg);
-          }
-          100% {
-            transform: rotateX(0deg) rotateY(0deg);
-          }
+          0% { transform: rotateX(0deg) rotateY(0deg); }
+          45% { transform: rotateX(70deg) rotateY(50deg); }
+          50%, 52% { transform: rotateX(75deg) rotateY(55deg); }
+          100% { transform: rotateX(0deg) rotateY(0deg); }
         }
         .react-circle-loader {
           transform-origin: center;
@@ -50,30 +42,12 @@ const AuthLoader = () => {
   );
 };
 
-export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, initialized } = useAuthStore();
-
-  if (!initialized) {
-    return <AuthLoader />;
-  }
-
-  if (!user) {
-    return <Navigate to="/auth" replace />;
-  }
-
-  return <>{children}</>;
-};
-
+// PublicRoute нужен, чтобы авторизованного юзера со страницы входа выкидывало в приложение
 export const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, initialized } = useAuthStore();
 
-  if (!initialized) {
-    return <AuthLoader />;
-  }
-
-  if (user) {
-    return <Navigate to="/app/tree" replace />;
-  }
+  if (!initialized) return <AuthLoader />;
+  if (user) return <Navigate to="/app/tree" replace />;
 
   return <>{children}</>;
 };

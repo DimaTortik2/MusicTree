@@ -14,6 +14,8 @@ import { useGlobalPiano } from '@/app/hooks/useGlobalPiano';
 import { useAppShortcuts } from '@/app/hooks/useAppShortcuts';
 import { Tooltip } from '@/shared/Tooltip';
 import { AmbientGlow } from '@/shared/AmbientGlow';
+import { useCloudSync } from '@/shared/hooks/useCloudSync';
+import { AuthLoader } from '@/app/providers/AuthRoutes';
 
 const TAB_ROUTES: Record<string, string> = {
   tree: '/app/tree',
@@ -64,7 +66,7 @@ const pageTransitionVariants: Variants = {
 };
 
 export const AppLayout = () => {
-
+  const { isSyncing } = useCloudSync();
 
   const [isPianoActive, setIsPianoActive] = useState(false);
   const [isOverflowOpen, setIsOverflowOpen] = useState(false);
@@ -145,6 +147,10 @@ export const AppLayout = () => {
     if (isOverflowOpen) document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOverflowOpen]);
+
+  if (isSyncing) {
+    return <AuthLoader />;
+  }
 
   const renderTabIcon = (id: string, isMobileView: boolean) => {
     const info = TABS_INFO[id];

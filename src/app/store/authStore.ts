@@ -1,8 +1,7 @@
-import { useProgressStore } from '@/app/store/useProgressStore';
-import { useShortcutStore } from '@/app/store/useShortcutStore';
 import { supabase } from '@/shared/lib/supabase';
 import type { Session, User } from '@supabase/supabase-js';
 import { create } from 'zustand';
+import localforage from 'localforage';
 
 interface AuthState {
   user: User | null;
@@ -40,7 +39,16 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   signOut: async () => {
     await supabase.auth.signOut();
-    useProgressStore.persist.clearStorage();
-    useShortcutStore.persist.clearStorage();
+
+    // 1. Очищаем IndexedDB (все локальные аудиозаписи)
+    await localforage.clear();
+
+    // 2. Очищаем LocalStorage (прогресс и шорткаты)
+    localStorage.removeItem('music-tree-progress');
+    localStorage.removeItem('app-shortcuts-storage');
+
+    // 3. Делаем хард-редирект на главную (или в /app/tree).
+    // Это гарантированно выгрузит старые данные из оперативной памяти Zustand.
+    window.location.href = '/';
   },
 }));

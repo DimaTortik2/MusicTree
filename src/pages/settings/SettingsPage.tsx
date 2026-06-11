@@ -16,6 +16,7 @@ import { UserProfileMenu } from '@/shared/UserProfileMenu';
 import { useAuthStore } from '@/app/store/authStore';
 import { supabase } from '@/shared/lib/supabase';
 import localforage from 'localforage';
+import { AuthButton } from '@/shared/buttons/AuthButton';
 
 // Форматирование клавиш
 const formatKeyName = (code: string | null) => {
@@ -344,6 +345,7 @@ export default function SettingsPage() {
 
   return (
     <div className="relative min-h-screen w-full p-6 pb-[50vh] text-text md:p-10 md:pb-[50vh]">
+      <AuthButton/>
       <UserProfileMenu />
 
       <div className="mb-10 md:hidden">

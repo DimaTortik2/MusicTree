@@ -2,44 +2,117 @@ import { useAuthStore } from '@/app/store/authStore';
 import { useProgressStore } from '@/app/store/useProgressStore';
 import { useShortcutStore } from '@/app/store/useShortcutStore';
 import { supabase } from '@/shared/lib/supabase';
-import { useEffect } from 'react';
-
+import { useEffect, useState } from 'react';
+import localforage from 'localforage';
 
 export const useCloudSync = () => {
-  const { user } = useAuthStore();
+  const { user, initialized } = useAuthStore();
+  const [isSyncing, setIsSyncing] = useState(true);
 
   useEffect(() => {
-    if (!user) return;
+    if (!initialized) {
+      setIsSyncing(true);
+      return;
+    }
+
+    if (!user) {
+      setIsSyncing(false);
+      return;
+    }
 
     let timeout: ReturnType<typeof setTimeout>;
-    let isInitialized = false;
+    let isInitializedState = false;
     let unsubProgress: () => void;
     let unsubShortcuts: () => void;
 
     const loadAndSubscribe = async () => {
-      // 1. СКАЧИВАЕМ ДАННЫЕ ПРИ ВХОДЕ
+      setIsSyncing(true);
+
+      // Запрашиваем состояние и ФЛАГ доступа к облачному аудио
       const { data, error } = await supabase
         .from('profiles')
-        .select('progress_state, shortcut_state')
+        .select('progress_state, shortcut_state, can_cloud_audio')
         .eq('id', user.id)
         .single();
 
+      const hasCloudProgress = data?.progress_state && Object.keys(data.progress_state).length > 0;
+      const userHasCloudAccess = !!data?.can_cloud_audio;
+
       if (data && !error) {
-        // Если в облаке есть данные, принудительно обновляем Zustand (и localStorage)
-        if (data.progress_state && Object.keys(data.progress_state).length > 0) {
+        // 1. Применяем прогресс из облака, если он есть
+        if (hasCloudProgress) {
           useProgressStore.setState(data.progress_state);
+          if (data.shortcut_state && Object.keys(data.shortcut_state).length > 0) {
+            useShortcutStore.setState(data.shortcut_state);
+          }
         }
-        if (data.shortcut_state && Object.keys(data.shortcut_state).length > 0) {
-          useShortcutStore.setState(data.shortcut_state);
+
+        // 2. Умная миграция аудио (РАБОТАЕТ ТОЛЬКО ЕСЛИ ДАЛИ ОБЛАКО)
+        const state = useProgressStore.getState();
+        if (userHasCloudAccess && state.audioRecordIds && state.audioRecordIds.length > 0) {
+          let allSuccess = true;
+
+          for (const id of state.audioRecordIds) {
+            try {
+              const recData = await localforage.getItem<any>(id);
+              if (recData && recData.blob) {
+                const ext =
+                  recData.blob.type.includes('mp4') || recData.blob.type.includes('m4a')
+                    ? 'm4a'
+                    : 'webm';
+                const filePath = `${user.id}/${id}.${ext}`;
+
+                // Загружаем в Storage
+                const { error: uploadError } = await supabase.storage
+                  .from('audio_records')
+                  .upload(filePath, recData.blob, { contentType: recData.blob.type });
+
+                // Игнорируем ошибку, если такой файл там уже лежит
+                if (
+                  uploadError &&
+                  !uploadError.message.includes('already exists') &&
+                  !uploadError.message.includes('Duplicate')
+                ) {
+                  throw uploadError;
+                }
+
+                // Добавляем запись в БД (проверяем, чтобы не было дублей)
+                const { count } = await supabase
+                  .from('audio_tracks')
+                  .select('id', { count: 'exact', head: true })
+                  .eq('id', id);
+                if (count === 0) {
+                  const { error: dbError } = await supabase.from('audio_tracks').insert([
+                    {
+                      id: id,
+                      user_id: user.id,
+                      title: recData.title,
+                      dur: recData.dur,
+                      url: filePath,
+                      created_at: recData.createdAt,
+                    },
+                  ]);
+                  if (dbError) throw dbError;
+                }
+              }
+            } catch (e) {
+              console.error('Ошибка миграции аудио:', e);
+              allSuccess = false; // Если хоть один файл упал, мы НЕ будем чистить локалку
+            }
+          }
+
+          // 3. Стираем локальные данные ТОЛЬКО если перенос прошел без единой ошибки
+          if (allSuccess) {
+            await localforage.clear();
+            useProgressStore.setState({ audioRecordIds: [] });
+          }
         }
       }
 
-      isInitialized = true; // Разрешаем отправку данных обратно в облако
+      setIsSyncing(false);
+      isInitializedState = true;
 
-      // 2. ФУНКЦИЯ ОТПРАВКИ В ОБЛАКО
       const saveToCloud = async () => {
-        // ZustandgetState() возвращает стейт + функции.
-        // Supabase при конвертации в JSON автоматически отбросит функции, сохранив только данные!
         await supabase
           .from('profiles')
           .update({
@@ -50,28 +123,24 @@ export const useCloudSync = () => {
           .eq('id', user.id);
       };
 
-      // 3. ПОДПИСЫВАЕМСЯ НА ИЗМЕНЕНИЯ СТЕЙТА
       const onChange = () => {
-        if (!isInitialized) return; // Защита от случайной перезаписи при загрузке
-
-        // Очищаем предыдущий таймер, если юзер быстро-быстро кликает
+        if (!isInitializedState) return;
         clearTimeout(timeout);
-        // Сохраняем в БД только когда юзер перестал кликать на 2 секунды
         timeout = setTimeout(saveToCloud, 2000);
       };
 
-      // Zustand позволяет подписаться на любые изменения в сторе
       unsubProgress = useProgressStore.subscribe(onChange);
       unsubShortcuts = useShortcutStore.subscribe(onChange);
     };
 
     loadAndSubscribe();
 
-    // Очистка при размонтировании (или выходе юзера)
     return () => {
       if (unsubProgress) unsubProgress();
       if (unsubShortcuts) unsubShortcuts();
       clearTimeout(timeout);
     };
-  }, [user]);
+  }, [user, initialized]);
+
+  return { isSyncing };
 };

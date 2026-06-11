@@ -12,7 +12,7 @@ import { TestsPage } from '@/pages/tests/TestsPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import ShortcutsPage from '@/pages/ShortcutsPage';
 import { VocalTunerPage } from '@/features/VocalTunerPage';
-import { ProtectedRoute, PublicRoute } from '@/app/providers/ProtectedRoute';
+import { PublicRoute } from '@/app/providers/AuthRoutes';
 import { AuthPage } from '@/pages/Auth/AuthPage';
 
 export const router = createBrowserRouter([
@@ -30,11 +30,7 @@ export const router = createBrowserRouter([
   },
   {
     path: '/app',
-    element: (
-      <ProtectedRoute>
-        <AppLayout />
-      </ProtectedRoute>
-    ),
+    element: <AppLayout />,
     children: [
       {
         index: true,

@@ -1,52 +1,41 @@
 import React, { useState, useEffect } from 'react';
-import { GithubLogo, GoogleLogo, EnvelopeOpen } from '@phosphor-icons/react';
+import { GithubLogo, GoogleLogo, EnvelopeOpen, ArrowLeft } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Turnstile } from '@marsidev/react-turnstile'; // Импортируем капчу
+import { Turnstile } from '@marsidev/react-turnstile';
 import { supabase } from '@/shared/lib/supabase';
 import { Button } from '@/shared/buttons/Button';
 import { Input } from '@/shared/Input';
 import { toast } from '@/app/utils/toast';
 import { cn } from '@/app/utils/cn';
+import { useNavigate } from 'react-router-dom';
 
 const getFriendlyErrorMessage = (message: string): string => {
   const msg = message.toLowerCase();
-
-  if (msg.includes('invalid login credentials')) {
-    return 'Неверная почта или пароль';
-  }
-  if (msg.includes('user already registered') || msg.includes('user already exists')) {
+  if (msg.includes('invalid login credentials')) return 'Неверная почта или пароль';
+  if (msg.includes('user already registered') || msg.includes('user already exists'))
     return 'Этот аккаунт уже существует';
-  }
-  if (msg.includes('email format is invalid') || msg.includes('invalid email')) {
+  if (msg.includes('email format is invalid') || msg.includes('invalid email'))
     return 'Некорректный формат почты';
-  }
-  if (msg.includes('password should be at least 6 characters')) {
+  if (msg.includes('password should be at least 6 characters'))
     return 'Пароль должен быть >= 6 символов.';
-  }
-  if (msg.includes('rate limit exceeded') || msg.includes('too many requests')) {
+  if (msg.includes('rate limit exceeded') || msg.includes('too many requests'))
     return 'Слишком много попыток. Пожалуйста, подождите пару минут.';
-  }
-  if (msg.includes('email not confirmed') || msg.includes('confirmation required')) {
+  if (msg.includes('email not confirmed') || msg.includes('confirmation required'))
     return 'Пожалуйста, подтвердите вашу почту по ссылке из письма.';
-  }
-  if (msg.includes('network error') || msg.includes('failed to fetch')) {
+  if (msg.includes('network error') || msg.includes('failed to fetch'))
     return 'Проблема с сетью. Проверьте интернет-соединение.';
-  }
-  // Ошибка от самого Supabase, если капчу забыли отправить или она невалидна
-  if (msg.includes('captcha') || msg.includes('bot detection')) {
+  if (msg.includes('captcha') || msg.includes('bot detection'))
     return 'Пожалуйста, подтвердите, что вы человек (капча не пройдена).';
-  }
-
   return 'Что-то пошло не так. Пожалуйста, попробуйте позже.';
 };
 
 export const RegisterForm = () => {
+  const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Стейты для капчи и отправки писем
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [isEmailSent, setIsEmailSent] = useState(false);
   const [cooldown, setCooldown] = useState(0);
@@ -57,90 +46,65 @@ export const RegisterForm = () => {
     return () => clearTimeout(timer);
   }, [cooldown]);
 
-  // Сбрасываем токен капчи при переключении табов Вход / Регистрация
   useEffect(() => {
     setCaptchaToken(null);
   }, [isLogin]);
 
-  // Валидация полей
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const isPasswordValid = password.length >= 6;
   const isFormValid = isEmailValid && isPasswordValid;
-
-  // Кнопка заблокирована, если:
-  // 1. Поля не валидны или идет загрузка
-  // 2. Или мы регистрируемся (не вошли) и капча еще не пройдена
   const isSubmitDisabled = !isFormValid || isLoading || (!isLogin && !captchaToken);
 
-  const handleEmailAuth = async (e: React.FormEvent) => {
+  const executeAction = async (
+    e: React.FormEvent | React.MouseEvent,
+    action: 'email' | 'google' | 'github',
+  ) => {
     e.preventDefault();
-    if (isSubmitDisabled) return;
+    if (isSubmitDisabled && action === 'email') return;
 
     setIsLoading(true);
 
-    if (isLogin) {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) {
-        toast.error(getFriendlyErrorMessage(error.message), { position: 'bottom-right' });
+    if (action === 'email') {
+      if (isLogin) {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error)
+          toast.error(getFriendlyErrorMessage(error.message), { position: 'bottom-right' });
+        else toast.success('Рады видеть вас снова!', { position: 'bottom-right' });
       } else {
-        toast.success('Рады видеть вас снова!', { position: 'bottom-right' });
-      }
-    } else {
-      // Регистрируем пользователя и прикрепляем токен капчи
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          captchaToken: captchaToken || undefined, // Передаем полученный токен в Supabase
-        },
-      });
-
-      if (error) {
-        toast.error(getFriendlyErrorMessage(error.message), { position: 'bottom-right' });
-      } else {
-        if (data.user && !data.session) {
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { captchaToken: captchaToken || undefined },
+        });
+        if (error)
+          toast.error(getFriendlyErrorMessage(error.message), { position: 'bottom-right' });
+        else if (data.user && !data.session) {
           setIsEmailSent(true);
           toast.success('Письмо отправлено!', { position: 'bottom-right' });
         } else {
           toast.success('Успешный вход!', { position: 'bottom-right' });
         }
       }
+    } else {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: action,
+        options: { redirectTo: `${window.location.origin}/app/tree` },
+      });
+      if (error) toast.error(getFriendlyErrorMessage(error.message), { position: 'bottom-right' });
     }
-
     setIsLoading(false);
   };
 
   const handleResendEmail = async () => {
     if (cooldown > 0) return;
-
-    const { error } = await supabase.auth.resend({
-      type: 'signup',
-      email: email,
-    });
-
-    if (error) {
-      toast.error(getFriendlyErrorMessage(error.message), { position: 'bottom-right' });
-    } else {
+    const { error } = await supabase.auth.resend({ type: 'signup', email: email });
+    if (error) toast.error(getFriendlyErrorMessage(error.message), { position: 'bottom-right' });
+    else {
       toast.success('Письмо отправлено повторно!', { position: 'bottom-right' });
       setCooldown(60);
     }
   };
 
-  const handleOAuthLogin = async (provider: 'google' | 'github') => {
-    const redirectUrl = `${window.location.origin}/app/tree`;
-
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: {
-        redirectTo: redirectUrl,
-      },
-    });
-    if (error) {
-      toast.error(getFriendlyErrorMessage(error.message), { position: 'bottom-right' });
-    }
-  };
-
-  // Экран ожидания подтверждения почты
   if (isEmailSent) {
     return (
       <motion.div
@@ -151,15 +115,12 @@ export const RegisterForm = () => {
         <div className="mb-6 flex size-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
           <EnvelopeOpen size={32} />
         </div>
-
         <h2 className="mb-3 text-xl font-medium text-text sm:text-2xl">Подтвердите ваш аккаунт</h2>
-
         <p className="mb-8 max-w-sm text-sm leading-relaxed text-text/60 sm:text-base">
           Мы отправили ссылку для активации на почту{' '}
           <span className="font-semibold text-text">{email}</span>. Пожалуйста, перейдите по ней,
           чтобы войти в систему.
         </p>
-
         <div className="w-full space-y-4">
           <Button
             type="button"
@@ -174,7 +135,6 @@ export const RegisterForm = () => {
           >
             Вернуться ко входу
           </Button>
-
           <button
             type="button"
             disabled={cooldown > 0}
@@ -194,9 +154,17 @@ export const RegisterForm = () => {
   }
 
   return (
-    <div className="flex h-full w-full flex-col items-center">
-      {/* Переключатель вкладок */}
-      <div className="relative mb-12 flex w-fit rounded-2xl bg-background p-1.5">
+    <div className="relative flex h-full w-full flex-col items-center pt-8 sm:pt-0">
+      {/* Кнопка "Назад" (на мобилках сдвигаем чуть ниже, чтобы не накладывалась на UI браузера) */}
+      <button
+        type="button"
+        onClick={() => navigate(-1)}
+        className="absolute top-0 left-0 flex cursor-pointer items-center gap-2 text-sm font-medium text-text/50 transition-colors outline-none hover:text-text active:scale-95 sm:-top-4 sm:-left-4"
+      >
+        <ArrowLeft size={20} weight="bold" />
+      </button>
+
+      <div className="relative mt-4 mb-12 flex w-fit rounded-2xl bg-background p-1.5 sm:mt-0">
         <button
           type="button"
           onClick={() => setIsLogin(false)}
@@ -233,7 +201,7 @@ export const RegisterForm = () => {
         </button>
       </div>
 
-      <form onSubmit={handleEmailAuth} className="flex w-full flex-1 flex-col">
+      <form onSubmit={(e) => executeAction(e, 'email')} className="flex w-full flex-1 flex-col">
         <div className="space-y-10">
           <Input
             type="email"
@@ -242,7 +210,6 @@ export const RegisterForm = () => {
             onChange={(e) => setEmail(e.target.value)}
             placeholder="Почта..."
           />
-
           <Input
             type="password"
             required
@@ -253,14 +220,12 @@ export const RegisterForm = () => {
           />
         </div>
 
-        {/* Разделитель */}
         <div className="my-10 flex items-center gap-4">
           <div className="h-px flex-1 bg-line"></div>
           <span className="text-sm text-text/40">или</span>
           <div className="h-px flex-1 bg-line"></div>
         </div>
 
-        {/* OAuth Кнопки */}
         <div className="space-y-4">
           <Button
             type="button"
@@ -268,10 +233,9 @@ export const RegisterForm = () => {
             color="primary"
             size="md"
             className="relative w-full justify-center border-none font-medium"
-            onClick={() => handleOAuthLogin('google')}
+            onClick={(e) => executeAction(e, 'google')}
           >
-            <GoogleLogo className="absolute left-6 h-5 w-5" />
-            Войти через Google
+            <GoogleLogo className="absolute left-6 h-5 w-5" /> Войти через Google
           </Button>
           <Button
             type="button"
@@ -279,16 +243,15 @@ export const RegisterForm = () => {
             color="primary"
             size="md"
             className="relative w-full justify-center border-none font-medium"
-            onClick={() => handleOAuthLogin('github')}
+            onClick={(e) => executeAction(e, 'github')}
           >
-            <GithubLogo className="absolute left-6 h-5 w-5" />
-            Войти через Github
+            <GithubLogo className="absolute left-6 h-5 w-5" /> Войти через Github
           </Button>
         </div>
+
         {!isLogin && (
           <div className="mt-8 flex min-h-[65px] w-full justify-center">
             <Turnstile
-              // ⚠️ ВСТАВЬ СЮДА СВОЙ "SITE KEY" ИЗ CLOUDFLARE
               siteKey="0x4AAAAAADhan7iwbBXBvP5v"
               onSuccess={(token) => setCaptchaToken(token)}
               onExpire={() => setCaptchaToken(null)}
@@ -297,7 +260,6 @@ export const RegisterForm = () => {
           </div>
         )}
 
-        {/* Кнопка сабмита */}
         <div className="mt-auto pt-12">
           <Button
             type="submit"
@@ -306,7 +268,7 @@ export const RegisterForm = () => {
               'w-full border-none transition-all duration-300',
               isSubmitDisabled
                 ? 'pointer-events-none scale-100 cursor-not-allowed bg-[#7A224D]/30 text-text/30'
-                : 'cursor-pointer bg-[#7A224D] text-white hover:scale-102 hover:bg-[#902A5B] active:scale-98',
+                : 'cursor-pointer bg-primary text-white hover:scale-102 hover:bg-[#902A5B] active:scale-98',
             )}
           >
             <AnimatePresence mode="wait" initial={false}>

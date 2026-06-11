@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '@/app/utils/cn';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
@@ -72,6 +72,9 @@ export const Modal: React.FC<ModalProps> = ({
   iconContainerClassName,
   className,
 }) => {
+  // Реф для отслеживания старта клика
+  const isMouseDownOnBackdrop = useRef(false);
+
   useEffect(() => {
     if (inline || !isOpen) return;
 
@@ -165,7 +168,18 @@ export const Modal: React.FC<ModalProps> = ({
           animate="visible"
           exit="exit"
           className="fixed inset-0 z-2000 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm"
-          onClick={onClose}
+          onMouseDown={(e) => {
+            // Запоминаем, что мышку нажали ИМЕННО на фоне, а не внутри карточки
+            isMouseDownOnBackdrop.current = e.target === e.currentTarget;
+          }}
+          onClick={(e) => {
+            // Закрываем, только если и начали клик на фоне, и закончили на фоне
+            if (isMouseDownOnBackdrop.current && e.target === e.currentTarget) {
+              onClose?.();
+            }
+            // Сбрасываем стейт клика
+            isMouseDownOnBackdrop.current = false;
+          }}
         >
           {CardContent}
         </motion.div>

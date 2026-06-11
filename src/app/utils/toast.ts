@@ -5,7 +5,7 @@ import React from 'react';
 const getResponsivePosition = (customPosition?: ToastPosition): ToastPosition => {
   if (customPosition) return customPosition;
   if (typeof window !== 'undefined' && window.innerWidth <= 767) {
-    return 'top-right';
+    return 'bottom-right';
   }
   return 'bottom-right';
 };

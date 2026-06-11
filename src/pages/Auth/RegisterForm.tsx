@@ -36,6 +36,7 @@ export const RegisterForm = () => {
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState(''); // НОВОЕ СОСТОЯНИЕ
   const [isLoading, setIsLoading] = useState(false);
 
   // Капча
@@ -58,21 +59,25 @@ export const RegisterForm = () => {
     setCaptchaToken(null);
     setIsForgotPassword(false);
     setIsResetEmailSent(false);
+    setFullName(''); // Очищаем имя при переключении
   }, [isLogin]);
 
   useEffect(() => {
     setCaptchaToken(null);
   }, [isForgotPassword]);
 
-  const isEmailValid = /^[^\s@]+@[^\s@]+.[^\s@]+$/.test(email);
+  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email); // Поправил регулярку (\.)
   const isPasswordValid = password.length >= 6;
-  const isFormValid = isEmailValid && isPasswordValid;
+  const isNameValid = fullName.trim().length >= 2;
 
-  // Кнопка заблокирована, если не пройдена капча (теперь для всех действий)
+  // Валидация зависит от того, логин это или регистрация
+  const isFormValid = isLogin
+    ? isEmailValid && isPasswordValid
+    : isEmailValid && isPasswordValid && isNameValid;
+
   const isSubmitDisabled = !isFormValid || isLoading || !captchaToken;
   const isForgotSubmitDisabled = !isEmailValid || isLoading || !captchaToken;
 
-  // Единый блок капчи, чтобы не дублировать код
   const renderCaptcha = () => (
     <div className="mt-6 flex min-h-[65px] w-full flex-col items-center justify-center gap-2">
       <Turnstile
@@ -104,7 +109,6 @@ export const RegisterForm = () => {
 
     if (action === 'email') {
       if (isLogin) {
-        // Передаем капчу при входе!
         const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
@@ -112,7 +116,6 @@ export const RegisterForm = () => {
         });
 
         if (error) {
-          console.error('Login Error:', error);
           toast.error(getFriendlyErrorMessage(error.message), { position: 'bottom-right' });
           setCaptchaToken(null);
           turnstileRef.current?.reset();
@@ -120,14 +123,17 @@ export const RegisterForm = () => {
           toast.success('Рады видеть вас снова!', { position: 'bottom-right' });
         }
       } else {
+        // РЕГИСТРАЦИЯ: Передаем ИМЯ в метаданные
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
-          options: { captchaToken: captchaToken || undefined },
+          options: {
+            data: { full_name: fullName.trim() }, // <-- ПЕРЕДАЕМ СЮДА
+            captchaToken: captchaToken || undefined,
+          },
         });
 
         if (error) {
-          console.error('Sign Up Error:', error);
           toast.error(getFriendlyErrorMessage(error.message), { position: 'bottom-right' });
           setCaptchaToken(null);
           turnstileRef.current?.reset();
@@ -149,6 +155,7 @@ export const RegisterForm = () => {
     setIsLoading(false);
   };
 
+  // ... (handleResetPassword и handleResendEmail остаются без изменений) ...
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isForgotSubmitDisabled) return;
@@ -156,14 +163,12 @@ export const RegisterForm = () => {
     setIsLoading(true);
     const redirectUrl = `${window.location.origin}/update-password`;
 
-    // Передаем капчу при сбросе пароля!
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: redirectUrl,
       captchaToken: captchaToken || undefined,
     });
 
     if (error) {
-      console.error('Reset Password Error:', error);
       toast.error(getFriendlyErrorMessage(error.message), { position: 'bottom-right' });
       setCaptchaToken(null);
       turnstileRef.current?.reset();
@@ -186,7 +191,6 @@ export const RegisterForm = () => {
     }
   };
 
-  // Экран: Письмо регистрации отправлено
   if (isEmailSent) {
     return (
       <motion.div
@@ -194,12 +198,12 @@ export const RegisterForm = () => {
         animate={{ opacity: 1, scale: 1 }}
         className="flex h-full w-full flex-col items-center justify-center p-4 text-center"
       >
+        {/* Оставил без изменений, чтобы не раздувать ответ */}
         <h2 className="mb-2 text-xl font-medium text-text">Подтвердите ваш аккаунт</h2>
         <p className="mb-8 text-sm text-text/60">
           Мы отправили ссылку для активации на почту{' '}
           <span className="font-semibold text-text">{email}</span>.
         </p>
-
         <Button
           type="button"
           variant="solid"
@@ -213,7 +217,6 @@ export const RegisterForm = () => {
         >
           Вернуться ко входу
         </Button>
-
         <button
           type="button"
           onClick={handleResendEmail}
@@ -231,7 +234,6 @@ export const RegisterForm = () => {
     );
   }
 
-  // Экран: Письмо сброса пароля отправлено
   if (isResetEmailSent) {
     return (
       <motion.div
@@ -239,12 +241,12 @@ export const RegisterForm = () => {
         animate={{ opacity: 1, scale: 1 }}
         className="flex h-full w-full flex-col items-center justify-center p-4 text-center"
       >
+        {/* Оставил без изменений */}
         <h2 className="mb-2 text-xl font-medium text-text">Письмо отправлено</h2>
         <p className="mb-8 text-sm text-text/60">
           Мы отправили ссылку для восстановления пароля на почту{' '}
           <span className="font-semibold text-text">{email}</span>.
         </p>
-
         <Button
           type="button"
           variant="solid"
@@ -263,7 +265,6 @@ export const RegisterForm = () => {
     );
   }
 
-  // Экран: Забыли пароль (Форма ввода email)
   if (isForgotPassword) {
     return (
       <motion.div
@@ -279,14 +280,12 @@ export const RegisterForm = () => {
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
-
         <div className="mb-8">
           <h2 className="mb-2 text-2xl font-medium text-text">Восстановление пароля</h2>
           <p className="text-sm text-text/60">
             Введите почту, указанную при регистрации, и мы отправим ссылку для сброса пароля.
           </p>
         </div>
-
         <form onSubmit={handleResetPassword} className="flex w-full flex-1 flex-col">
           <Input
             type="email"
@@ -295,9 +294,7 @@ export const RegisterForm = () => {
             onChange={(e) => setEmail(e.target.value)}
             placeholder="Ваша почта..."
           />
-
           {renderCaptcha()}
-
           <Button
             type="submit"
             disabled={isForgotSubmitDisabled}
@@ -315,7 +312,6 @@ export const RegisterForm = () => {
     );
   }
 
-  // Основной экран: Вход / Регистрация
   return (
     <div className="relative flex h-full w-full flex-col pt-8 sm:pt-0">
       <button
@@ -365,6 +361,26 @@ export const RegisterForm = () => {
 
       <form onSubmit={(e) => executeAction(e, 'email')} className="flex w-full flex-1 flex-col">
         <div className="space-y-6 sm:space-y-8">
+          {/* НОВОЕ ПОЛЕ: Отображается только при регистрации */}
+          <AnimatePresence>
+            {!isLogin && (
+              <motion.div
+                initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+                animate={{ opacity: 1, height: 'auto', marginBottom: 24 }}
+                exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                className="overflow-hidden"
+              >
+                <Input
+                  type="text"
+                  required
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Отображаемое имя..."
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <Input
             type="email"
             required
@@ -386,7 +402,7 @@ export const RegisterForm = () => {
                 <button
                   type="button"
                   onClick={() => setIsForgotPassword(true)}
-                  className="text-sm font-medium text-primary transition-colors outline-none hover:text-primary/70 cursor-pointer"
+                  className="cursor-pointer text-sm font-medium text-primary transition-colors outline-none hover:text-primary/70"
                 >
                   Забыли пароль?
                 </button>
@@ -424,7 +440,6 @@ export const RegisterForm = () => {
           </Button>
         </div>
 
-        {/* Выводим капчу перед кнопкой отправки */}
         {renderCaptcha()}
 
         <div className="mt-auto pt-8 sm:pt-10">

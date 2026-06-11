@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useAuthStore } from '@/app/store/authStore';
+import { supabase } from '@/shared/lib/supabase';
 import { SignOut, WarningCircle, PencilSimple, CameraPlus } from '@phosphor-icons/react';
 import { Modal } from '@/shared/Modal';
 import { Button } from '@/shared/buttons/Button';
 import { Avatar } from '@/shared/Avatar';
+import { toast } from '@/app/utils/toast';
 
 export const UserProfileMenu = () => {
   const { user, signOut } = useAuthStore();
@@ -15,14 +17,14 @@ export const UserProfileMenu = () => {
   // Стэйты для редактирования профиля
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [newNickname, setNewNickname] = useState('');
+  const [isUpdating, setIsUpdating] = useState(false);
 
   if (!user) return null;
 
   const userEmail = user.email || '';
+  // Читаем имя и аватар прямо из метаданных пользователя!
   const currentName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Пользователь';
-
-  // Мок фотографии (потом возьмешь из user_metadata или хранилища)
-  const userPhoto = null;
+  const userPhoto = user.user_metadata?.avatar_url || null;
 
   const isConfirmed = confirmEmail.trim().toLowerCase() === userEmail.toLowerCase();
 
@@ -32,25 +34,56 @@ export const UserProfileMenu = () => {
     }
   };
 
-  // МОКОВЫЕ ФУНКЦИИ (для будущего оживления)
-  const handleUpdateProfile = () => {
-    if (!newNickname.trim()) return;
-    console.log('Сохраняем новый никнейм:', newNickname);
-    // await updateProfile({ full_name: newNickname });
-    setIsEditModalOpen(false);
+  // --- ОЖИВЛЕННАЯ ФУНКЦИЯ: Обновление имени ---
+  const handleUpdateProfile = async () => {
+    const trimmedName = newNickname.trim();
+    if (!trimmedName || trimmedName === currentName) {
+      setIsEditModalOpen(false); // Если ничего не изменили, просто закрываем
+      return;
+    }
+
+    setIsUpdating(true);
+    // Обновляем метаданные пользователя в Supabase
+    const { error } = await supabase.auth.updateUser({
+      data: { full_name: trimmedName },
+    });
+
+    if (error) {
+      toast.error('Ошибка при обновлении профиля');
+      console.error(error);
+    } else {
+      toast.success('Имя успешно изменено!');
+      setIsEditModalOpen(false);
+      // useAuthStore автоматически обновится благодаря подписке onAuthStateChange
+    }
+    setIsUpdating(false);
   };
 
-  const handleRemovePhoto = () => {
-    console.log('Удаляем фото...');
+  // --- ОЖИВЛЕННАЯ ФУНКЦИЯ: Удаление фото ---
+  const handleRemovePhoto = async () => {
+    if (!userPhoto) return;
+
+    setIsUpdating(true);
+    // Затираем avatar_url в метаданных (полезно для OAuth аккаунтов)
+    const { error } = await supabase.auth.updateUser({
+      data: { avatar_url: null },
+    });
+
+    if (error) {
+      toast.error('Не удалось убрать фото');
+    } else {
+      toast.success('Фото удалено');
+    }
+    setIsUpdating(false);
   };
 
   const handleUploadPhoto = () => {
-    console.log('Открываем диалог выбора файла...');
+    // Для загрузки фото в будущем потребуется создать Storage bucket (напр. 'avatars')
+    toast.info('Загрузка кастомных аватаров появится в будущем обновлении!');
   };
 
   return (
     <>
-      {/* ОСНОВНОЙ БЛОК ПРОФИЛЯ (По дизайну скриншота 1) */}
       <div className="mb-10 flex items-center gap-5 sm:gap-6">
         <Avatar
           name={currentName}
@@ -91,15 +124,13 @@ export const UserProfileMenu = () => {
         </div>
       </div>
 
-      {/* МОДАЛКА РЕДАКТИРОВАНИЯ ПРОФИЛЯ (По дизайну скриншота 2) */}
       <Modal
         isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
+        onClose={() => !isUpdating && setIsEditModalOpen(false)}
         layout="vertical"
         className="max-w-lg rounded-[32px] bg-surface !p-8 shadow-2xl md:max-w-[540px]"
       >
         <div className="flex flex-col gap-6 text-left">
-          {/* Верхняя часть с аватаром и кнопкой удаления фото */}
           <div className="relative mb-2 flex w-full justify-center">
             <Avatar
               name={newNickname || currentName}
@@ -114,41 +145,44 @@ export const UserProfileMenu = () => {
               </div>
             </Avatar>
 
-            <div className="absolute top-0 right-0 sm:top-2">
-              <Button
-                variant="outline"
-                size="sm"
-                color="primary"
-                onClick={handleRemovePhoto}
-                className="rounded-xl border-2 px-4 py-2 text-sm"
-              >
-                Убрать фото
-              </Button>
-            </div>
+            {userPhoto && (
+              <div className="absolute top-0 right-0 sm:top-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  color="primary"
+                  onClick={handleRemovePhoto}
+                  disabled={isUpdating}
+                  className="rounded-xl border-2 px-4 py-2 text-sm"
+                >
+                  Убрать фото
+                </Button>
+              </div>
+            )}
           </div>
 
-          {/* Поле ввода никнейма */}
           <div className="flex flex-col gap-2">
             <span className="text-sm font-normal text-text">Введите новый никнейм</span>
             <input
               type="text"
               value={newNickname}
               onChange={(e) => setNewNickname(e.target.value)}
+              disabled={isUpdating}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleUpdateProfile();
               }}
               placeholder="Новый никнейм..."
               autoFocus
-              className="w-full border-b-2 border-accent bg-transparent pb-2.5 text-2xl font-medium text-text transition-colors outline-none focus:border-accent"
+              className="w-full border-b-2 border-accent bg-transparent pb-2.5 text-2xl font-medium text-text transition-colors outline-none focus:border-accent disabled:opacity-50"
             />
           </div>
 
-          {/* Кнопки действий */}
           <div className="mt-8 flex w-full flex-col-reverse gap-3 sm:flex-row sm:justify-end sm:gap-3.5">
             <Button
               variant="outline"
               size="sm"
               color="accent"
+              disabled={isUpdating}
               onClick={() => setIsEditModalOpen(false)}
               className="w-full rounded-[16px] border-2 py-3 text-[15px] font-medium sm:w-auto sm:min-w-[140px] md:min-w-[160px]"
             >
@@ -158,16 +192,17 @@ export const UserProfileMenu = () => {
               variant="solid"
               size="sm"
               color="accent"
+              disabled={isUpdating || !newNickname.trim()}
               onClick={handleUpdateProfile}
               className="w-full rounded-[16px] border-2 py-3 text-[15px] font-medium sm:w-auto sm:min-w-[140px] md:min-w-[160px]"
             >
-              Применить
+              {isUpdating ? 'Сохранение...' : 'Применить'}
             </Button>
           </div>
         </div>
       </Modal>
 
-      {/* МОДАЛКА ВЫХОДА (Оставил твою, только чуть подогнал стили) */}
+      {/* Модалка выхода остается такой же ... */}
       <Modal
         isOpen={isSignOutModalOpen}
         onClose={() => setIsSignOutModalOpen(false)}

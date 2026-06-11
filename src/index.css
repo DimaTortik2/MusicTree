@@ -39,8 +39,16 @@
   --toastify-font-family: var(--font-sans);
   --toastify-border-radius: 16px;
 
-  --glow-opacity: 0.08; /* Для темной темы */
-  --glow-blend: screen; /* Свечение осветляет темный фон */
+  --glow-opacity: 0.08; 
+  --glow-blend: screen; 
+
+   --avatar-1: #e28743; 
+  --avatar-2: #eab308; 
+  --avatar-3: #22c55e; 
+  --avatar-4: #06b6d4; 
+  --avatar-5: #3b82f6; 
+  --avatar-6: #8b5cf6; 
+  --avatar-7: #ec4899; 
 }
 
 .Toastify__toast {

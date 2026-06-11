@@ -23,15 +23,17 @@ const getFriendlyErrorMessage = (message: string): string => {
   if (msg.includes('email not confirmed') || msg.includes('confirmation required'))
     return 'Пожалуйста, подтвердите вашу почту по ссылке из письма.';
   if (msg.includes('network error') || msg.includes('failed to fetch'))
-    return 'Проблема с сетью. Проверьте интернет-соединение.';
+    return 'Ошибка сети. Возможно, запрос блокирует AdBlock, VPN или превышен лимит писем.';
   if (msg.includes('captcha') || msg.includes('bot detection'))
     return 'Пожалуйста, подтвердите, что вы человек (капча не пройдена).';
+  if (msg.includes('user not found')) return 'Пользователь с такой почтой не найден.';
   return 'Что-то пошло не так. Пожалуйста, попробуйте позже.';
 };
 
 export const RegisterForm = () => {
   const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -42,6 +44,7 @@ export const RegisterForm = () => {
 
   // Письмо и таймер
   const [isEmailSent, setIsEmailSent] = useState(false);
+  const [isResetEmailSent, setIsResetEmailSent] = useState(false);
   const [cooldown, setCooldown] = useState(0);
 
   useEffect(() => {
@@ -50,15 +53,45 @@ export const RegisterForm = () => {
     return () => clearTimeout(timer);
   }, [cooldown]);
 
-  // Сбрасываем капчу при переключении между Входом и Регистрацией
+  // Сбрасываем состояния при переключении табов
   useEffect(() => {
     setCaptchaToken(null);
+    setIsForgotPassword(false);
+    setIsResetEmailSent(false);
   }, [isLogin]);
+
+  useEffect(() => {
+    setCaptchaToken(null);
+  }, [isForgotPassword]);
 
   const isEmailValid = /^[^\s@]+@[^\s@]+.[^\s@]+$/.test(email);
   const isPasswordValid = password.length >= 6;
   const isFormValid = isEmailValid && isPasswordValid;
-  const isSubmitDisabled = !isFormValid || isLoading || (!isLogin && !captchaToken);
+
+  // Кнопка заблокирована, если не пройдена капча (теперь для всех действий)
+  const isSubmitDisabled = !isFormValid || isLoading || !captchaToken;
+  const isForgotSubmitDisabled = !isEmailValid || isLoading || !captchaToken;
+
+  // Единый блок капчи, чтобы не дублировать код
+  const renderCaptcha = () => (
+    <div className="mt-6 flex min-h-[65px] w-full flex-col items-center justify-center gap-2">
+      <Turnstile
+        ref={turnstileRef}
+        siteKey="0x4AAAAAADhan7iwbBXBvP5v"
+        options={{ language: 'ru', theme: 'auto' }}
+        onSuccess={(token) => setCaptchaToken(token)}
+        onExpire={() => {
+          setCaptchaToken(null);
+          toast.error('Время капчи истекло', { position: 'bottom-right' });
+          turnstileRef.current?.reset();
+        }}
+        onError={() => {
+          setCaptchaToken(null);
+          toast.error('Ошибка капчи. Отключите VPN/AdBlock.', { position: 'bottom-right' });
+        }}
+      />
+    </div>
+  );
 
   const executeAction = async (
     e: React.FormEvent | React.MouseEvent,
@@ -71,9 +104,18 @@ export const RegisterForm = () => {
 
     if (action === 'email') {
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        // Передаем капчу при входе!
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+          options: { captchaToken: captchaToken || undefined },
+        });
+
         if (error) {
+          console.error('Login Error:', error);
           toast.error(getFriendlyErrorMessage(error.message), { position: 'bottom-right' });
+          setCaptchaToken(null);
+          turnstileRef.current?.reset();
         } else {
           toast.success('Рады видеть вас снова!', { position: 'bottom-right' });
         }
@@ -85,8 +127,8 @@ export const RegisterForm = () => {
         });
 
         if (error) {
+          console.error('Sign Up Error:', error);
           toast.error(getFriendlyErrorMessage(error.message), { position: 'bottom-right' });
-          // Сбрасываем токен, если рега не прошла, чтобы юзер мог попробовать еще раз
           setCaptchaToken(null);
           turnstileRef.current?.reset();
         } else if (data.user && !data.session) {
@@ -107,6 +149,32 @@ export const RegisterForm = () => {
     setIsLoading(false);
   };
 
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isForgotSubmitDisabled) return;
+
+    setIsLoading(true);
+    const redirectUrl = `${window.location.origin}/update-password`;
+
+    // Передаем капчу при сбросе пароля!
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: redirectUrl,
+      captchaToken: captchaToken || undefined,
+    });
+
+    if (error) {
+      console.error('Reset Password Error:', error);
+      toast.error(getFriendlyErrorMessage(error.message), { position: 'bottom-right' });
+      setCaptchaToken(null);
+      turnstileRef.current?.reset();
+    } else {
+      setIsResetEmailSent(true);
+      toast.success('Письмо для сброса пароля отправлено!', { position: 'bottom-right' });
+    }
+
+    setIsLoading(false);
+  };
+
   const handleResendEmail = async () => {
     if (cooldown > 0) return;
     const { error } = await supabase.auth.resend({ type: 'signup', email: email });
@@ -118,7 +186,7 @@ export const RegisterForm = () => {
     }
   };
 
-  // Экран успешной отправки письма
+  // Экран: Письмо регистрации отправлено
   if (isEmailSent) {
     return (
       <motion.div
@@ -129,8 +197,7 @@ export const RegisterForm = () => {
         <h2 className="mb-2 text-xl font-medium text-text">Подтвердите ваш аккаунт</h2>
         <p className="mb-8 text-sm text-text/60">
           Мы отправили ссылку для активации на почту{' '}
-          <span className="font-semibold text-text">{email}</span>. Пожалуйста, перейдите по ней,
-          чтобы войти в систему.
+          <span className="font-semibold text-text">{email}</span>.
         </p>
 
         <Button
@@ -164,15 +231,99 @@ export const RegisterForm = () => {
     );
   }
 
+  // Экран: Письмо сброса пароля отправлено
+  if (isResetEmailSent) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="flex h-full w-full flex-col items-center justify-center p-4 text-center"
+      >
+        <h2 className="mb-2 text-xl font-medium text-text">Письмо отправлено</h2>
+        <p className="mb-8 text-sm text-text/60">
+          Мы отправили ссылку для восстановления пароля на почту{' '}
+          <span className="font-semibold text-text">{email}</span>.
+        </p>
+
+        <Button
+          type="button"
+          variant="solid"
+          color="primary"
+          size="md"
+          className="w-full"
+          onClick={() => {
+            setIsResetEmailSent(false);
+            setIsForgotPassword(false);
+            setIsLogin(true);
+          }}
+        >
+          Вернуться ко входу
+        </Button>
+      </motion.div>
+    );
+  }
+
+  // Экран: Забыли пароль (Форма ввода email)
+  if (isForgotPassword) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: 20 }}
+        className="relative flex h-full w-full flex-col pt-12 sm:pt-8"
+      >
+        <button
+          type="button"
+          onClick={() => setIsForgotPassword(false)}
+          className="absolute top-0 left-0 flex cursor-pointer items-center gap-2 text-sm font-medium text-text/50 transition-colors outline-none hover:text-text active:scale-95 sm:-top-4 sm:-left-4"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </button>
+
+        <div className="mb-8">
+          <h2 className="mb-2 text-2xl font-medium text-text">Восстановление пароля</h2>
+          <p className="text-sm text-text/60">
+            Введите почту, указанную при регистрации, и мы отправим ссылку для сброса пароля.
+          </p>
+        </div>
+
+        <form onSubmit={handleResetPassword} className="flex w-full flex-1 flex-col">
+          <Input
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Ваша почта..."
+          />
+
+          {renderCaptcha()}
+
+          <Button
+            type="submit"
+            disabled={isForgotSubmitDisabled}
+            className={cn(
+              'mt-auto w-full border-none transition-all duration-300 sm:mt-8',
+              isForgotSubmitDisabled
+                ? 'pointer-events-none scale-100 cursor-not-allowed bg-[#7A224D]/30 text-text/30'
+                : 'cursor-pointer bg-primary text-white hover:scale-102 hover:bg-[#902A5B] active:scale-98',
+            )}
+          >
+            {isLoading ? 'Отправка...' : 'Отправить ссылку'}
+          </Button>
+        </form>
+      </motion.div>
+    );
+  }
+
+  // Основной экран: Вход / Регистрация
   return (
-    <>
+    <div className="relative flex h-full w-full flex-col pt-8 sm:pt-0">
       <button
         type="button"
         onClick={() => navigate(-1)}
-        className="absolute top-0 left-0 flex cursor-pointer items-center gap-2 text-sm font-medium text-text/50 transition-colors outline-none hover:text-text active:scale-95 sm:-top-4 sm:-left-4"
+        className="absolute top-0 left-0 flex cursor-pointer items-center gap-2 text-sm font-medium text-text/50 transition-colors outline-none hover:text-text active:scale-95 sm:-top-8 sm:-left-8"
       >
         <ArrowLeft className="h-5 w-5" />
-        Назад
       </button>
 
       <div className="relative mt-4 mb-12 flex w-fit rounded-2xl bg-surface p-1.5 sm:mt-0">
@@ -213,7 +364,7 @@ export const RegisterForm = () => {
       </div>
 
       <form onSubmit={(e) => executeAction(e, 'email')} className="flex w-full flex-1 flex-col">
-        <div className="space-y-6 sm:space-y-10">
+        <div className="space-y-6 sm:space-y-8">
           <Input
             type="email"
             required
@@ -221,14 +372,27 @@ export const RegisterForm = () => {
             onChange={(e) => setEmail(e.target.value)}
             placeholder="Почта..."
           />
-          <Input
-            type="password"
-            required
-            minLength={6}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Пароль..."
-          />
+          <div>
+            <Input
+              type="password"
+              required
+              minLength={6}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Пароль..."
+            />
+            {isLogin && (
+              <div className="mt-2 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setIsForgotPassword(true)}
+                  className="text-sm font-medium text-primary transition-colors outline-none hover:text-accent"
+                >
+                  Забыли пароль?
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="my-8 flex items-center gap-4 sm:my-10">
@@ -260,34 +424,10 @@ export const RegisterForm = () => {
           </Button>
         </div>
 
-        {!isLogin && (
-          <div className="mt-8 flex min-h-[65px] w-full flex-col items-center justify-center gap-2">
-            <Turnstile
-              ref={turnstileRef}
-              siteKey="0x4AAAAAADhan7iwbBXBvP5v"
-              options={{ language: 'ru', theme: 'auto' }}
-              onSuccess={(token) => setCaptchaToken(token)}
-              onExpire={() => {
-                setCaptchaToken(null);
-                toast.error('Время капчи истекло', { position: 'bottom-right' });
-                turnstileRef.current?.reset();
-              }}
-              onError={() => {
-                setCaptchaToken(null);
-                toast.error('Ошибка загрузки капчи. Проверьте соединение.', {
-                  position: 'bottom-right',
-                });
-              }}
-            />
-            {isFormValid && !captchaToken && (
-              <span className="animate-pulse text-center text-xs text-primary/80">
-                Ожидаем проверку безопасности...
-              </span>
-            )}
-          </div>
-        )}
+        {/* Выводим капчу перед кнопкой отправки */}
+        {renderCaptcha()}
 
-        <div className="mt-auto pt-10 sm:pt-12">
+        <div className="mt-auto pt-8 sm:pt-10">
           <Button
             type="submit"
             disabled={isSubmitDisabled}
@@ -324,6 +464,6 @@ export const RegisterForm = () => {
           </Button>
         </div>
       </form>
-    </>
+    </div>
   );
 };

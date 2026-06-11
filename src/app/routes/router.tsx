@@ -14,6 +14,7 @@ import ShortcutsPage from '@/pages/ShortcutsPage';
 import { VocalTunerPage } from '@/features/VocalTunerPage';
 import { PublicRoute } from '@/app/providers/AuthRoutes';
 import { AuthPage } from '@/pages/Auth/AuthPage';
+import { UpdatePasswordPage } from '@/pages/Auth/UpdatePasswordPage';
 
 export const router = createBrowserRouter([
   {
@@ -27,6 +28,10 @@ export const router = createBrowserRouter([
         <AuthPage />
       </PublicRoute>
     ),
+  },
+  {
+    path: '/update-password',
+    element: <UpdatePasswordPage />,
   },
   {
     path: '/app',

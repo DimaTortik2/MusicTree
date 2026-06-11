@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { GithubLogo, GoogleLogo, ArrowLeft } from '@phosphor-icons/react';
+import { GithubLogo, GoogleLogo, ArrowLeft, Eye, EyeSlash } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Turnstile, type TurnstileInstance } from '@marsidev/react-turnstile';
 import { supabase } from '@/shared/lib/supabase';
@@ -36,8 +36,11 @@ export const RegisterForm = () => {
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState(''); // НОВОЕ СОСТОЯНИЕ
+  const [fullName, setFullName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // Состояние для глазика
+  const [showPassword, setShowPassword] = useState(false);
 
   // Капча
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
@@ -59,18 +62,18 @@ export const RegisterForm = () => {
     setCaptchaToken(null);
     setIsForgotPassword(false);
     setIsResetEmailSent(false);
-    setFullName(''); // Очищаем имя при переключении
+    setFullName('');
+    setShowPassword(false); // Скрываем пароль при переключении табов
   }, [isLogin]);
 
   useEffect(() => {
     setCaptchaToken(null);
   }, [isForgotPassword]);
 
-  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email); // Поправил регулярку (\.)
+  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const isPasswordValid = password.length >= 6;
   const isNameValid = fullName.trim().length >= 2;
 
-  // Валидация зависит от того, логин это или регистрация
   const isFormValid = isLogin
     ? isEmailValid && isPasswordValid
     : isEmailValid && isPasswordValid && isNameValid;
@@ -123,12 +126,11 @@ export const RegisterForm = () => {
           toast.success('Рады видеть вас снова!', { position: 'bottom-right' });
         }
       } else {
-        // РЕГИСТРАЦИЯ: Передаем ИМЯ в метаданные
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
-            data: { full_name: fullName.trim() }, // <-- ПЕРЕДАЕМ СЮДА
+            data: { full_name: fullName.trim() },
             captchaToken: captchaToken || undefined,
           },
         });
@@ -155,7 +157,6 @@ export const RegisterForm = () => {
     setIsLoading(false);
   };
 
-  // ... (handleResetPassword и handleResendEmail остаются без изменений) ...
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isForgotSubmitDisabled) return;
@@ -198,7 +199,6 @@ export const RegisterForm = () => {
         animate={{ opacity: 1, scale: 1 }}
         className="flex h-full w-full flex-col items-center justify-center p-4 text-center"
       >
-        {/* Оставил без изменений, чтобы не раздувать ответ */}
         <h2 className="mb-2 text-xl font-medium text-text">Подтвердите ваш аккаунт</h2>
         <p className="mb-8 text-sm text-text/60">
           Мы отправили ссылку для активации на почту{' '}
@@ -241,7 +241,6 @@ export const RegisterForm = () => {
         animate={{ opacity: 1, scale: 1 }}
         className="flex h-full w-full flex-col items-center justify-center p-4 text-center"
       >
-        {/* Оставил без изменений */}
         <h2 className="mb-2 text-xl font-medium text-text">Письмо отправлено</h2>
         <p className="mb-8 text-sm text-text/60">
           Мы отправили ссылку для восстановления пароля на почту{' '}
@@ -360,54 +359,73 @@ export const RegisterForm = () => {
       </div>
 
       <form onSubmit={(e) => executeAction(e, 'email')} className="flex w-full flex-1 flex-col">
-        <div className="space-y-6 sm:space-y-8">
-          {/* НОВОЕ ПОЛЕ: Отображается только при регистрации */}
-          <AnimatePresence>
+        {/* ИЗМЕНЕНИЕ 1: Использование flex и gap вместо space-y, чтобы анимация не прыгала */}
+        <div className="flex flex-col">
+          <AnimatePresence initial={false}>
             {!isLogin && (
               <motion.div
-                initial={{ opacity: 0, height: 0, marginBottom: 0 }}
-                animate={{ opacity: 1, height: 'auto', marginBottom: 24 }}
-                exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.3, ease: 'easeInOut' }}
                 className="overflow-hidden"
               >
-                <Input
-                  type="text"
-                  required
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Отображаемое имя..."
-                />
+                {/* Свободное пространство (gap) теперь внутри анимируемого контейнера */}
+                <div className="pb-6 sm:pb-8">
+                  <Input
+                    type="text"
+                    required
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="Отображаемое имя..."
+                  />
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
 
-          <Input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="Почта..."
-          />
-          <div>
+          {/* Почта и Пароль сгруппированы отдельно и имеют свой независимый gap */}
+          <div className="flex flex-col gap-6 sm:gap-8">
             <Input
-              type="password"
+              type="email"
               required
-              minLength={6}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Пароль..."
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Почта..."
             />
-            {isLogin && (
-              <div className="mt-2 flex justify-end">
+
+            <div>
+              <div className="relative">
+                <Input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  minLength={6}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Пароль..."
+                  className="pr-12"
+                />
                 <button
                   type="button"
-                  onClick={() => setIsForgotPassword(true)}
-                  className="cursor-pointer text-sm font-medium text-primary transition-colors outline-none hover:text-primary/70"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute top-1/2 right-4 flex -translate-y-1/2 cursor-pointer items-center justify-center text-text/50 transition-colors outline-none hover:text-text"
                 >
-                  Забыли пароль?
+                  {showPassword ? <Eye className="h-5 w-5" /> : <EyeSlash className="h-5 w-5" />}
                 </button>
               </div>
-            )}
+
+              {isLogin && (
+                <div className="mt-2 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setIsForgotPassword(true)}
+                    className="cursor-pointer text-sm font-medium text-primary transition-colors outline-none hover:text-primary/70"
+                  >
+                    Забыли пароль?
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

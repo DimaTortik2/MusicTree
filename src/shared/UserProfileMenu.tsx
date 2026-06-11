@@ -21,20 +21,14 @@ import { cn } from '@/app/utils/cn';
 export const UserProfileMenu = () => {
   const { user, signOut } = useAuthStore();
 
-  // Стэйты модалок
   const [isSignOutModalOpen, setIsSignOutModalOpen] = useState(false);
   const [confirmEmail, setConfirmEmail] = useState('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
-  // Стэйты данных
   const [newNickname, setNewNickname] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
   const [canUpload, setCanUpload] = useState<boolean>(false);
 
-  // Оптимистичный UI
-  const [optimisticPhoto, setOptimisticPhoto] = useState<string | null | undefined>(undefined);
-
-  // Стэйты кроппера и DnD
   const [isDragActive, setIsDragActive] = useState(false);
   const [cropModalOpen, setCropModalOpen] = useState(false);
   const [imageSrc, setImageSrc] = useState<string | null>(null);
@@ -48,9 +42,6 @@ export const UserProfileMenu = () => {
   const imgRef = useRef<HTMLImageElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // === ВСЕ ХУКИ ДОЛЖНЫ БЫТЬ ДО EARLY RETURN ===
-
-  // 1. Получение прав
   useEffect(() => {
     if (user) {
       supabase
@@ -62,14 +53,6 @@ export const UserProfileMenu = () => {
     }
   }, [user]);
 
-  // 2. Безопасно достаем фото для зависимостей
-  const userPhoto = user?.user_metadata?.avatar_url || null;
-
-  useEffect(() => {
-    setOptimisticPhoto(undefined);
-  }, [userPhoto]);
-
-  // 3. Логика границ для кроппера
   const clampOffset = (newX: number, newY: number, currentZoom: number) => {
     if (!imgRef.current || !containerRef.current) return { x: newX, y: newY };
     const img = imgRef.current;
@@ -91,14 +74,14 @@ export const UserProfileMenu = () => {
     setOffset((prev) => clampOffset(prev.x, prev.y, zoom));
   }, [zoom, baseScale]);
 
-  // === EARLY RETURN (теперь он безопасен) ===
   if (!user) return null;
 
   const userEmail = user.email || '';
   const currentName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Пользователь';
-  const displayPhoto = optimisticPhoto !== undefined ? optimisticPhoto : userPhoto;
 
-  // Провайдеры (Google/GitHub)
+  // Берем фото напрямую из стора (оно будет моментально обновляться)
+  const displayPhoto = user.user_metadata?.avatar_url || null;
+
   const identity = user.identities?.find(
     (id) => id.provider === 'google' || id.provider === 'github',
   );
@@ -139,8 +122,12 @@ export const UserProfileMenu = () => {
   };
 
   const deleteOldStoragePhoto = async () => {
-    if (userPhoto && userPhoto.includes('supabase.co') && userPhoto.includes('/avatars/')) {
-      const oldFilePath = userPhoto.split('/avatars/')[1];
+    if (
+      displayPhoto &&
+      displayPhoto.includes('supabase.co') &&
+      displayPhoto.includes('/avatars/')
+    ) {
+      const oldFilePath = displayPhoto.split('/avatars/')[1];
       if (oldFilePath) {
         await supabase.storage.from('avatars').remove([oldFilePath]);
       }
@@ -150,16 +137,20 @@ export const UserProfileMenu = () => {
   const handleRemovePhoto = async () => {
     if (!displayPhoto) return;
 
-    setOptimisticPhoto(null);
+    // Глобально обнуляем в Zustand
+    useAuthStore.setState((state) => ({
+      user: state.user
+        ? { ...state.user, user_metadata: { ...state.user.user_metadata, avatar_url: null } }
+        : null,
+    }));
+
     if (newNickname.trim() === currentName.trim()) setIsEditModalOpen(false);
 
     try {
       await deleteOldStoragePhoto();
-      const { error } = await supabase.auth.updateUser({ data: { avatar_url: null } });
-      if (error) throw error;
+      await supabase.auth.updateUser({ data: { avatar_url: null } });
       toast.success('Фото удалено');
     } catch (error) {
-      setOptimisticPhoto(undefined);
       toast.error('Не удалось убрать фото');
     }
   };
@@ -167,18 +158,100 @@ export const UserProfileMenu = () => {
   const handleRestoreProviderPhoto = async () => {
     if (!providerAvatar) return;
 
-    setOptimisticPhoto(providerAvatar);
+    useAuthStore.setState((state) => ({
+      user: state.user
+        ? {
+            ...state.user,
+            user_metadata: { ...state.user.user_metadata, avatar_url: providerAvatar },
+          }
+        : null,
+    }));
+
     if (newNickname.trim() === currentName.trim()) setIsEditModalOpen(false);
 
     try {
       await deleteOldStoragePhoto();
-      const { error } = await supabase.auth.updateUser({ data: { avatar_url: providerAvatar } });
-      if (error) throw error;
+      await supabase.auth.updateUser({ data: { avatar_url: providerAvatar } });
       toast.success(`Фотография ${providerName} восстановлена!`);
     } catch (error) {
-      setOptimisticPhoto(undefined);
       toast.error('Не удалось вернуть фото');
     }
+  };
+
+  const handleCropApply = async () => {
+    const image = imgRef.current;
+    const container = containerRef.current;
+    if (!image || !container) return;
+
+    const canvas = document.createElement('canvas');
+    const size = 512;
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+
+    if (!ctx) return;
+
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, size, size);
+    ctx.translate(size / 2, size / 2);
+    const ratio = size / container.clientWidth;
+    ctx.scale(ratio, ratio);
+    ctx.translate(offset.x, offset.y);
+    ctx.scale(zoom, zoom);
+    ctx.scale(baseScale, baseScale);
+    ctx.drawImage(image, -image.naturalWidth / 2, -image.naturalHeight / 2);
+
+    canvas.toBlob(
+      async (blob) => {
+        if (!blob) {
+          toast.error('Ошибка обработки фото');
+          return;
+        }
+
+        const localUrl = URL.createObjectURL(blob);
+
+        // МАГИЯ: Закидываем Blob в Zustand! Шапка и модалка обновятся за 0мс 🚀
+        useAuthStore.setState((state) => ({
+          user: state.user
+            ? {
+                ...state.user,
+                user_metadata: { ...state.user.user_metadata, avatar_url: localUrl },
+              }
+            : null,
+        }));
+
+        setCropModalOpen(false);
+        setImageSrc(null);
+
+        if (newNickname.trim() === currentName.trim()) {
+          setIsEditModalOpen(false);
+        }
+
+        // Тихая фоновая загрузка в Supabase
+        try {
+          const fileName = `${user.id}/${Date.now()}.webp`;
+
+          const { error: uploadError } = await supabase.storage
+            .from('avatars')
+            .upload(fileName, blob, { cacheControl: '3600', contentType: 'image/webp' });
+
+          if (uploadError) throw uploadError;
+
+          const { data: publicUrlData } = supabase.storage.from('avatars').getPublicUrl(fileName);
+          const newAvatarUrl = publicUrlData.publicUrl;
+
+          await deleteOldStoragePhoto();
+
+          await supabase.auth.updateUser({
+            data: { avatar_url: newAvatarUrl },
+          });
+        } catch (error) {
+          toast.error('Не удалось сохранить фото на сервере');
+        }
+      },
+      'image/webp',
+      0.9,
+    );
   };
 
   const handleAvatarClick = () => {
@@ -217,7 +290,6 @@ export const UserProfileMenu = () => {
     processFile(e.target.files?.[0]);
   };
 
-  // --- ЛОГИКА Drag & Drop ---
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragActive(true);
@@ -270,79 +342,8 @@ export const UserProfileMenu = () => {
     e.currentTarget.releasePointerCapture(e.pointerId);
   };
 
-  const handleCropApply = async () => {
-    const image = imgRef.current;
-    const container = containerRef.current;
-    if (!image || !container) return;
-
-    const canvas = document.createElement('canvas');
-    const size = 512;
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext('2d');
-
-    if (!ctx) return;
-
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, size, size);
-    ctx.translate(size / 2, size / 2);
-    const ratio = size / container.clientWidth;
-    ctx.scale(ratio, ratio);
-    ctx.translate(offset.x, offset.y);
-    ctx.scale(zoom, zoom);
-    ctx.scale(baseScale, baseScale);
-    ctx.drawImage(image, -image.naturalWidth / 2, -image.naturalHeight / 2);
-
-    canvas.toBlob(
-      async (blob) => {
-        if (!blob) {
-          toast.error('Ошибка обработки фото');
-          return;
-        }
-
-        const localUrl = URL.createObjectURL(blob);
-        setOptimisticPhoto(localUrl);
-        setCropModalOpen(false);
-
-        if (newNickname.trim() === currentName.trim()) {
-          setIsEditModalOpen(false);
-        }
-
-        setImageSrc(null);
-
-        // ФОНОВАЯ ЗАГРУЗКА
-        try {
-          const fileName = `${user.id}/${Date.now()}.webp`;
-
-          const { error: uploadError } = await supabase.storage
-            .from('avatars')
-            .upload(fileName, blob, { cacheControl: '3600', contentType: 'image/webp' });
-
-          if (uploadError) throw uploadError;
-
-          const { data: publicUrlData } = supabase.storage.from('avatars').getPublicUrl(fileName);
-          const newAvatarUrl = publicUrlData.publicUrl;
-
-          await deleteOldStoragePhoto();
-
-          const { error: updateError } = await supabase.auth.updateUser({
-            data: { avatar_url: newAvatarUrl },
-          });
-
-          if (updateError) throw updateError;
-        } catch (error) {
-          setOptimisticPhoto(undefined);
-          toast.error('Не удалось сохранить фото на сервере');
-        }
-      },
-      'image/webp',
-      0.9,
-    );
-  };
-
   return (
     <>
-      {/* --- ШАПКА ПРОФИЛЯ --- */}
       <div className="mb-8 flex items-center gap-4">
         <Avatar
           src={displayPhoto}
@@ -382,7 +383,6 @@ export const UserProfileMenu = () => {
         </div>
       </div>
 
-      {/* --- МОДАЛКА РЕДАКТИРОВАНИЯ --- */}
       <Modal
         isOpen={isEditModalOpen && !cropModalOpen}
         onClose={() => !isUpdating && setIsEditModalOpen(false)}
@@ -390,7 +390,6 @@ export const UserProfileMenu = () => {
         className="max-w-lg rounded-[32px] bg-surface !p-8 shadow-2xl md:max-w-[540px]"
       >
         <div className="flex flex-col gap-6 text-left">
-          {/* Контейнер Drag & Drop */}
           <div
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
@@ -425,7 +424,7 @@ export const UserProfileMenu = () => {
             </Avatar>
 
             {isDragActive && (
-              <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-[24px] bg-background/50 backdrop-blur-lg">
+              <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center rounded-[24px] bg-background/50 backdrop-blur-lg">
                 <div className="flex flex-col items-center gap-2 text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]">
                   <UploadSimple size={48} className="animate-bounce" />
                   <span className="text-lg font-medium">Отпустите фото</span>
@@ -508,7 +507,6 @@ export const UserProfileMenu = () => {
         </div>
       </Modal>
 
-      {/* --- МОДАЛКА КРОППЕРА (ОБРЕЗКА) --- */}
       <Modal
         isOpen={cropModalOpen}
         onClose={() => {}}
@@ -609,7 +607,6 @@ export const UserProfileMenu = () => {
         </div>
       </Modal>
 
-      {/* --- МОДАЛКА ВЫХОДА --- */}
       <Modal
         isOpen={isSignOutModalOpen}
         onClose={() => setIsSignOutModalOpen(false)}

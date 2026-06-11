@@ -9,13 +9,17 @@ export const useCloudSync = () => {
   const { user, initialized } = useAuthStore();
   const [isSyncing, setIsSyncing] = useState(true);
 
+  // Вытаскиваем только ID. Он не меняется при смене аватарки/имени!
+  const userId = user?.id;
+
   useEffect(() => {
     if (!initialized) {
       setIsSyncing(true);
       return;
     }
 
-    if (!user) {
+    // Проверяем по userId
+    if (!userId) {
       setIsSyncing(false);
       return;
     }
@@ -32,7 +36,7 @@ export const useCloudSync = () => {
       const { data, error } = await supabase
         .from('profiles')
         .select('progress_state, shortcut_state, can_cloud_audio')
-        .eq('id', user.id)
+        .eq('id', userId)
         .single();
 
       const hasCloudProgress = data?.progress_state && Object.keys(data.progress_state).length > 0;
@@ -60,7 +64,7 @@ export const useCloudSync = () => {
                   recData.blob.type.includes('mp4') || recData.blob.type.includes('m4a')
                     ? 'm4a'
                     : 'webm';
-                const filePath = `${user.id}/${id}.${ext}`;
+                const filePath = `${userId}/${id}.${ext}`;
 
                 // Загружаем в Storage
                 const { error: uploadError } = await supabase.storage
@@ -85,7 +89,7 @@ export const useCloudSync = () => {
                   const { error: dbError } = await supabase.from('audio_tracks').insert([
                     {
                       id: id,
-                      user_id: user.id,
+                      user_id: userId,
                       title: recData.title,
                       dur: recData.dur,
                       url: filePath,
@@ -120,7 +124,7 @@ export const useCloudSync = () => {
             shortcut_state: useShortcutStore.getState(),
             updated_at: new Date().toISOString(),
           })
-          .eq('id', user.id);
+          .eq('id', userId);
       };
 
       const onChange = () => {
@@ -140,7 +144,9 @@ export const useCloudSync = () => {
       if (unsubShortcuts) unsubShortcuts();
       clearTimeout(timeout);
     };
-  }, [user, initialized]);
+    // ВНИМАНИЕ: Здесь теперь отслеживаем только userId, а не весь объект user!
+    // Это предотвращает ре-рендер лоадера при смене аватарки/имени.
+  }, [userId, initialized]);
 
   return { isSyncing };
 };

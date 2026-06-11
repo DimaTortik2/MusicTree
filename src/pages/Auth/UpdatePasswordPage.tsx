@@ -14,7 +14,7 @@ export const UpdatePasswordPage = () => {
 
   // Опционально: слушаем, подхватил ли Supabase сессию из ссылки
   useEffect(() => {
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, _) => {
       // Если по какой-то причине сессии нет и это не процесс восстановления — редирект
       if (event === 'SIGNED_OUT') {
         toast.error('Ссылка устарела или недействительна. Попробуйте еще раз.');
@@ -58,7 +58,7 @@ export const UpdatePasswordPage = () => {
       >
         <div className="mb-8 flex flex-col items-center text-center">
           <div className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-primary text-text">
-            <LockKey  className="size-8" />
+            <LockKey className="size-8" />
           </div>
           <h1 className="text-2xl font-medium text-text">Новый пароль</h1>
           <p className="mt-2 text-sm text-text/60">

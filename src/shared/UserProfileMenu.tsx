@@ -414,6 +414,7 @@ export const UserProfileMenu = () => {
               src={displayPhoto}
               className="group size-32 cursor-pointer text-5xl transition-transform duration-300"
               style={{ transform: isDragActive ? 'scale(1.05)' : 'scale(1)' }}
+              enableTypingEffect={true}
             >
               <div
                 onClick={() => !isUpdating && handleAvatarClick()}
@@ -424,7 +425,7 @@ export const UserProfileMenu = () => {
             </Avatar>
 
             {isDragActive && (
-              <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-[24px] backdrop-blur-lg bg-background/50">
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-[24px] bg-background/50 backdrop-blur-lg">
                 <div className="flex flex-col items-center gap-2 text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]">
                   <UploadSimple size={48} className="animate-bounce" />
                   <span className="text-lg font-medium">Отпустите фото</span>

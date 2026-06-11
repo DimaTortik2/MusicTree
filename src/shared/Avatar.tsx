@@ -6,7 +6,7 @@ interface AvatarProps {
   name: string;
   src?: string | null;
   className?: string;
-  style?: React.CSSProperties; // Добавили поддержку стилей
+  style?: React.CSSProperties;
   children?: React.ReactNode;
 }
 
@@ -14,9 +14,13 @@ export const Avatar: React.FC<AvatarProps> = ({ name, src, className, style, chi
   const bgColor = getAvatarColor(name);
   const initial = getInitial(name);
 
-  // Смешиваем стили: внешний style имеет приоритет над авто-цветом bgColor
   const mergedStyle: React.CSSProperties = {
-    ...(!src ? { backgroundColor: bgColor } : {}),
+    backgroundColor: bgColor,
+    // Настраиваем раздельные тайминги:
+    // Медленное, медитативное перетекание цвета (1.2 секунды)
+    // и отзывчивый трансформ при взаимодействии (300 миллисекунд)
+    transition:
+      'background-color 1200ms cubic-bezier(0.4, 0, 0.2, 1), transform 300ms cubic-bezier(0.4, 0, 0.2, 1)',
     ...style,
   };
 
@@ -29,9 +33,15 @@ export const Avatar: React.FC<AvatarProps> = ({ name, src, className, style, chi
       style={mergedStyle}
     >
       {src ? (
-        <img src={src} alt={name} className="h-full w-full object-cover" />
+        <img
+          src={src}
+          alt={name}
+          className="animate-in fade-in absolute inset-0 h-full w-full object-cover duration-300"
+        />
       ) : (
-        <span className="font-medium">{initial}</span>
+        <span key={initial} className="animate-in fade-in font-medium duration-200">
+          {initial}
+        </span>
       )}
       {children}
     </div>

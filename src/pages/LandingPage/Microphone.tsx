@@ -4,7 +4,7 @@ interface MicrophoneProps {
 
 export const Microphone = ({ className }: MicrophoneProps) => {
   return (
-    <svg viewBox="0 0 435 433" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+    <svg viewBox="0 0 460 475" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
       {/* 
         Здесь мы связываем цвета с нашими CSS-переменными темы.
         1A0B22 заменен на var(--color-surface),

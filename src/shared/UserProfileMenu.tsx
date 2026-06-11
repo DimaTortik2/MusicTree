@@ -48,6 +48,9 @@ export const UserProfileMenu = () => {
   const imgRef = useRef<HTMLImageElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // === ВСЕ ХУКИ ДОЛЖНЫ БЫТЬ ДО EARLY RETURN ===
+
+  // 1. Получение прав
   useEffect(() => {
     if (user) {
       supabase
@@ -59,17 +62,41 @@ export const UserProfileMenu = () => {
     }
   }, [user]);
 
-  if (!user) return null;
-
-  const userEmail = user.email || '';
-  const currentName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Пользователь';
-  const userPhoto = user.user_metadata?.avatar_url || null;
-
-  const displayPhoto = optimisticPhoto !== undefined ? optimisticPhoto : userPhoto;
+  // 2. Безопасно достаем фото для зависимостей
+  const userPhoto = user?.user_metadata?.avatar_url || null;
 
   useEffect(() => {
     setOptimisticPhoto(undefined);
   }, [userPhoto]);
+
+  // 3. Логика границ для кроппера
+  const clampOffset = (newX: number, newY: number, currentZoom: number) => {
+    if (!imgRef.current || !containerRef.current) return { x: newX, y: newY };
+    const img = imgRef.current;
+    const container = containerRef.current;
+
+    const scaledW = img.naturalWidth * baseScale * currentZoom;
+    const scaledH = img.naturalHeight * baseScale * currentZoom;
+
+    const maxOffsetX = Math.max(0, (scaledW - container.clientWidth) / 2);
+    const maxOffsetY = Math.max(0, (scaledH - container.clientHeight) / 2);
+
+    return {
+      x: Math.max(-maxOffsetX, Math.min(maxOffsetX, newX)),
+      y: Math.max(-maxOffsetY, Math.min(maxOffsetY, newY)),
+    };
+  };
+
+  useEffect(() => {
+    setOffset((prev) => clampOffset(prev.x, prev.y, zoom));
+  }, [zoom, baseScale]);
+
+  // === EARLY RETURN (теперь он безопасен) ===
+  if (!user) return null;
+
+  const userEmail = user.email || '';
+  const currentName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Пользователь';
+  const displayPhoto = optimisticPhoto !== undefined ? optimisticPhoto : userPhoto;
 
   // Провайдеры (Google/GitHub)
   const identity = user.identities?.find(
@@ -95,8 +122,8 @@ export const UserProfileMenu = () => {
 
   const handleUpdateProfile = async () => {
     const trimmedName = newNickname.trim();
-    console.log(!trimmedName || trimmedName === currentName.trim());
     if (!trimmedName || trimmedName === currentName.trim()) return;
+
     setIsUpdating(true);
     const { error } = await supabase.auth.updateUser({
       data: { full_name: trimmedName },
@@ -124,8 +151,7 @@ export const UserProfileMenu = () => {
     if (!displayPhoto) return;
 
     setOptimisticPhoto(null);
-    // Если юзер не менял никнейм, закрываем модалку для удобства
-    if (newNickname.trim() === currentName) setIsEditModalOpen(false);
+    if (newNickname.trim() === currentName.trim()) setIsEditModalOpen(false);
 
     try {
       await deleteOldStoragePhoto();
@@ -142,7 +168,7 @@ export const UserProfileMenu = () => {
     if (!providerAvatar) return;
 
     setOptimisticPhoto(providerAvatar);
-    if (newNickname.trim() === currentName) setIsEditModalOpen(false);
+    if (newNickname.trim() === currentName.trim()) setIsEditModalOpen(false);
 
     try {
       await deleteOldStoragePhoto();
@@ -214,7 +240,6 @@ export const UserProfileMenu = () => {
     processFile(e.dataTransfer.files?.[0]);
   };
 
-  // --- ЛОГИКА КРОППЕРА ---
   const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
     const img = e.currentTarget;
     const container = containerRef.current;
@@ -226,27 +251,6 @@ export const UserProfileMenu = () => {
       setBaseScale(scale);
     }
   };
-
-  const clampOffset = (newX: number, newY: number, currentZoom: number) => {
-    if (!imgRef.current || !containerRef.current) return { x: newX, y: newY };
-    const img = imgRef.current;
-    const container = containerRef.current;
-
-    const scaledW = img.naturalWidth * baseScale * currentZoom;
-    const scaledH = img.naturalHeight * baseScale * currentZoom;
-
-    const maxOffsetX = Math.max(0, (scaledW - container.clientWidth) / 2);
-    const maxOffsetY = Math.max(0, (scaledH - container.clientHeight) / 2);
-
-    return {
-      x: Math.max(-maxOffsetX, Math.min(maxOffsetX, newX)),
-      y: Math.max(-maxOffsetY, Math.min(maxOffsetY, newY)),
-    };
-  };
-
-  useEffect(() => {
-    setOffset((prev) => clampOffset(prev.x, prev.y, zoom));
-  }, [zoom, baseScale]);
 
   const handlePointerDown = (e: React.PointerEvent) => {
     setIsDragging(true);
@@ -300,8 +304,7 @@ export const UserProfileMenu = () => {
         setOptimisticPhoto(localUrl);
         setCropModalOpen(false);
 
-        // Автоматически закрываем главное окно, если никнейм не менялся
-        if (newNickname.trim() === currentName) {
+        if (newNickname.trim() === currentName.trim()) {
           setIsEditModalOpen(false);
         }
 
@@ -420,11 +423,10 @@ export const UserProfileMenu = () => {
               </div>
             </Avatar>
 
-            {/* Иконка DnD БЕЗ затемняющего фона, с элегантной тенью текста */}
             {isDragActive && (
-              <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-[24px] bg-background/80 backdrop-blur-xl transition-all">
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-[24px] backdrop-blur-lg bg-background/50">
                 <div className="flex flex-col items-center gap-2 text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]">
-                  <UploadSimple size={48} />
+                  <UploadSimple size={48} className="animate-bounce" />
                   <span className="text-lg font-medium">Отпустите фото</span>
                 </div>
               </div>
@@ -505,7 +507,7 @@ export const UserProfileMenu = () => {
         </div>
       </Modal>
 
-      {/* --- МОДАЛКА КРОППЕРА (ОБРЕЗКА) - Теперь в оттенках ACCENT --- */}
+      {/* --- МОДАЛКА КРОППЕРА (ОБРЕЗКА) --- */}
       <Modal
         isOpen={cropModalOpen}
         onClose={() => {}}
@@ -554,7 +556,6 @@ export const UserProfileMenu = () => {
                 className="text-surface/80"
                 mask="url(#crop-mask)"
               />
-              {/* Кольцо теперь акцентное */}
               <circle
                 cx="50"
                 cy="50"
@@ -576,7 +577,6 @@ export const UserProfileMenu = () => {
               step="0.01"
               value={zoom}
               onChange={(e) => setZoom(parseFloat(e.target.value))}
-              // Ползунок тоже акцентный
               className="h-1.5 w-full cursor-pointer appearance-none rounded-lg bg-text/10 accent-accent"
             />
             <MagnifyingGlassPlus size={20} className="text-text/50" />
@@ -586,7 +586,7 @@ export const UserProfileMenu = () => {
             <Button
               variant="outline"
               size="sm"
-              color="accent" // Кнопка акцентная
+              color="accent"
               onClick={() => {
                 setCropModalOpen(false);
                 setImageSrc(null);
@@ -598,7 +598,7 @@ export const UserProfileMenu = () => {
             <Button
               variant="solid"
               size="sm"
-              color="accent" // Кнопка акцентная
+              color="accent"
               onClick={handleCropApply}
               className="flex-1 rounded-[16px] border-2 py-3 text-[15px] font-medium"
             >
@@ -608,7 +608,7 @@ export const UserProfileMenu = () => {
         </div>
       </Modal>
 
-      {/* --- МОДАЛКА ВЫХОДА (Без изменений) --- */}
+      {/* --- МОДАЛКА ВЫХОДА --- */}
       <Modal
         isOpen={isSignOutModalOpen}
         onClose={() => setIsSignOutModalOpen(false)}

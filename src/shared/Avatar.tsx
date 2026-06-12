@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { cn } from '@/app/utils/cn';
-import { getAvatarColor, getInitial } from '@/shared/utils/avatar';
+import { getAvatarColor, getInitial, getOAuthLqipUrl } from '@/shared/utils/avatar'; // <-- импортируем утилиту
 
 interface AvatarProps {
   name: string;
@@ -47,20 +47,18 @@ export const Avatar: React.FC<AvatarProps> = React.memo(
       }
     }, [name, enableTypingEffect]);
 
+    // --- МАГИЯ ДЛЯ OAUTH LQIP ---
+    // Используем base64 (если есть) ИЛИ генерируем микро-ссылку (если это гугл/гитхаб)
+    const computedLqip = lqip || getOAuthLqipUrl(src);
+
     // --- ЖЕЛЕЗОБЕТОННАЯ ЛОГИКА СЛОЕВ ---
-    // 1. Есть ли у нас валидный URL оригинала (без ошибки загрузки)?
     const hasValidSrc = !!src && !hasError;
 
-    // 2. Показываем ли мы LQIP? (Только если есть оригинал, есть LQIP, и оригинал еще не загрузился)
-    const showLqip = hasValidSrc && !!lqip && !highResLoaded;
+    // Показываем LQIP, если есть src, есть computedLqip, и оригинал еще не загрузился
+    const showLqip = hasValidSrc && !!computedLqip && !highResLoaded;
 
-    // 3. Показываем ли мы оригинал?
     const showHighRes = hasValidSrc && highResLoaded;
-
-    // 4. Фолбэк (кружок с буквой) показываем всегда, когда НЕ показываем ни одну из картинок
     const showFallback = !showLqip && !showHighRes;
-
-    // 5. Градиент при печати крутится, если HD фото еще не загружено
     const showSpinningGradient = enableTypingEffect && isTyping && !showHighRes;
 
     return (
@@ -111,10 +109,10 @@ export const Avatar: React.FC<AvatarProps> = React.memo(
         {/* СЛОЙ 3: Изображения */}
         {hasValidSrc && (
           <div className="pointer-events-none absolute inset-0 z-20 h-full w-full overflow-hidden rounded-full">
-            {/* А. Мгновенный LQIP */}
+            {/* А. Мгновенный LQIP (base64 или мини-URL) */}
             {showLqip && (
               <img
-                src={lqip}
+                src={computedLqip}
                 alt=""
                 className="absolute inset-0 h-full w-full object-cover blur-md"
                 style={{

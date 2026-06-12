@@ -166,7 +166,11 @@ export const UserProfileMenu = () => {
       user: state.user
         ? {
             ...state.user,
-            user_metadata: { ...state.user.user_metadata, avatar_url: providerAvatar },
+            user_metadata: {
+              ...state.user.user_metadata,
+              avatar_url: providerAvatar,
+              avatar_lqip: null,
+            },
           }
         : null,
     }));
@@ -175,7 +179,7 @@ export const UserProfileMenu = () => {
 
     try {
       await deleteOldStoragePhoto();
-      await supabase.auth.updateUser({ data: { avatar_url: providerAvatar } });
+      await supabase.auth.updateUser({ data: { avatar_url: providerAvatar, avatar_lqip: null } });
       toast.success(`Фотография ${providerName} восстановлена!`);
     } catch (error) {
       toast.error('Не удалось вернуть фото');

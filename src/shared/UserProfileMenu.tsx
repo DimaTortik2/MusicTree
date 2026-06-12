@@ -81,6 +81,7 @@ export const UserProfileMenu = () => {
 
   // Берем фото напрямую из стора (оно будет моментально обновляться)
   const displayPhoto = user.user_metadata?.avatar_url || null;
+  const displayLqip = user.user_metadata?.avatar_lqip || null;
 
   const identity = user.identities?.find(
     (id) => id.provider === 'google' || id.provider === 'github',
@@ -201,6 +202,19 @@ export const UserProfileMenu = () => {
     ctx.scale(baseScale, baseScale);
     ctx.drawImage(image, -image.naturalWidth / 2, -image.naturalHeight / 2);
 
+    // --- НОВОЕ: Генерируем LQIP (Low Quality Image Placeholder) ---
+    const lqipCanvas = document.createElement('canvas');
+    lqipCanvas.width = 16; // Крошечный размер
+    lqipCanvas.height = 16;
+    const lqipCtx = lqipCanvas.getContext('2d');
+    if (lqipCtx) {
+      // Рисуем большую картинку на маленьком канвасе
+      lqipCtx.drawImage(canvas, 0, 0, size, size, 0, 0, 16, 16);
+    }
+    // Конвертируем в Base64 с очень сильным сжатием
+    const lqipBase64 = lqipCanvas.toDataURL('image/webp', 0.2);
+    // -------------------------------------------------------------
+
     canvas.toBlob(
       async (blob) => {
         if (!blob) {
@@ -210,12 +224,16 @@ export const UserProfileMenu = () => {
 
         const localUrl = URL.createObjectURL(blob);
 
-        // МАГИЯ: Закидываем Blob в Zustand! Шапка и модалка обновятся за 0мс 🚀
+        // Обновляем Zustand мгновенно (и добавляем lqip в кэш!)
         useAuthStore.setState((state) => ({
           user: state.user
             ? {
                 ...state.user,
-                user_metadata: { ...state.user.user_metadata, avatar_url: localUrl },
+                user_metadata: {
+                  ...state.user.user_metadata,
+                  avatar_url: localUrl,
+                  avatar_lqip: lqipBase64, // <-- Сохраняем в Zustand
+                },
               }
             : null,
         }));
@@ -227,7 +245,7 @@ export const UserProfileMenu = () => {
           setIsEditModalOpen(false);
         }
 
-        // Тихая фоновая загрузка в Supabase
+        // Фоновая загрузка
         try {
           const fileName = `${user.id}/${Date.now()}.webp`;
 
@@ -242,8 +260,12 @@ export const UserProfileMenu = () => {
 
           await deleteOldStoragePhoto();
 
+          // Обновляем пользователя (триггер базы данных автоматически скопирует это в таблицу profiles!)
           await supabase.auth.updateUser({
-            data: { avatar_url: newAvatarUrl },
+            data: {
+              avatar_url: newAvatarUrl,
+              avatar_lqip: lqipBase64, // <-- Улетает в БД
+            },
           });
         } catch (error) {
           toast.error('Не удалось сохранить фото на сервере');
@@ -348,6 +370,7 @@ export const UserProfileMenu = () => {
         <Avatar
           src={displayPhoto}
           name={currentName}
+          lqip={displayLqip}
           className="size-20 shrink-0 text-3xl font-medium shadow-sm sm:size-24"
         />
         <div className="flex flex-col items-start justify-center">
@@ -411,6 +434,7 @@ export const UserProfileMenu = () => {
             <Avatar
               name={newNickname || currentName}
               src={displayPhoto}
+              lqip={displayLqip}
               className="group size-32 cursor-pointer text-5xl transition-transform duration-300"
               style={{ transform: isDragActive ? 'scale(1.05)' : 'scale(1)' }}
               enableTypingEffect={true}

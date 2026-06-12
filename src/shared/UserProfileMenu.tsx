@@ -139,17 +139,20 @@ export const UserProfileMenu = () => {
     if (!displayPhoto) return;
 
     // Глобально обнуляем в Zustand
-    useAuthStore.setState((state) => ({
-      user: state.user
-        ? { ...state.user, user_metadata: { ...state.user.user_metadata, avatar_url: null } }
-        : null,
-    }));
+  useAuthStore.setState((state) => ({
+    user: state.user
+      ? {
+          ...state.user,
+          user_metadata: { ...state.user.user_metadata, avatar_url: null, avatar_lqip: null }, // <-- добавил null
+        }
+      : null,
+  }));
 
     if (newNickname.trim() === currentName.trim()) setIsEditModalOpen(false);
 
     try {
       await deleteOldStoragePhoto();
-      await supabase.auth.updateUser({ data: { avatar_url: null } });
+      await supabase.auth.updateUser({ data: { avatar_url: null, avatar_lqip: null } });
       toast.success('Фото удалено');
     } catch (error) {
       toast.error('Не удалось убрать фото');

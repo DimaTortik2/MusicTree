@@ -5,7 +5,7 @@ import { getAvatarColor, getInitial } from '@/shared/utils/avatar';
 interface AvatarProps {
   name: string;
   src?: string | null;
-  lqip?: string | null; // <-- Новая пропса для Base64 превью
+  lqip?: string | null;
   className?: string;
   style?: React.CSSProperties;
   children?: React.ReactNode;
@@ -30,7 +30,7 @@ export const Avatar: React.FC<AvatarProps> = React.memo(
       setHasError(false);
     }, [src]);
 
-    // Анимация печати никнейма (оптимизирована, чтобы не дергать DOM зря)
+    // Анимация печати никнейма
     useEffect(() => {
       if (!enableTypingEffect) return;
 
@@ -47,9 +47,21 @@ export const Avatar: React.FC<AvatarProps> = React.memo(
       }
     }, [name, enableTypingEffect]);
 
-    const showImageLayers = !!src && !hasError;
-    // Если у нас нет картинки вообще ИЛИ включен эффект печати + мы печатаем
-    const showSpinningGradient = enableTypingEffect && isTyping && !highResLoaded;
+    // --- ЖЕЛЕЗОБЕТОННАЯ ЛОГИКА СЛОЕВ ---
+    // 1. Есть ли у нас валидный URL оригинала (без ошибки загрузки)?
+    const hasValidSrc = !!src && !hasError;
+
+    // 2. Показываем ли мы LQIP? (Только если есть оригинал, есть LQIP, и оригинал еще не загрузился)
+    const showLqip = hasValidSrc && !!lqip && !highResLoaded;
+
+    // 3. Показываем ли мы оригинал?
+    const showHighRes = hasValidSrc && highResLoaded;
+
+    // 4. Фолбэк (кружок с буквой) показываем всегда, когда НЕ показываем ни одну из картинок
+    const showFallback = !showLqip && !showHighRes;
+
+    // 5. Градиент при печати крутится, если HD фото еще не загружено
+    const showSpinningGradient = enableTypingEffect && isTyping && !showHighRes;
 
     return (
       <div
@@ -58,8 +70,8 @@ export const Avatar: React.FC<AvatarProps> = React.memo(
           className,
         )}
         style={{
-          backgroundColor: highResLoaded ? 'transparent' : bgColor,
-          transition: highResLoaded
+          backgroundColor: showFallback ? bgColor : 'transparent',
+          transition: showHighRes
             ? 'transform 200ms ease-out'
             : isTyping
               ? 'background-color 200ms ease-out, transform 200ms ease-out'
@@ -68,8 +80,8 @@ export const Avatar: React.FC<AvatarProps> = React.memo(
           ...style,
         }}
       >
-        {/* СЛОЙ 1: Крутящийся брендовый градиент (активен только при наборе текста) */}
-        {!highResLoaded && enableTypingEffect && (
+        {/* СЛОЙ 1: Крутящийся брендовый градиент */}
+        {!showHighRes && enableTypingEffect && (
           <div
             className={cn(
               'pointer-events-none absolute inset-0 z-0 overflow-hidden rounded-full transition-opacity ease-in-out',
@@ -83,7 +95,7 @@ export const Avatar: React.FC<AvatarProps> = React.memo(
         )}
 
         {/* СЛОЙ 2: Инициалы */}
-        {!highResLoaded && (
+        {showFallback && (
           <span
             className={cn(
               'ease-out-quint z-10 font-medium transition-all',
@@ -96,32 +108,40 @@ export const Avatar: React.FC<AvatarProps> = React.memo(
           </span>
         )}
 
-        {/* СЛОЙ 3: Прогрессивные изображения (LQIP Base64 -> High Res) */}
-        {showImageLayers && (
-          <div className="absolute inset-0 z-20 h-full w-full overflow-hidden rounded-full bg-surface">
-            {/* А. Мгновенный LQIP из Base64 */}
-            {lqip && !highResLoaded && (
+        {/* СЛОЙ 3: Изображения */}
+        {hasValidSrc && (
+          <div className="pointer-events-none absolute inset-0 z-20 h-full w-full overflow-hidden rounded-full">
+            {/* А. Мгновенный LQIP */}
+            {showLqip && (
               <img
                 src={lqip}
                 alt=""
-                className="absolute inset-0 h-full w-full scale-110 object-cover blur-md"
-                style={{ transform: 'translateZ(0)', backfaceVisibility: 'hidden' }}
+                className="absolute inset-0 h-full w-full object-cover blur-md"
+                style={{
+                  transform: 'scale(1.5) translateZ(0)',
+                  backfaceVisibility: 'hidden',
+                  WebkitBackfaceVisibility: 'hidden',
+                }}
               />
             )}
 
             {/* Б. Полноразмерное изображение */}
             <img
-              src={src!}
+              src={src}
               alt={name}
               decoding="async"
-              loading="lazy" // Полезно для списков друзей
+              loading="lazy"
               onLoad={() => setHighResLoaded(true)}
               onError={() => setHasError(true)}
               className={cn(
-                'absolute inset-0 h-full w-full scale-[1.01] object-cover transition-opacity duration-500 ease-out',
+                'absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ease-out',
                 highResLoaded ? 'opacity-100' : 'opacity-0',
               )}
-              style={{ transform: 'translateZ(0)', backfaceVisibility: 'hidden' }}
+              style={{
+                transform: 'scale(1.01) translateZ(0)',
+                backfaceVisibility: 'hidden',
+                WebkitBackfaceVisibility: 'hidden',
+              }}
             />
           </div>
         )}
@@ -137,4 +157,4 @@ export const Avatar: React.FC<AvatarProps> = React.memo(
   },
 );
 
-Avatar.displayName = 'Avatar'; // Важно для React.memo
+Avatar.displayName = 'Avatar';

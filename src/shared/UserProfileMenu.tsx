@@ -19,7 +19,8 @@ import { toast } from '@/app/utils/toast';
 import { cn } from '@/app/utils/cn';
 
 export const UserProfileMenu = () => {
-  const { user, signOut } = useAuthStore();
+  // ДОБАВИЛИ: profile и updateProfileState из стора
+  const { user, profile, signOut, updateProfileState } = useAuthStore();
 
   const [isSignOutModalOpen, setIsSignOutModalOpen] = useState(false);
   const [confirmEmail, setConfirmEmail] = useState('');
@@ -27,7 +28,9 @@ export const UserProfileMenu = () => {
 
   const [newNickname, setNewNickname] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
-  const [canUpload, setCanUpload] = useState<boolean>(false);
+
+  // Права на загрузку теперь берем напрямую из profile (useEffect больше не нужен)
+  const canUpload = !!profile?.can_upload_avatar;
 
   const [isDragActive, setIsDragActive] = useState(false);
   const [cropModalOpen, setCropModalOpen] = useState(false);
@@ -41,17 +44,6 @@ export const UserProfileMenu = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (user) {
-      supabase
-        .from('profiles')
-        .select('can_upload_avatar')
-        .eq('id', user.id)
-        .single()
-        .then(({ data }) => setCanUpload(!!data?.can_upload_avatar));
-    }
-  }, [user]);
 
   const clampOffset = (newX: number, newY: number, currentZoom: number) => {
     if (!imgRef.current || !containerRef.current) return { x: newX, y: newY };
@@ -77,11 +69,21 @@ export const UserProfileMenu = () => {
   if (!user) return null;
 
   const userEmail = user.email || '';
-  const currentName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Пользователь';
 
-  // Берем фото напрямую из стора (оно будет моментально обновляться)
-  const displayPhoto = user.user_metadata?.avatar_url || null;
-  const displayLqip = user.user_metadata?.avatar_lqip || null;
+  // Приоритет данных: сначала таблица profiles, если там пусто — дефолт из Google/GitHub
+  const currentName =
+    profile?.full_name ||
+    user.user_metadata?.full_name ||
+    user.email?.split('@')[0] ||
+    'Пользователь';
+
+  // Проверяем на undefined, чтобы отличить отсутствие данных от намеренно удаленной аватарки (null)
+  const displayPhoto =
+    profile?.avatar_url !== undefined ? profile.avatar_url : user.user_metadata?.avatar_url || null;
+  const displayLqip =
+    profile?.avatar_lqip !== undefined
+      ? profile.avatar_lqip
+      : user.user_metadata?.avatar_lqip || null;
 
   const identity = user.identities?.find(
     (id) => id.provider === 'google' || id.provider === 'github',
@@ -109,13 +111,17 @@ export const UserProfileMenu = () => {
     if (!trimmedName || trimmedName === currentName.trim()) return;
 
     setIsUpdating(true);
-    const { error } = await supabase.auth.updateUser({
-      data: { full_name: trimmedName },
-    });
+
+    // ИСПРАВЛЕНО: Сохраняем в таблицу profiles, а не в user_metadata
+    const { error } = await supabase
+      .from('profiles')
+      .update({ full_name: trimmedName })
+      .eq('id', user.id);
 
     if (error) {
       toast.error('Ошибка при обновлении профиля');
     } else {
+      updateProfileState({ full_name: trimmedName }); // Мгновенный апдейт UI
       toast.success('Имя успешно изменено!');
       setIsEditModalOpen(false);
     }
@@ -138,21 +144,18 @@ export const UserProfileMenu = () => {
   const handleRemovePhoto = async () => {
     if (!displayPhoto) return;
 
-    // Глобально обнуляем в Zustand
-  useAuthStore.setState((state) => ({
-    user: state.user
-      ? {
-          ...state.user,
-          user_metadata: { ...state.user.user_metadata, avatar_url: null, avatar_lqip: null }, // <-- добавил null
-        }
-      : null,
-  }));
+    // ИСПРАВЛЕНО: Меняем локально через новую функцию
+    updateProfileState({ avatar_url: null, avatar_lqip: null });
 
     if (newNickname.trim() === currentName.trim()) setIsEditModalOpen(false);
 
     try {
       await deleteOldStoragePhoto();
-      await supabase.auth.updateUser({ data: { avatar_url: null, avatar_lqip: null } });
+      // ИСПРАВЛЕНО: Обновляем таблицу profiles
+      await supabase
+        .from('profiles')
+        .update({ avatar_url: null, avatar_lqip: null })
+        .eq('id', user.id);
       toast.success('Фото удалено');
     } catch (error) {
       toast.error('Не удалось убрать фото');
@@ -162,24 +165,18 @@ export const UserProfileMenu = () => {
   const handleRestoreProviderPhoto = async () => {
     if (!providerAvatar) return;
 
-    useAuthStore.setState((state) => ({
-      user: state.user
-        ? {
-            ...state.user,
-            user_metadata: {
-              ...state.user.user_metadata,
-              avatar_url: providerAvatar,
-              avatar_lqip: null,
-            },
-          }
-        : null,
-    }));
+    // ИСПРАВЛЕНО: Меняем локально
+    updateProfileState({ avatar_url: providerAvatar, avatar_lqip: null });
 
     if (newNickname.trim() === currentName.trim()) setIsEditModalOpen(false);
 
     try {
       await deleteOldStoragePhoto();
-      await supabase.auth.updateUser({ data: { avatar_url: providerAvatar, avatar_lqip: null } });
+      // ИСПРАВЛЕНО: Обновляем таблицу profiles
+      await supabase
+        .from('profiles')
+        .update({ avatar_url: providerAvatar, avatar_lqip: null })
+        .eq('id', user.id);
       toast.success(`Фотография ${providerName} восстановлена!`);
     } catch (error) {
       toast.error('Не удалось вернуть фото');
@@ -209,18 +206,14 @@ export const UserProfileMenu = () => {
     ctx.scale(baseScale, baseScale);
     ctx.drawImage(image, -image.naturalWidth / 2, -image.naturalHeight / 2);
 
-    // --- НОВОЕ: Генерируем LQIP (Low Quality Image Placeholder) ---
     const lqipCanvas = document.createElement('canvas');
-    lqipCanvas.width = 16; // Крошечный размер
+    lqipCanvas.width = 16;
     lqipCanvas.height = 16;
     const lqipCtx = lqipCanvas.getContext('2d');
     if (lqipCtx) {
-      // Рисуем большую картинку на маленьком канвасе
       lqipCtx.drawImage(canvas, 0, 0, size, size, 0, 0, 16, 16);
     }
-    // Конвертируем в Base64 с очень сильным сжатием
     const lqipBase64 = lqipCanvas.toDataURL('image/webp', 0.2);
-    // -------------------------------------------------------------
 
     canvas.toBlob(
       async (blob) => {
@@ -231,19 +224,8 @@ export const UserProfileMenu = () => {
 
         const localUrl = URL.createObjectURL(blob);
 
-        // Обновляем Zustand мгновенно (и добавляем lqip в кэш!)
-        useAuthStore.setState((state) => ({
-          user: state.user
-            ? {
-                ...state.user,
-                user_metadata: {
-                  ...state.user.user_metadata,
-                  avatar_url: localUrl,
-                  avatar_lqip: lqipBase64, // <-- Сохраняем в Zustand
-                },
-              }
-            : null,
-        }));
+        // ИСПРАВЛЕНО: Обновляем мгновенно через новую функцию стейта
+        updateProfileState({ avatar_url: localUrl, avatar_lqip: lqipBase64 });
 
         setCropModalOpen(false);
         setImageSrc(null);
@@ -252,7 +234,6 @@ export const UserProfileMenu = () => {
           setIsEditModalOpen(false);
         }
 
-        // Фоновая загрузка
         try {
           const fileName = `${user.id}/${Date.now()}.webp`;
 
@@ -267,13 +248,14 @@ export const UserProfileMenu = () => {
 
           await deleteOldStoragePhoto();
 
-          // Обновляем пользователя (триггер базы данных автоматически скопирует это в таблицу profiles!)
-          await supabase.auth.updateUser({
-            data: {
+          // ИСПРАВЛЕНО: Сохраняем в таблицу profiles
+          await supabase
+            .from('profiles')
+            .update({
               avatar_url: newAvatarUrl,
-              avatar_lqip: lqipBase64, // <-- Улетает в БД
-            },
-          });
+              avatar_lqip: lqipBase64,
+            })
+            .eq('id', user.id);
         } catch (error) {
           toast.error('Не удалось сохранить фото на сервере');
         }

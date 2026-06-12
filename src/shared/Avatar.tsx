@@ -1,6 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { cn } from '@/app/utils/cn';
-import { getAvatarColor, getInitial, getOAuthLqipUrl } from '@/shared/utils/avatar'; // <-- импортируем утилиту
+import { getAvatarColor, getInitial, getOAuthLqipUrl } from '@/shared/utils/avatar';
+
+const ANIMATION_CONFIG = {
+  // Как часто меняется базовый цвет фона (в миллисекундах)
+  colorCycleIntervalMs: 2500,
+
+  // Плавность перетекания цвета фона, когда тогл ВКЛЮЧЕН (в мс)
+  bgTransitionGradientMs: 500,
+
+  // Плавность смены цвета при ручном НАБОРЕ текста (в мс)
+  bgTransitionTypingMs: 200,
+
+  // Плавность возврата цвета в спокойном состоянии (в мс)
+  bgTransitionIdleMs: 200,
+
+  // Скорость вращения градиентного пятна при НАБОРЕ текста
+  spinDurationFast: '5s',
+
+  // Скорость вращения градиентного пятна, когда тогл ВКЛЮЧЕН (фоновое)
+  spinDurationSlow: '5s',
+};
 
 interface AvatarProps {
   name: string;
@@ -10,27 +30,50 @@ interface AvatarProps {
   style?: React.CSSProperties;
   children?: React.ReactNode;
   enableTypingEffect?: boolean;
+  forceGradient?: boolean;
 }
 
 export const Avatar: React.FC<AvatarProps> = React.memo(
-  ({ name, src, lqip, className, style, children, enableTypingEffect = false }) => {
-    const bgColor = getAvatarColor(name);
+  ({
+    name,
+    src,
+    lqip,
+    className,
+    style,
+    children,
+    enableTypingEffect = false,
+    forceGradient = false,
+  }) => {
+    // Базовый цвет из хэша (меняется при вводе)
+    const bgColorHash = getAvatarColor(name);
     const initial = getInitial(name);
 
     const [isTyping, setIsTyping] = useState(false);
     const [highResLoaded, setHighResLoaded] = useState(false);
     const [hasError, setHasError] = useState(false);
 
+    // Стейт для цикличного цвета
+    const [autoColorIndex, setAutoColorIndex] = useState(1);
+
     const prevNameRef = useRef<string>(name);
     const isFirstMount = useRef(true);
 
-    // Сброс при смене исходника
+    // Логика цикличного изменения цвета, когда включен тогл
+    useEffect(() => {
+      if (!forceGradient) return;
+      const interval = setInterval(() => {
+        // Переключаем цвета от 1 до 7
+        setAutoColorIndex((prev) => (prev % 7) + 1);
+      }, ANIMATION_CONFIG.colorCycleIntervalMs);
+
+      return () => clearInterval(interval);
+    }, [forceGradient]);
+
     useEffect(() => {
       setHighResLoaded(false);
       setHasError(false);
     }, [src]);
 
-    // Анимация печати никнейма
     useEffect(() => {
       if (!enableTypingEffect) return;
 
@@ -47,19 +90,17 @@ export const Avatar: React.FC<AvatarProps> = React.memo(
       }
     }, [name, enableTypingEffect]);
 
-    // --- МАГИЯ ДЛЯ OAUTH LQIP ---
-    // Используем base64 (если есть) ИЛИ генерируем микро-ссылку (если это гугл/гитхаб)
     const computedLqip = lqip || getOAuthLqipUrl(src);
-
-    // --- ЖЕЛЕЗОБЕТОННАЯ ЛОГИКА СЛОЕВ ---
     const hasValidSrc = !!src && !hasError;
-
-    // Показываем LQIP, если есть src, есть computedLqip, и оригинал еще не загрузился
     const showLqip = hasValidSrc && !!computedLqip && !highResLoaded;
-
     const showHighRes = hasValidSrc && highResLoaded;
     const showFallback = !showLqip && !showHighRes;
-    const showSpinningGradient = enableTypingEffect && isTyping && !showHighRes;
+
+    const showSpinningGradient =
+      (enableTypingEffect && isTyping && !showHighRes) || (forceGradient && !showHighRes);
+
+    // Если тогл включен - берем цвет из цикла, иначе из хэша имени
+    const currentBgColor = forceGradient ? `var(--avatar-${autoColorIndex})` : bgColorHash;
 
     return (
       <div
@@ -68,25 +109,41 @@ export const Avatar: React.FC<AvatarProps> = React.memo(
           className,
         )}
         style={{
-          backgroundColor: showFallback ? bgColor : 'transparent',
+          // Подставляем вычисленный цвет
+          backgroundColor: showFallback ? currentBgColor : 'transparent',
+          // Используем константы для плавности перехода цвета
           transition: showHighRes
             ? 'transform 200ms ease-out'
             : isTyping
-              ? 'background-color 200ms ease-out, transform 200ms ease-out'
-              : 'background-color 1000ms cubic-bezier(0.4, 0, 0.2, 1), transform 200ms ease-out',
+              ? `background-color ${ANIMATION_CONFIG.bgTransitionTypingMs}ms ease-out, transform 200ms ease-out`
+              : forceGradient
+                ? `background-color ${ANIMATION_CONFIG.bgTransitionGradientMs}ms linear, transform 200ms ease-out`
+                : `background-color ${ANIMATION_CONFIG.bgTransitionIdleMs}ms cubic-bezier(0.4, 0, 0.2, 1), transform 200ms ease-out`,
           transform: 'translateZ(0)',
           ...style,
         }}
       >
         {/* СЛОЙ 1: Крутящийся брендовый градиент */}
-        {!showHighRes && enableTypingEffect && (
+        {!showHighRes && (enableTypingEffect || forceGradient) && (
           <div
             className={cn(
               'pointer-events-none absolute inset-0 z-0 overflow-hidden rounded-full transition-opacity ease-in-out',
               showSpinningGradient ? 'opacity-100 duration-200' : 'opacity-0 duration-1000',
             )}
           >
-            <div className="absolute inset-[-50%] translate-z-0 animate-[spin_5s_linear_infinite] bg-gradient-to-tr from-primary/70 via-accent/70 to-access-glow opacity-95 blur-xl will-change-transform" />
+            {/* Крутящееся пятно */}
+            <div
+              className={cn(
+                'absolute inset-[-50%] translate-z-0 animate-spin bg-gradient-to-tr from-primary/70 via-accent/70 to-access-glow opacity-95 blur-xl will-change-transform',
+              )}
+              style={{
+                // Динамическая смена скорости вращения
+                animationDuration:
+                  forceGradient && !isTyping
+                    ? ANIMATION_CONFIG.spinDurationSlow
+                    : ANIMATION_CONFIG.spinDurationFast,
+              }}
+            />
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.65)_0%,transparent_70%)] mix-blend-overlay" />
             <div className="absolute inset-0 bg-white/15 mix-blend-overlay" />
           </div>
@@ -109,7 +166,6 @@ export const Avatar: React.FC<AvatarProps> = React.memo(
         {/* СЛОЙ 3: Изображения */}
         {hasValidSrc && (
           <div className="pointer-events-none absolute inset-0 z-20 h-full w-full overflow-hidden rounded-full">
-            {/* А. Мгновенный LQIP (base64 или мини-URL) */}
             {showLqip && (
               <img
                 src={computedLqip}
@@ -122,8 +178,6 @@ export const Avatar: React.FC<AvatarProps> = React.memo(
                 }}
               />
             )}
-
-            {/* Б. Полноразмерное изображение */}
             <img
               src={src}
               alt={name}

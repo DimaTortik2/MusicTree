@@ -17,6 +17,7 @@ import { Button } from '@/shared/buttons/Button';
 import { Avatar } from '@/shared/Avatar';
 import { toast } from '@/app/utils/toast';
 import { cn } from '@/app/utils/cn';
+import { Toggle } from '@/shared/Toggle';
 
 export const UserProfileMenu = () => {
   // ДОБАВИЛИ: profile и updateProfileState из стора
@@ -355,12 +356,12 @@ export const UserProfileMenu = () => {
 
   return (
     <>
-   
       <div className="mb-8 flex w-full items-center gap-4 overflow-hidden">
         <Avatar
           src={displayPhoto}
           name={currentName}
           lqip={displayLqip}
+          forceGradient={!!profile?.use_gradient}
           className="size-20 shrink-0 text-3xl font-medium shadow-sm sm:size-24"
         />
 
@@ -438,6 +439,7 @@ export const UserProfileMenu = () => {
               name={newNickname || currentName}
               src={displayPhoto}
               lqip={displayLqip}
+              forceGradient={!!profile?.use_gradient}
               className="group size-32 cursor-pointer text-5xl transition-transform duration-300"
               style={{ transform: isDragActive ? 'scale(1.05)' : 'scale(1)' }}
               enableTypingEffect={true}
@@ -506,6 +508,27 @@ export const UserProfileMenu = () => {
               className="w-full border-b-2 border-accent bg-transparent pb-2.5 text-2xl font-medium text-text transition-colors outline-none focus:border-accent disabled:opacity-50"
             />
           </div>
+
+          {profile?.can_use_gradient && !displayPhoto && (
+            <div className="mt-2 flex items-center justify-between rounded-[16px] border border-surface bg-background/50 p-4">
+              <div className="flex flex-col gap-1">
+                <span className="text-base font-medium text-text">Анимированный градиент</span>
+                <span className="text-sm text-text/50">Постоянное медленное переливание</span>
+              </div>
+              <Toggle
+                checked={!!profile.use_gradient}
+                onCheckedChange={async (newVal) => {
+                  // Меняем локально мгновенно
+                  updateProfileState({ use_gradient: newVal });
+                  // Отправляем в бд
+                  await supabase
+                    .from('profiles')
+                    .update({ use_gradient: newVal })
+                    .eq('id', user.id);
+                }}
+              />
+            </div>
+          )}
 
           <div className="mt-4 flex w-full flex-col-reverse gap-3 sm:flex-row sm:justify-end sm:gap-3.5">
             <Button

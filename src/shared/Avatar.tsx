@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { cn } from '@/app/utils/cn';
-import { getAvatarColor, getInitial, getOAuthLqipUrl } from '@/shared/utils/avatar'; // <-- импортируем утилиту
+import { getAvatarColor, getInitial, getOAuthLqipUrl } from '@/shared/utils/avatar';
 
 interface AvatarProps {
   name: string;
@@ -17,20 +17,22 @@ export const Avatar: React.FC<AvatarProps> = React.memo(
     const bgColor = getAvatarColor(name);
     const initial = getInitial(name);
 
+    const computedLqip = lqip || getOAuthLqipUrl(src);
+
     const [isTyping, setIsTyping] = useState(false);
     const [highResLoaded, setHighResLoaded] = useState(false);
+    const [lqipLoaded, setLqipLoaded] = useState(!!computedLqip?.startsWith('data:'));
     const [hasError, setHasError] = useState(false);
 
     const prevNameRef = useRef<string>(name);
     const isFirstMount = useRef(true);
 
-    // Сброс при смене исходника
     useEffect(() => {
       setHighResLoaded(false);
       setHasError(false);
-    }, [src]);
+      setLqipLoaded(!!computedLqip?.startsWith('data:'));
+    }, [src, computedLqip]);
 
-    // Анимация печати никнейма
     useEffect(() => {
       if (!enableTypingEffect) return;
 
@@ -47,18 +49,12 @@ export const Avatar: React.FC<AvatarProps> = React.memo(
       }
     }, [name, enableTypingEffect]);
 
-    // --- МАГИЯ ДЛЯ OAUTH LQIP ---
-    // Используем base64 (если есть) ИЛИ генерируем микро-ссылку (если это гугл/гитхаб)
-    const computedLqip = lqip || getOAuthLqipUrl(src);
-
-    // --- ЖЕЛЕЗОБЕТОННАЯ ЛОГИКА СЛОЕВ ---
     const hasValidSrc = !!src && !hasError;
-
-    // Показываем LQIP, если есть src, есть computedLqip, и оригинал еще не загрузился
-    const showLqip = hasValidSrc && !!computedLqip && !highResLoaded;
-
     const showHighRes = hasValidSrc && highResLoaded;
-    const showFallback = !showLqip && !showHighRes;
+
+    // Фолбэк (кружок с цветом и буквой) показываем ТОЛЬКО если у нас еще нет НИ ОДНОЙ картинки
+    const showFallback = !hasValidSrc || (!lqipLoaded && !highResLoaded);
+
     const showSpinningGradient = enableTypingEffect && isTyping && !showHighRes;
 
     return (
@@ -68,12 +64,7 @@ export const Avatar: React.FC<AvatarProps> = React.memo(
           className,
         )}
         style={{
-          backgroundColor: showFallback ? bgColor : 'transparent',
-          transition: showHighRes
-            ? 'transform 200ms ease-out'
-            : isTyping
-              ? 'background-color 200ms ease-out, transform 200ms ease-out'
-              : 'background-color 1000ms cubic-bezier(0.4, 0, 0.2, 1), transform 200ms ease-out',
+          // УБРАЛИ background-color ОТСЮДА! Больше никаких рамок по краям.
           transform: 'translateZ(0)',
           ...style,
         }}
@@ -92,11 +83,18 @@ export const Avatar: React.FC<AvatarProps> = React.memo(
           </div>
         )}
 
-        {/* СЛОЙ 2: Инициалы */}
-        {showFallback && (
+        {/* СЛОЙ 2: Фолбэк (Фон + Инициалы) */}
+        {/* Как только картинка загрузится (даже мыльная), этот слой станет opacity-0 и рамка исчезнет */}
+        <div
+          className={cn(
+            'absolute inset-0 z-10 flex items-center justify-center transition-opacity duration-500 ease-out',
+            showFallback ? 'opacity-100' : 'opacity-0',
+          )}
+          style={{ backgroundColor: bgColor }}
+        >
           <span
             className={cn(
-              'ease-out-quint z-10 font-medium transition-all',
+              'ease-out-quint font-medium transition-all',
               isTyping && enableTypingEffect
                 ? 'scale-[0.96] text-white/90 opacity-85 duration-200'
                 : 'scale-100 opacity-100 duration-600',
@@ -104,17 +102,21 @@ export const Avatar: React.FC<AvatarProps> = React.memo(
           >
             {initial}
           </span>
-        )}
+        </div>
 
         {/* СЛОЙ 3: Изображения */}
         {hasValidSrc && (
-          <div className="pointer-events-none absolute inset-0 z-20 h-full w-full overflow-hidden rounded-full">
-            {/* А. Мгновенный LQIP (base64 или мини-URL) */}
-            {showLqip && (
+          <div className="pointer-events-none absolute inset-0 z-20 h-full w-full rounded-full">
+            {/* А. Размытый превью (base64 или мини-URL) */}
+            {!!computedLqip && (
               <img
                 src={computedLqip}
                 alt=""
-                className="absolute inset-0 h-full w-full object-cover blur-md"
+                onLoad={() => setLqipLoaded(true)}
+                className={cn(
+                  'absolute inset-0 z-10 h-full w-full object-cover blur-md transition-opacity duration-300 ease-out',
+                  lqipLoaded ? 'opacity-100' : 'opacity-0',
+                )}
                 style={{
                   transform: 'scale(1.5) translateZ(0)',
                   backfaceVisibility: 'hidden',
@@ -132,8 +134,8 @@ export const Avatar: React.FC<AvatarProps> = React.memo(
               onLoad={() => setHighResLoaded(true)}
               onError={() => setHasError(true)}
               className={cn(
-                'absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ease-out',
-                highResLoaded ? 'opacity-100' : 'opacity-0',
+                'absolute inset-0 z-20 h-full w-full object-cover transition-opacity duration-500 ease-out',
+                showHighRes ? 'opacity-100' : 'opacity-0',
               )}
               style={{
                 transform: 'scale(1.01) translateZ(0)',

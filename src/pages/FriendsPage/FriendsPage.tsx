@@ -12,7 +12,8 @@ import {
   List as SidebarSimple,
 } from '@phosphor-icons/react';
 import { useAuthStore } from '@/app/store/authStore';
-import { Avatar } from '@/shared/Avatar';
+// 1. ИМПОРТИРУЕМ НАШ НОВЫЙ UserAvatar ВМЕСТО Avatar
+import { UserAvatar } from '@/shared/UserAvatar';
 import { Modal } from '@/shared/Modal';
 import { Button } from '@/shared/buttons/Button';
 import { useFriends, type FriendProfile } from '@/features/friends/hooks/useFriends';
@@ -20,10 +21,13 @@ import { MobileSidebarPortal } from '@/shared/MobileSidebarPortal';
 import { toast } from '@/app/utils/toast';
 import { QrShareModal } from '@/pages/FriendsPage/QrShareModal';
 import { QrScannerModal } from '@/pages/FriendsPage/QrScannerModal';
-
+// 2. ИМПОРТ usePresenceStore БОЛЬШЕ НЕ НУЖЕН, УДАЛИЛИ ЕГО!
 
 export function FriendsPage() {
   const { profile } = useAuthStore();
+
+  // 3. УБРАЛИ СТРОКУ С onlineUsers ИЗ ЗУСТАНДА
+
   const {
     friends,
     notifications,
@@ -46,7 +50,6 @@ export function FriendsPage() {
   const displayList = searchQuery.trim() ? searchResults : friends;
   const isSearchMode = !!searchQuery.trim();
 
-  // 1. СНАЧАЛА ОБЪЯВЛЯЕМ ФУНКЦИЮ
   const handleAddByUsername = async (targetUsername: string) => {
     if (targetUsername === profile?.username) {
       toast.error('Вы не можете добавить самого себя');
@@ -74,9 +77,6 @@ export function FriendsPage() {
     }
   };
 
-  // 2. ДАЛЕЕ ИДУТ ЭФФЕКТЫ
-
-  // Debounce для ручного поиска
   useEffect(() => {
     const timer = setTimeout(() => {
       searchUsers(searchQuery);
@@ -86,22 +86,20 @@ export function FriendsPage() {
 
   const processedAddParam = useRef<string | null>(null);
 
-  // Обработка перехода по ссылке
   useEffect(() => {
     const addUsername = searchParams.get('add');
 
-    // Проверяем, что есть профиль и мы еще не обрабатывали этот username в этом рендере
     if (addUsername && profile && processedAddParam.current !== addUsername) {
-      processedAddParam.current = addUsername; // Лочим от повторных вызовов
+      processedAddParam.current = addUsername;
 
-      handleAddByUsername(addUsername); // Теперь функция 100% существует
+      handleAddByUsername(addUsername);
 
-      // Чисто удаляем параметр, не трогая другие
       const newParams = new URLSearchParams(searchParams);
       newParams.delete('add');
       setSearchParams(newParams, { replace: true });
     }
-  }, [searchParams, profile, setSearchParams]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [searchParams, profile, setSearchParams]);
+
   const sidebarContent = (
     <div className="flex min-h-0 w-full flex-1 flex-col px-6 pt-6 pb-24 md:h-full md:w-[340px] md:flex-none md:border-r-[3px] md:border-line md:bg-background/50">
       <h2 className="mb-6 text-2xl font-medium text-text">Ваши уведомления</h2>
@@ -128,7 +126,9 @@ export function FriendsPage() {
               className="flex flex-col rounded-2xl border-3 border-primary bg-transparent p-4 transition-colors"
             >
               <div className="flex items-center gap-3">
-                <Avatar
+                {/* ЗАМЕНА 1: Уведомления */}
+                <UserAvatar
+                  userId={notif.sender?.id}
                   name={notif.sender?.full_name || 'Удаленный аккаунт'}
                   src={notif.sender?.avatar_url}
                   lqip={notif.sender?.avatar_lqip}
@@ -254,7 +254,10 @@ export function FriendsPage() {
                   className="flex items-center justify-between rounded-2xl border-3 border-primary bg-transparent p-3 sm:p-4"
                 >
                   <div className="flex items-center gap-4 overflow-hidden">
-                    <Avatar
+                    {/* ЗАМЕНА 2: Главный список друзей.
+                        Убрали isOnline={isOnline}, просто передали userId={person.id} */}
+                    <UserAvatar
+                      userId={person.id}
                       name={person.full_name || 'User'}
                       src={person.avatar_url}
                       lqip={person.avatar_lqip}
@@ -291,7 +294,6 @@ export function FriendsPage() {
         </div>
       </main>
 
-      {/* Вынесенные модалки QR */}
       <QrShareModal
         isOpen={isQrShareOpen}
         onClose={() => setIsQrShareOpen(false)}
@@ -318,7 +320,9 @@ export function FriendsPage() {
           </span>
           {userToRemove && (
             <div className="flex items-center gap-4 border-l-3 border-primary pl-4">
-              <Avatar
+              {/* ЗАМЕНА 3: Аватарка в модалке подтверждения */}
+              <UserAvatar
+                userId={userToRemove.id}
                 name={userToRemove.full_name || 'User'}
                 src={userToRemove.avatar_url}
                 forceGradient={userToRemove.use_gradient}

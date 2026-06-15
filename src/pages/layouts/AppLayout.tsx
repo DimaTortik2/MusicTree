@@ -16,6 +16,7 @@ import { Tooltip } from '@/shared/Tooltip';
 import { AmbientGlow } from '@/shared/AmbientGlow';
 import { useCloudSync } from '@/shared/hooks/useCloudSync';
 import { AuthLoader } from '@/app/providers/AuthRoutes';
+import { useAppPresence } from '@/app/hooks/useAppPresence';
 
 const TAB_ROUTES: Record<string, string> = {
   tree: '/app/tree',
@@ -81,6 +82,7 @@ export const AppLayout = () => {
   const outlet = useOutlet();
 
   useGlobalPiano();
+  useAppPresence();
 
   // ✨ Слушаем ресайз окна для переключения типа анимации
   useEffect(() => {

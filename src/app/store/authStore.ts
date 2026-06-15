@@ -11,6 +11,7 @@ export interface UserProfile {
   can_upload_avatar: boolean;
   can_use_gradient: boolean;
   use_gradient: boolean;
+  can_use_presence: boolean;
 }
 
 interface AuthState {
@@ -43,7 +44,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { data } = await supabase
         .from('profiles')
         .select(
-          'full_name, avatar_url, avatar_lqip, can_upload_avatar, can_use_gradient, use_gradient, username',
+          'full_name, avatar_url, avatar_lqip, can_upload_avatar, can_use_gradient, use_gradient, username, can_use_presence',
         )
         .eq('id', userId)
         .single();

@@ -17,7 +17,7 @@ export interface AppNotification {
 
 // ДОБАВИЛИ username
 const PROFILE_FIELDS =
-  'id, full_name, avatar_url, avatar_lqip, username, can_upload_avatar, can_use_gradient, use_gradient';
+  'id, full_name, avatar_url, avatar_lqip, username, can_upload_avatar, can_use_gradient, use_gradient, can_use_presence';
 
 export const useFriends = () => {
   const { user } = useAuthStore();

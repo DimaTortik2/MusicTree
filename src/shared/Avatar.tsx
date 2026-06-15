@@ -31,6 +31,7 @@ interface AvatarProps {
   children?: React.ReactNode;
   enableTypingEffect?: boolean;
   forceGradient?: boolean;
+  isOnline?: boolean;
 }
 
 export const Avatar: React.FC<AvatarProps> = React.memo(
@@ -43,6 +44,7 @@ export const Avatar: React.FC<AvatarProps> = React.memo(
     children,
     enableTypingEffect = false,
     forceGradient = false,
+    isOnline = false,
   }) => {
     // Базовый цвет из хэша (меняется при вводе)
     const bgColorHash = getAvatarColor(name);
@@ -105,7 +107,7 @@ export const Avatar: React.FC<AvatarProps> = React.memo(
     return (
       <div
         className={cn(
-          'relative isolate flex shrink-0 items-center justify-center overflow-hidden rounded-full text-white',
+          'relative isolate flex shrink-0 items-center justify-center rounded-full text-white',
           className,
         )}
         style={{
@@ -203,6 +205,10 @@ export const Avatar: React.FC<AvatarProps> = React.memo(
           <div className="pointer-events-auto absolute inset-0 z-30 flex items-center justify-center">
             {children}
           </div>
+        )}
+        {/* СЛОЙ 5: Индикатор онлайна */}
+        {isOnline && (
+          <div className="absolute top-[2px] right-[2px] z-40 size-[12px] rounded-full border-2 border-background bg-access shadow-sm sm:top-[3px] sm:right-[3px] sm:size-[14px]" />
         )}
       </div>
     );

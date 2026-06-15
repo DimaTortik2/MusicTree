@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import QRCode from 'react-qr-code';
 import { useSearchParams } from 'react-router-dom';
-import { Scanner, type IDetectedBarcode } from '@yudiel/react-qr-scanner';
 import { supabase } from '@/shared/lib/supabase';
 import {
   UserMinus,
@@ -11,10 +9,7 @@ import {
   QrCode,
   Check,
   X,
-  Scan,
-  ShareNetwork,
   List as SidebarSimple,
-  CameraSlash, // Иконка для экрана ошибки камеры
 } from '@phosphor-icons/react';
 import { useAuthStore } from '@/app/store/authStore';
 import { Avatar } from '@/shared/Avatar';
@@ -23,6 +18,9 @@ import { Button } from '@/shared/buttons/Button';
 import { useFriends, type FriendProfile } from '@/features/friends/hooks/useFriends';
 import { MobileSidebarPortal } from '@/shared/MobileSidebarPortal';
 import { toast } from '@/app/utils/toast';
+import { QrShareModal } from '@/pages/FriendsPage/QrShareModal';
+import { QrScannerModal } from '@/pages/FriendsPage/QrScannerModal';
+
 
 export function FriendsPage() {
   const { profile } = useAuthStore();
@@ -41,34 +39,14 @@ export function FriendsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [userToRemove, setUserToRemove] = useState<FriendProfile | null>(null);
-  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
 
-  // Стейты для камеры
-  const [isScannerOpen, setIsScannerOpen] = useState(false);
-  const [cameraError, setCameraError] = useState<string | null>(null);
-  const isProcessingScan = useRef(false);
-
-  // Debounce для ручного поиска
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      searchUsers(searchQuery);
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
-
-  // Обработка перехода по ссылке
-  useEffect(() => {
-    const addUsername = searchParams.get('add');
-    if (addUsername && profile) {
-      handleAddByUsername(addUsername);
-      searchParams.delete('add');
-      setSearchParams(searchParams, { replace: true });
-    }
-  }, [searchParams, profile]);
+  const [isQrShareOpen, setIsQrShareOpen] = useState(false);
+  const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
 
   const displayList = searchQuery.trim() ? searchResults : friends;
   const isSearchMode = !!searchQuery.trim();
 
+  // 1. СНАЧАЛА ОБЪЯВЛЯЕМ ФУНКЦИЮ
   const handleAddByUsername = async (targetUsername: string) => {
     if (targetUsername === profile?.username) {
       toast.error('Вы не можете добавить самого себя');
@@ -96,41 +74,34 @@ export function FriendsPage() {
     }
   };
 
-  const handleShareQR = () => {
-    if (navigator.share) {
-      navigator
-        .share({
-          title: 'Добавь меня в друзья в Music Tree!',
-          url: `${window.location.origin}/app/friends?add=${profile?.username}`,
-        })
-        .catch(console.error);
+  // 2. ДАЛЕЕ ИДУТ ЭФФЕКТЫ
+
+  // Debounce для ручного поиска
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      searchUsers(searchQuery);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const processedAddParam = useRef<string | null>(null);
+
+  // Обработка перехода по ссылке
+  useEffect(() => {
+    const addUsername = searchParams.get('add');
+
+    // Проверяем, что есть профиль и мы еще не обрабатывали этот username в этом рендере
+    if (addUsername && profile && processedAddParam.current !== addUsername) {
+      processedAddParam.current = addUsername; // Лочим от повторных вызовов
+
+      handleAddByUsername(addUsername); // Теперь функция 100% существует
+
+      // Чисто удаляем параметр, не трогая другие
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete('add');
+      setSearchParams(newParams, { replace: true });
     }
-  };
-
-  // Плавное закрытие сканера с очисткой ошибки
-  const closeScanner = () => {
-    setIsScannerOpen(false);
-    setTimeout(() => setCameraError(null), 300);
-  };
-
-  // Обработка ошибок доступа к камере
-  const handleCameraError = (error: unknown) => {
-    console.error('Ошибка сканера:', error);
-    const err = error as Error;
-
-    if (err?.name === 'NotAllowedError') {
-      setCameraError('Доступ к камере запрещен. Разрешите его в настройках вашего браузера.');
-    } else if (err?.name === 'NotFoundError') {
-      setCameraError('Камера не найдена на вашем устройстве.');
-    } else if (err?.name === 'NotReadableError' || err?.name === 'TrackStartError') {
-      setCameraError('Камера в данный момент используется другим приложением.');
-    } else {
-      setCameraError(
-        'Мессенджер или браузер блокирует камеру. Откройте ссылку в стандартном браузере (Safari / Chrome).',
-      );
-    }
-  };
-
+  }, [searchParams, profile, setSearchParams]); // eslint-disable-line react-hooks/exhaustive-deps
   const sidebarContent = (
     <div className="flex min-h-0 w-full flex-1 flex-col px-6 pt-6 pb-24 md:h-full md:w-[340px] md:flex-none md:border-r-[3px] md:border-line md:bg-background/50">
       <h2 className="mb-6 text-2xl font-medium text-text">Ваши уведомления</h2>
@@ -218,10 +189,8 @@ export function FriendsPage() {
 
   return (
     <div className="flex h-screen w-full overflow-hidden font-sans text-text">
-      {/* Десктопный сайдбар */}
       <aside className="hidden h-full shrink-0 flex-col md:flex">{sidebarContent}</aside>
 
-      {/* Мобильный сайдбар */}
       <MobileSidebarPortal
         isOpen={isMobileSidebarOpen}
         onClose={() => setIsMobileSidebarOpen(false)}
@@ -239,7 +208,6 @@ export function FriendsPage() {
           </button>
         </div>
 
-        {/* Поиск */}
         <div className="relative w-full max-w-xl">
           <div className="absolute inset-y-0 left-0 flex items-center pl-4">
             <MagnifyingGlass size={22} className="text-primary" weight="bold" />
@@ -253,7 +221,7 @@ export function FriendsPage() {
           />
           <div className="absolute inset-y-0 right-0 flex items-center pr-2">
             <button
-              onClick={() => setIsQrModalOpen(true)}
+              onClick={() => setIsQrShareOpen(true)}
               className="flex size-9 cursor-pointer items-center justify-center rounded-lg bg-text/20 text-text transition-all outline-none hover:bg-text hover:text-surface"
             >
               <QrCode size={20} weight="fill" />
@@ -261,7 +229,6 @@ export function FriendsPage() {
           </div>
         </div>
 
-        {/* Список друзей / результатов */}
         <div className="custom-scroll mt-8 flex w-full max-w-xl flex-1 flex-col gap-4 overflow-y-auto">
           <AnimatePresence mode="popLayout">
             {displayList.length === 0 && (
@@ -324,6 +291,20 @@ export function FriendsPage() {
         </div>
       </main>
 
+      {/* Вынесенные модалки QR */}
+      <QrShareModal
+        isOpen={isQrShareOpen}
+        onClose={() => setIsQrShareOpen(false)}
+        username={profile?.username}
+        onOpenScanner={() => setIsQrScannerOpen(true)}
+      />
+
+      <QrScannerModal
+        isOpen={isQrScannerOpen}
+        onClose={() => setIsQrScannerOpen(false)}
+        onScanSuccess={handleAddByUsername}
+      />
+
       {/* Модалка удаления друга */}
       <Modal
         isOpen={!!userToRemove}
@@ -335,7 +316,6 @@ export function FriendsPage() {
           <span className="text-base font-normal text-text">
             Вы действительно хотите убрать из списка друзей?
           </span>
-
           {userToRemove && (
             <div className="flex items-center gap-4 border-l-3 border-primary pl-4">
               <Avatar
@@ -350,7 +330,6 @@ export function FriendsPage() {
               </div>
             </div>
           )}
-
           <div className="mt-4 flex w-full flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <Button
               variant="outline"
@@ -373,132 +352,6 @@ export function FriendsPage() {
             >
               Удалить
             </Button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Модалка с личным QR Кодом */}
-      <Modal
-        isOpen={isQrModalOpen}
-        onClose={() => setIsQrModalOpen(false)}
-        layout="vertical"
-        className="max-w-sm rounded-[32px] bg-surface !p-6"
-      >
-        <div className="relative flex flex-col items-center">
-          <button
-            onClick={() => setIsQrModalOpen(false)}
-            className="absolute top-0 right-0 p-2 text-text/40 transition-colors hover:text-text"
-          >
-            <X size={24} weight="bold" />
-          </button>
-
-          <div className="mt-8 mb-8 rounded-2xl bg-white p-4">
-            <QRCode
-              value={`${window.location.origin}/app/friends?add=${profile?.username}`}
-              size={200}
-            />
-          </div>
-
-          <Button
-            variant="outline"
-            color="text"
-            onClick={handleShareQR}
-            className="w-full gap-2 rounded-2xl border-3 py-4"
-          >
-            <ShareNetwork size={20} weight="bold" />
-            Поделиться
-          </Button>
-
-          <Button
-            variant="solid"
-            color="primary"
-            onClick={() => {
-              setIsQrModalOpen(false);
-              setIsScannerOpen(true);
-            }}
-            className="mt-3 w-full gap-2 rounded-2xl md:hidden"
-          >
-            <Scan size={20} weight="bold" />
-            Сканировать QR-код
-          </Button>
-        </div>
-      </Modal>
-
-      {/* Модалка со Сканером */}
-      <Modal
-        isOpen={isScannerOpen}
-        onClose={closeScanner}
-        layout="vertical"
-        className="overflow-hidden !bg-black/95 !p-0 sm:max-w-md sm:rounded-[32px]"
-      >
-        <div className="relative flex h-[70vh] w-full flex-col bg-black sm:h-[500px]">
-          {/* Хедер сканера поверх */}
-          <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between bg-gradient-to-b from-black/80 to-transparent p-4">
-            <span className="font-medium text-white shadow-black drop-shadow-md">
-              Наведите на QR-код
-            </span>
-            <button
-              onClick={closeScanner}
-              className="rounded-full bg-white/20 p-2 text-white backdrop-blur-md transition-colors hover:bg-white/30"
-            >
-              <X size={20} weight="bold" />
-            </button>
-          </div>
-
-          <div className="relative h-full w-full">
-            {/* Ошибка камеры */}
-            {cameraError ? (
-              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-surface p-6 text-center">
-                <CameraSlash size={56} className="mb-4 text-primary" weight="duotone" />
-                <p className="mb-2 text-xl font-medium text-text">Камера недоступна</p>
-                <p className="mb-8 text-sm leading-relaxed text-text/60">{cameraError}</p>
-                <Button variant="solid" color="primary" onClick={closeScanner}>
-                  Понятно
-                </Button>
-                <p className="mt-6 px-4 text-xs text-text/40">
-                  Подсказка: нажмите на три точки в углу экрана и выберите «Открыть в браузере».
-                </p>
-              </div>
-            ) : (
-              /* Сам сканер */
-              isScannerOpen && (
-                <Scanner
-                  onScan={(detectedCodes: IDetectedBarcode[]) => {
-                    if (isProcessingScan.current) return;
-
-                    if (detectedCodes && detectedCodes.length > 0) {
-                      const url = detectedCodes[0].rawValue;
-                      try {
-                        const parsedUrl = new URL(url);
-                        const scannedUsername = parsedUrl.searchParams.get('add');
-
-                        if (scannedUsername) {
-                          isProcessingScan.current = true;
-                          closeScanner();
-
-                          handleAddByUsername(scannedUsername).finally(() => {
-                            setTimeout(() => {
-                              isProcessingScan.current = false;
-                            }, 1000);
-                          });
-                        } else {
-                          toast.error('Это не QR-код Music Tree');
-                        }
-                      } catch {
-                        toast.error('Неверный формат QR-кода');
-                      }
-                    }
-                  }}
-                  onError={(error) => handleCameraError(error)} // <-- ОБРАБОТЧИК ОШИБКИ
-                  components={{
-                    finder: true,
-                  }}
-                  styles={{
-                    container: { width: '100%', height: '100%' },
-                  }}
-                />
-              )
-            )}
           </div>
         </div>
       </Modal>

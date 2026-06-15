@@ -15,7 +15,7 @@ import { VocalTunerPage } from '@/features/VocalTunerPage';
 import { PublicRoute } from '@/app/providers/AuthRoutes';
 import { AuthPage } from '@/pages/Auth/AuthPage';
 import { UpdatePasswordPage } from '@/pages/Auth/UpdatePasswordPage';
-import { FriendsPage } from '@/pages/FriendsPage';
+import { FriendsPage } from '@/pages/FriendsPage/FriendsPage';
 
 export const router = createBrowserRouter([
   {

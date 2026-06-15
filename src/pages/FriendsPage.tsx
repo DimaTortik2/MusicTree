@@ -1,6 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import QRCode from 'react-qr-code';
+import { useSearchParams } from 'react-router-dom'; // ДОБАВИЛИ для парсинга URL
+import { Scanner, type IDetectedBarcode } from '@yudiel/react-qr-scanner'; // ДОБАВИЛИ сканер
+import { supabase } from '@/shared/lib/supabase'; // ДОБАВИЛИ для поиска юзера по QR
 import {
   UserMinus,
   UserPlus,
@@ -18,9 +21,9 @@ import { Modal } from '@/shared/Modal';
 import { Button } from '@/shared/buttons/Button';
 import { useFriends, type FriendProfile } from '@/features/friends/hooks/useFriends';
 import { MobileSidebarPortal } from '@/shared/MobileSidebarPortal';
+import { toast } from '@/app/utils/toast';
 
 export function FriendsPage() {
-  // ИСПРАВЛЕНО: Добавили profile сюда
   const { profile } = useAuthStore();
   const {
     friends,
@@ -33,12 +36,17 @@ export function FriendsPage() {
     dismissNotification,
   } = useFriends();
 
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [userToRemove, setUserToRemove] = useState<FriendProfile | null>(null);
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
 
-  // Debounce для поиска
+  // Новые стейты для камеры
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const isProcessingScan = useRef(false); // Защита от двойного сканирования
+
+  // Debounce для ручного поиска
   useEffect(() => {
     const timer = setTimeout(() => {
       searchUsers(searchQuery);
@@ -46,15 +54,57 @@ export function FriendsPage() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  // Обработка перехода по ссылке (если отсканировали штатной камерой телефона)
+  useEffect(() => {
+    const addUsername = searchParams.get('add');
+    if (addUsername && profile) {
+      handleAddByUsername(addUsername);
+      // Очищаем URL, чтобы при рефреше не отправлялось заново
+      searchParams.delete('add');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, profile]);
+
   const displayList = searchQuery.trim() ? searchResults : friends;
   const isSearchMode = !!searchQuery.trim();
+
+  // ГЛАВНАЯ ФУНКЦИЯ ДОБАВЛЕНИЯ (Используется и URL и Сканером)
+  const handleAddByUsername = async (targetUsername: string) => {
+    if (targetUsername === profile?.username) {
+      toast.error('Вы не можете добавить самого себя');
+      return;
+    }
+
+    // Ищем юзера по юзернейму через наш безопасный RPC
+    const { data } = await supabase.rpc('search_users_secure', {
+      search_query: targetUsername,
+    });
+
+    if (data && data.length > 0) {
+      // Ищем точное совпадение
+      const targetUser = data.find((u: any) => u.username === targetUsername);
+
+      if (targetUser) {
+        // Проверяем, не в друзьях ли он уже
+        if (friends.some((f) => f.id === targetUser.id)) {
+          toast.info('Пользователь уже у вас в друзьях');
+        } else {
+          await sendRequest(targetUser.id);
+          // Уведомление об успехе вызывается внутри sendRequest, дублировать не нужно
+        }
+      } else {
+        toast.error('Пользователь не найден');
+      }
+    } else {
+      toast.error('Пользователь не найден');
+    }
+  };
 
   const handleShareQR = () => {
     if (navigator.share) {
       navigator
         .share({
           title: 'Добавь меня в друзья в Music Tree!',
-          // Используем username для шеринга
           url: `${window.location.origin}/app/friends?add=${profile?.username}`,
         })
         .catch(console.error);
@@ -160,7 +210,6 @@ export function FriendsPage() {
       </MobileSidebarPortal>
 
       <main className="relative flex flex-1 flex-col items-center px-4 pt-20 pb-24 md:pt-24">
-        {/* Кнопка открытия мобильного сайдбара */}
         <div className="absolute top-6 left-5 z-10 md:hidden">
           <button
             onClick={() => setIsMobileSidebarOpen(true)}
@@ -206,7 +255,6 @@ export function FriendsPage() {
             )}
 
             {displayList.map((person) => {
-              // ИСПРАВЛЕНО: Проверяем, в друзьях ли уже этот человек (важно для поиска)
               const isAlreadyFriend = friends.some((f) => f.id === person.id);
 
               return (
@@ -234,7 +282,6 @@ export function FriendsPage() {
                     </div>
                   </div>
 
-                  {/* ИСПРАВЛЕНО: Правильная логика показа иконок + и - */}
                   {isSearchMode && !isAlreadyFriend ? (
                     <button
                       onClick={() => sendRequest(person.id)}
@@ -279,7 +326,6 @@ export function FriendsPage() {
               />
               <div className="flex flex-col">
                 <span className="text-lg font-medium text-text">{userToRemove.full_name}</span>
-                {/* ИСПРАВЛЕНО: Теперь тут красивый username */}
                 <span className="text-sm text-text/40">@{userToRemove.username}</span>
               </div>
             </div>
@@ -311,7 +357,7 @@ export function FriendsPage() {
         </div>
       </Modal>
 
-      {/* Модалка QR Кода */}
+      {/* Модалка с личным QR Кодом */}
       <Modal
         isOpen={isQrModalOpen}
         onClose={() => setIsQrModalOpen(false)}
@@ -343,15 +389,83 @@ export function FriendsPage() {
             Поделиться
           </Button>
 
-          {/* Только на мобилках */}
+          {/* Кнопка сканирования */}
           <Button
             variant="solid"
             color="primary"
+            onClick={() => {
+              setIsQrModalOpen(false);
+              setIsScannerOpen(true);
+            }}
             className="mt-3 w-full gap-2 rounded-2xl md:hidden"
           >
             <Scan size={20} weight="bold" />
             Сканировать QR-код
           </Button>
+        </div>
+      </Modal>
+
+      {/* Модалка со Сканером (Telegram Style) */}
+      <Modal
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        layout="vertical"
+        className="overflow-hidden !bg-black/90 !p-0 sm:max-w-md sm:rounded-[32px]"
+      >
+        <div className="relative flex h-[70vh] w-full flex-col bg-black sm:h-[500px]">
+          {/* Хедер сканера поверх камеры */}
+          <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between bg-gradient-to-b from-black/60 to-transparent p-4">
+            <span className="font-medium text-white shadow-black drop-shadow-md">
+              Наведите на QR-код
+            </span>
+            <button
+              onClick={() => setIsScannerOpen(false)}
+              className="rounded-full bg-black/40 p-2 text-white backdrop-blur-md transition-colors hover:bg-black/60"
+            >
+              <X size={20} weight="bold" />
+            </button>
+          </div>
+
+          {isScannerOpen && (
+            <Scanner
+              // 1. ИСПРАВЛЕНО: добавили [] к типу, так как это массив результатов
+              onScan={(detectedCodes: IDetectedBarcode[]) => {
+                if (isProcessingScan.current) return; // Защита от дублей
+
+                if (detectedCodes && detectedCodes.length > 0) {
+                  const url = detectedCodes[0].rawValue;
+                  try {
+                    const parsedUrl = new URL(url);
+                    const scannedUsername = parsedUrl.searchParams.get('add');
+
+                    if (scannedUsername) {
+                      isProcessingScan.current = true;
+                      setIsScannerOpen(false); // Сразу закрываем сканер
+
+                      // Вызываем функцию добавления
+                      handleAddByUsername(scannedUsername).finally(() => {
+                        // Снимаем блокировку
+                        setTimeout(() => {
+                          isProcessingScan.current = false;
+                        }, 1000);
+                      });
+                    } else {
+                      toast.error('Это не QR-код Music Tree');
+                    }
+                  } catch {
+                    toast.error('Неверный формат QR-кода');
+                  }
+                }
+              }}
+              // 2. ИСПРАВЛЕНО: убрали audio: false, так как в версии 2.6.0 его больше нет
+              components={{
+                finder: true, // Рисует рамку сканера
+              }}
+              styles={{
+                container: { width: '100%', height: '100%' },
+              }}
+            />
+          )}
         </div>
       </Modal>
     </div>

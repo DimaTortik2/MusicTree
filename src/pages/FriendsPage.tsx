@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import QRCode from 'react-qr-code';
-import { useSearchParams } from 'react-router-dom'; // ДОБАВИЛИ для парсинга URL
-import { Scanner, type IDetectedBarcode } from '@yudiel/react-qr-scanner'; // ДОБАВИЛИ сканер
-import { supabase } from '@/shared/lib/supabase'; // ДОБАВИЛИ для поиска юзера по QR
+import { useSearchParams } from 'react-router-dom';
+import { Scanner, type IDetectedBarcode } from '@yudiel/react-qr-scanner';
+import { supabase } from '@/shared/lib/supabase';
 import {
   UserMinus,
   UserPlus,
@@ -14,6 +14,7 @@ import {
   Scan,
   ShareNetwork,
   List as SidebarSimple,
+  CameraSlash, // Иконка для экрана ошибки камеры
 } from '@phosphor-icons/react';
 import { useAuthStore } from '@/app/store/authStore';
 import { Avatar } from '@/shared/Avatar';
@@ -42,9 +43,10 @@ export function FriendsPage() {
   const [userToRemove, setUserToRemove] = useState<FriendProfile | null>(null);
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
 
-  // Новые стейты для камеры
+  // Стейты для камеры
   const [isScannerOpen, setIsScannerOpen] = useState(false);
-  const isProcessingScan = useRef(false); // Защита от двойного сканирования
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const isProcessingScan = useRef(false);
 
   // Debounce для ручного поиска
   useEffect(() => {
@@ -54,12 +56,11 @@ export function FriendsPage() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Обработка перехода по ссылке (если отсканировали штатной камерой телефона)
+  // Обработка перехода по ссылке
   useEffect(() => {
     const addUsername = searchParams.get('add');
     if (addUsername && profile) {
       handleAddByUsername(addUsername);
-      // Очищаем URL, чтобы при рефреше не отправлялось заново
       searchParams.delete('add');
       setSearchParams(searchParams, { replace: true });
     }
@@ -68,29 +69,24 @@ export function FriendsPage() {
   const displayList = searchQuery.trim() ? searchResults : friends;
   const isSearchMode = !!searchQuery.trim();
 
-  // ГЛАВНАЯ ФУНКЦИЯ ДОБАВЛЕНИЯ (Используется и URL и Сканером)
   const handleAddByUsername = async (targetUsername: string) => {
     if (targetUsername === profile?.username) {
       toast.error('Вы не можете добавить самого себя');
       return;
     }
 
-    // Ищем юзера по юзернейму через наш безопасный RPC
     const { data } = await supabase.rpc('search_users_secure', {
       search_query: targetUsername,
     });
 
     if (data && data.length > 0) {
-      // Ищем точное совпадение
       const targetUser = data.find((u: any) => u.username === targetUsername);
 
       if (targetUser) {
-        // Проверяем, не в друзьях ли он уже
         if (friends.some((f) => f.id === targetUser.id)) {
           toast.info('Пользователь уже у вас в друзьях');
         } else {
           await sendRequest(targetUser.id);
-          // Уведомление об успехе вызывается внутри sendRequest, дублировать не нужно
         }
       } else {
         toast.error('Пользователь не найден');
@@ -108,6 +104,30 @@ export function FriendsPage() {
           url: `${window.location.origin}/app/friends?add=${profile?.username}`,
         })
         .catch(console.error);
+    }
+  };
+
+  // Плавное закрытие сканера с очисткой ошибки
+  const closeScanner = () => {
+    setIsScannerOpen(false);
+    setTimeout(() => setCameraError(null), 300);
+  };
+
+  // Обработка ошибок доступа к камере
+  const handleCameraError = (error: unknown) => {
+    console.error('Ошибка сканера:', error);
+    const err = error as Error;
+
+    if (err?.name === 'NotAllowedError') {
+      setCameraError('Доступ к камере запрещен. Разрешите его в настройках вашего браузера.');
+    } else if (err?.name === 'NotFoundError') {
+      setCameraError('Камера не найдена на вашем устройстве.');
+    } else if (err?.name === 'NotReadableError' || err?.name === 'TrackStartError') {
+      setCameraError('Камера в данный момент используется другим приложением.');
+    } else {
+      setCameraError(
+        'Мессенджер или браузер блокирует камеру. Откройте ссылку в стандартном браузере (Safari / Chrome).',
+      );
     }
   };
 
@@ -167,7 +187,7 @@ export function FriendsPage() {
                         className="text-primary transition-opacity group-hover:opacity-40"
                       />
                       <span className="text-sm font-medium text-primary transition-opacity group-hover:opacity-40">
-                        Принять в друзья
+                        Принять
                       </span>
                     </button>
                     <button
@@ -389,7 +409,6 @@ export function FriendsPage() {
             Поделиться
           </Button>
 
-          {/* Кнопка сканирования */}
           <Button
             variant="solid"
             color="primary"
@@ -405,67 +424,82 @@ export function FriendsPage() {
         </div>
       </Modal>
 
-      {/* Модалка со Сканером (Telegram Style) */}
+      {/* Модалка со Сканером */}
       <Modal
         isOpen={isScannerOpen}
-        onClose={() => setIsScannerOpen(false)}
+        onClose={closeScanner}
         layout="vertical"
-        className="overflow-hidden !bg-black/90 !p-0 sm:max-w-md sm:rounded-[32px]"
+        className="overflow-hidden !bg-black/95 !p-0 sm:max-w-md sm:rounded-[32px]"
       >
         <div className="relative flex h-[70vh] w-full flex-col bg-black sm:h-[500px]">
-          {/* Хедер сканера поверх камеры */}
-          <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between bg-gradient-to-b from-black/60 to-transparent p-4">
+          {/* Хедер сканера поверх */}
+          <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between bg-gradient-to-b from-black/80 to-transparent p-4">
             <span className="font-medium text-white shadow-black drop-shadow-md">
               Наведите на QR-код
             </span>
             <button
-              onClick={() => setIsScannerOpen(false)}
-              className="rounded-full bg-black/40 p-2 text-white backdrop-blur-md transition-colors hover:bg-black/60"
+              onClick={closeScanner}
+              className="rounded-full bg-white/20 p-2 text-white backdrop-blur-md transition-colors hover:bg-white/30"
             >
               <X size={20} weight="bold" />
             </button>
           </div>
 
-          {isScannerOpen && (
-            <Scanner
-              // 1. ИСПРАВЛЕНО: добавили [] к типу, так как это массив результатов
-              onScan={(detectedCodes: IDetectedBarcode[]) => {
-                if (isProcessingScan.current) return; // Защита от дублей
+          <div className="relative h-full w-full">
+            {/* Ошибка камеры */}
+            {cameraError ? (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-surface p-6 text-center">
+                <CameraSlash size={56} className="mb-4 text-primary" weight="duotone" />
+                <p className="mb-2 text-xl font-medium text-text">Камера недоступна</p>
+                <p className="mb-8 text-sm leading-relaxed text-text/60">{cameraError}</p>
+                <Button variant="solid" color="primary" onClick={closeScanner}>
+                  Понятно
+                </Button>
+                <p className="mt-6 px-4 text-xs text-text/40">
+                  Подсказка: нажмите на три точки в углу экрана и выберите «Открыть в браузере».
+                </p>
+              </div>
+            ) : (
+              /* Сам сканер */
+              isScannerOpen && (
+                <Scanner
+                  onScan={(detectedCodes: IDetectedBarcode[]) => {
+                    if (isProcessingScan.current) return;
 
-                if (detectedCodes && detectedCodes.length > 0) {
-                  const url = detectedCodes[0].rawValue;
-                  try {
-                    const parsedUrl = new URL(url);
-                    const scannedUsername = parsedUrl.searchParams.get('add');
+                    if (detectedCodes && detectedCodes.length > 0) {
+                      const url = detectedCodes[0].rawValue;
+                      try {
+                        const parsedUrl = new URL(url);
+                        const scannedUsername = parsedUrl.searchParams.get('add');
 
-                    if (scannedUsername) {
-                      isProcessingScan.current = true;
-                      setIsScannerOpen(false); // Сразу закрываем сканер
+                        if (scannedUsername) {
+                          isProcessingScan.current = true;
+                          closeScanner();
 
-                      // Вызываем функцию добавления
-                      handleAddByUsername(scannedUsername).finally(() => {
-                        // Снимаем блокировку
-                        setTimeout(() => {
-                          isProcessingScan.current = false;
-                        }, 1000);
-                      });
-                    } else {
-                      toast.error('Это не QR-код Music Tree');
+                          handleAddByUsername(scannedUsername).finally(() => {
+                            setTimeout(() => {
+                              isProcessingScan.current = false;
+                            }, 1000);
+                          });
+                        } else {
+                          toast.error('Это не QR-код Music Tree');
+                        }
+                      } catch {
+                        toast.error('Неверный формат QR-кода');
+                      }
                     }
-                  } catch {
-                    toast.error('Неверный формат QR-кода');
-                  }
-                }
-              }}
-              // 2. ИСПРАВЛЕНО: убрали audio: false, так как в версии 2.6.0 его больше нет
-              components={{
-                finder: true, // Рисует рамку сканера
-              }}
-              styles={{
-                container: { width: '100%', height: '100%' },
-              }}
-            />
-          )}
+                  }}
+                  onError={(error) => handleCameraError(error)} // <-- ОБРАБОТЧИК ОШИБКИ
+                  components={{
+                    finder: true,
+                  }}
+                  styles={{
+                    container: { width: '100%', height: '100%' },
+                  }}
+                />
+              )
+            )}
+          </div>
         </div>
       </Modal>
     </div>

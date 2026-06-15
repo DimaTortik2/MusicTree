@@ -1,7 +1,7 @@
-import { SidebarIcon } from "@phosphor-icons/react";
-import { AnimatePresence, motion } from "framer-motion";
-import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
+import { SidebarIcon } from '@/shared/icons/sidebarIcon';
+import { AnimatePresence, motion } from 'framer-motion';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 interface MobileSidebarPortalProps {
   isOpen: boolean;
@@ -39,7 +39,7 @@ export const MobileSidebarPortal = ({ isOpen, onClose, children }: MobileSidebar
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             onClick={onClose}
-            className="absolute inset-0 bg-background/80 backdrop-blur-sm"
+            className="absolute inset-0 bg-background"
           />
 
           <motion.aside
@@ -47,17 +47,19 @@ export const MobileSidebarPortal = ({ isOpen, onClose, children }: MobileSidebar
             animate={{ x: 0 }}
             exit={{ x: '-100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 250 }}
-            className="absolute inset-y-0 left-0 flex w-full flex-col bg-background shadow-2xl"
+            className="absolute inset-y-0 left-0 flex w-full flex-col shadow-2xl"
           >
             <div className="flex shrink-0 items-center justify-between p-6 pb-0">
               <button
                 onClick={onClose}
-                // ИСПРАВЛЕНО: text-text/40 вместо text-white/60
-                className="text-text/40 transition-colors hover:text-text active:scale-95"
+                // Добавили -m-2 p-2 для увеличения области нажатия, как во втором варианте
+                className="-m-2 p-2 text-text/40 transition-colors hover:text-text active:scale-95"
               >
+                {/* Явно задаем размер иконке */}
                 <SidebarIcon />
               </button>
             </div>
+
             {children}
           </motion.aside>
         </div>

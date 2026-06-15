@@ -9,7 +9,6 @@ import {
   QrCode,
   Check,
   X,
-  List as SidebarSimple,
 } from '@phosphor-icons/react';
 import { useAuthStore } from '@/app/store/authStore';
 // 1. ИМПОРТИРУЕМ НАШ НОВЫЙ UserAvatar ВМЕСТО Avatar
@@ -21,6 +20,8 @@ import { MobileSidebarPortal } from '@/shared/MobileSidebarPortal';
 import { toast } from '@/app/utils/toast';
 import { QrShareModal } from '@/pages/FriendsPage/QrShareModal';
 import { QrScannerModal } from '@/pages/FriendsPage/QrScannerModal';
+import { ControlButton } from '@/shared/buttons/ControlButton';
+import { SidebarIcon } from '@/shared/icons/sidebarIcon';
 // 2. ИМПОРТ usePresenceStore БОЛЬШЕ НЕ НУЖЕН, УДАЛИЛИ ЕГО!
 
 export function FriendsPage() {
@@ -117,7 +118,7 @@ export function FriendsPage() {
   }
 
   const sidebarContent = (
-    <div className="flex min-h-0 w-full flex-1 flex-col px-6 pt-6 pb-24 md:h-full md:w-[340px] md:flex-none md:border-r-[3px] md:border-line md:bg-background/50">
+    <div className="flex min-h-0 w-full flex-1 flex-col px-6 pt-6 pb-24 md:h-full md:w-[340px] md:flex-none md:border-r-[3px] md:border-line">
       <h2 className="mb-6 text-2xl font-medium text-text">Ваши уведомления</h2>
 
       <div className="custom-scroll flex flex-1 flex-col gap-4 overflow-y-auto pr-2">
@@ -220,7 +221,7 @@ export function FriendsPage() {
             onClick={() => setIsMobileSidebarOpen(true)}
             className="-m-2 p-2 text-text/60 transition-colors outline-none hover:text-text"
           >
-            <SidebarSimple size={28} />
+            <SidebarIcon />
           </button>
         </div>
 
@@ -236,12 +237,11 @@ export function FriendsPage() {
             className="w-full border-b-[3px] border-primary bg-transparent py-3 pr-14 pl-12 text-lg font-medium text-text transition-colors outline-none placeholder:text-text/20"
           />
           <div className="absolute inset-y-0 right-0 flex items-center pr-2">
-            <button
+            <ControlButton
+              icon={<QrCode size={20} weight="fill" />}
               onClick={() => setIsQrShareOpen(true)}
-              className="flex size-9 cursor-pointer items-center justify-center rounded-lg bg-text/20 text-text transition-all outline-none hover:bg-text hover:text-surface"
-            >
-              <QrCode size={20} weight="fill" />
-            </button>
+              innerClassName="p-1"
+            />
           </div>
         </div>
 

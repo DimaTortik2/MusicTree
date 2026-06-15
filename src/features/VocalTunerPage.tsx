@@ -18,7 +18,6 @@ import { useVocalTuner, useVocalGlobalStore } from '@/features/vocalTuner/hooks/
 import {
   MiniWaveform,
   PlayerWidget,
-  SidebarIcon,
   TunerVisualizer,
 } from '@/features/vocalTuner/ui/TunerComponents';
 import { Modal } from '@/shared/Modal';
@@ -27,6 +26,7 @@ import type { Recording } from '@/features/vocalTuner/types';
 import { toast } from '@/app/utils/toast';
 import { Tooltip } from '@/shared/Tooltip';
 import { MobileSidebarPortal } from '@/shared/MobileSidebarPortal';
+import { SidebarIcon } from '@/shared/icons/sidebarIcon';
 
 const RecordingSkeleton = () => (
   <div className="flex items-center justify-between rounded-2xl border-3 border-text/5 bg-transparent p-3 [.light_&]:border-line/60 [.light_&]:bg-surface/40">
@@ -134,7 +134,7 @@ export function VocalTunerPage() {
 
   const sidebarContent = (
     // ВАЖНО: Добавлен min-h-0 для фикса бага с флексбоксами!
-    <div className="flex min-h-0 w-full flex-1 flex-col p-4 pb-0 md:h-full md:w-80 md:flex-none md:border-r md:border-line md:bg-background/50">
+    <div className="flex min-h-0 w-full flex-1 flex-col p-4 pb-0 md:h-full md:w-80 md:flex-none md:border-r md:border-line">
       <div className="mb-5 flex h-7 shrink-0 items-center justify-end pl-1">
         {hasLoaded && (
           <button

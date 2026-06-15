@@ -114,25 +114,24 @@ export const useFriends = () => {
     if (!error) toast.success('Заявка отправлена!');
   };
 
-  // 4. Принять заявку
+  // 4. Принять заявку (теперь через безопасный RPC)
   const acceptRequest = async (notificationId: string, senderId: string) => {
     if (!user) return;
 
-    // Пытаемся добавить перекрестно
-    const { error } = await supabase.from('friends').insert([
-      { user_id: user.id, friend_id: senderId },
-      { user_id: senderId, friend_id: user.id },
-    ]);
+    // Вызываем нашу транзакцию на стороне БД
+    const { error } = await supabase.rpc('accept_friend_request', {
+      notif_id: notificationId,
+      sender: senderId,
+    });
 
-    // Проверяем ошибку!
     if (error) {
       console.error('Ошибка при добавлении в друзья:', error);
       toast.error('Не удалось добавить в друзья');
       return;
     }
 
-    // Если всё ок, удаляем уведомление и радуемся
-    await dismissNotification(notificationId);
+    // Успех! Очищаем UI локально и перезагружаем
+    setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
     loadData();
     toast.success('Пользователь добавлен в друзья!');
   };
@@ -183,4 +182,4 @@ export const useFriends = () => {
     removeFriend,
     dismissNotification,
   };
-};;
+};;;

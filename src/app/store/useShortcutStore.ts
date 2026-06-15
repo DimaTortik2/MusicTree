@@ -17,7 +17,8 @@ export type ShortcutAction =
   | 'navWarmupChain'
   | 'navVocalTrainer'
   | 'navTests'
-  | 'navSettings';
+  | 'navSettings'
+  | 'navFriends';
 
 export interface ShortcutMetadata {
   label: string;
@@ -74,7 +75,8 @@ export const SHORTCUTS_METADATA: Record<ShortcutAction, ShortcutMetadata> = {
     defaultCode: 'Alt+Digit5',
   },
   navTests: { label: 'Тесты', category: 'Навигация', defaultCode: 'Alt+Digit6' },
-  navSettings: { label: 'Настройки', category: 'Навигация', defaultCode: 'Alt+Digit7' },
+  navFriends: { label: 'Друзья', category: 'Навигация', defaultCode: 'Alt+Digit7' },
+  navSettings: { label: 'Настройки', category: 'Навигация', defaultCode: 'Alt+Digit8' },
 };
 
 interface ShortcutState {

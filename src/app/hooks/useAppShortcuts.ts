@@ -10,7 +10,7 @@ const TAB_ROUTES: Record<string, string> = {
   chains: '/app/chains',
   vocal: '/app/mic',
   tests: '/app/tests',
-  exam: '/app/exam',
+  friends: '/app/friends',
   debug: '/app/debug',
   settings: '/app/settings',
 };
@@ -42,6 +42,7 @@ export const useAppShortcuts = ({ togglePiano }: UseAppShortcutsProps) => {
   useShortcut('navVocalTrainer', () => navigate(TAB_ROUTES.vocal));
   useShortcut('navTests', () => navigate(TAB_ROUTES.tests));
   useShortcut('navSettings', () => navigate(TAB_ROUTES.settings));
+  useShortcut('navFriends', () => navigate(TAB_ROUTES.friends));
 
   // ================= ТЕМА =================
   const { theme, setTheme } = useTheme();

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/shared/lib/supabase';
 import {
   UserMinus,
@@ -24,8 +24,8 @@ import { QrScannerModal } from '@/pages/FriendsPage/QrScannerModal';
 // 2. ИМПОРТ usePresenceStore БОЛЬШЕ НЕ НУЖЕН, УДАЛИЛИ ЕГО!
 
 export function FriendsPage() {
-  const { profile } = useAuthStore();
-
+  const { profile, user, initialized } = useAuthStore();
+  const navigate = useNavigate();
   // 3. УБРАЛИ СТРОКУ С onlineUsers ИЗ ЗУСТАНДА
 
   const {
@@ -99,6 +99,22 @@ export function FriendsPage() {
       setSearchParams(newParams, { replace: true });
     }
   }, [searchParams, profile, setSearchParams]);
+
+  if (initialized && !user) {
+    return (
+      <div className="flex h-screen w-full flex-col items-center justify-center p-6 md:p-12">
+        <Modal
+          inline
+          layout="horizontal"
+          title="Раздел друзей доступен только зарегистрированным пользователям"
+          description="Войдите или создайте аккаунт, чтобы добавлять друзей и проходить совместное дерево."
+          icon={<UserPlus className="size-8 sm:size-10 text-text" weight="regular" />}
+          onIconClick={() => navigate('/auth')}
+          iconContainerClassName="bg-primary text-surface"
+        />
+      </div>
+    );
+  }
 
   const sidebarContent = (
     <div className="flex min-h-0 w-full flex-1 flex-col px-6 pt-6 pb-24 md:h-full md:w-[340px] md:flex-none md:border-r-[3px] md:border-line md:bg-background/50">

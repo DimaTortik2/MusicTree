@@ -40,14 +40,22 @@ export const QrShareModal: React.FC<QrShareModalProps> = ({
       <div className="relative flex flex-col items-center">
         <button
           onClick={onClose}
-          className="absolute top-0 right-0 p-2 text-text/40 transition-colors hover:text-text"
+          className="absolute top-0 right-0 p-2 text-text/40 transition-colors hover:text-text cursor-pointer"
         >
           <X size={24} weight="bold" />
         </button>
 
-        <div className="mt-8 mb-8 rounded-2xl bg-white p-4">
+        {/* Изменили mb-8 на mb-4, чтобы освободить место для подписи */}
+        <div className="mt-8 mb-4 rounded-2xl bg-white p-4">
           {username && <QRCode value={shareUrl} size={200} />}
         </div>
+
+        {/* Текстовая подсказка */}
+        <p className="mb-6 max-w-[260px] text-center text-sm leading-relaxed text-text/60">
+          На в этом же меню на телефоне друга нажмите {' '}
+          <span className="font-semibold text-text">"Сканировать QR-код"</span>,
+          чтобы открыть камеру и подружиться.
+        </p>
 
         <Button
           variant="outline"

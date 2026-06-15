@@ -82,6 +82,7 @@ export const RouteWallpaper = () => {
     if (pathname.includes('/app/settings'))
       return { key: 'settings', Component: SettingsWallpaper };
     if (pathname.includes('/app/mic')) return { key: 'vocal', Component: VocalWallpaper };
+    if (pathname.includes('/app/friends')) return { key: 'friends', Component: VocalWallpaper };
     return null;
   }, [pathname]);
 

@@ -37,7 +37,7 @@ const colorStyles: Record<ButtonVariant, Record<ButtonColor, string>> = {
     accent: 'bg-surface border-accent text-text hover:bg-accent hover:text-white',
     homework: 'bg-surface border-homework text-text hover:bg-homework hover:text-white',
     access: 'bg-surface border-access text-text hover:bg-access hover:text-white',
-    text: 'bg-surface border-text text-text hover:bg-text hover:text-surface',
+    text: 'bg-surface border-text/40 text-text hover:bg-text hover:text-surface',
   },
 };
 

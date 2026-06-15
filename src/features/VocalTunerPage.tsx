@@ -17,7 +17,6 @@ import {
 import { useVocalTuner, useVocalGlobalStore } from '@/features/vocalTuner/hooks/useVocalTuner';
 import {
   MiniWaveform,
-  MobileSidebarPortal,
   PlayerWidget,
   SidebarIcon,
   TunerVisualizer,
@@ -27,6 +26,7 @@ import { Button } from '@/shared/buttons/Button';
 import type { Recording } from '@/features/vocalTuner/types';
 import { toast } from '@/app/utils/toast';
 import { Tooltip } from '@/shared/Tooltip';
+import { MobileSidebarPortal } from '@/shared/MobileSidebarPortal';
 
 const RecordingSkeleton = () => (
   <div className="flex items-center justify-between rounded-2xl border-3 border-text/5 bg-transparent p-3 [.light_&]:border-line/60 [.light_&]:bg-surface/40">

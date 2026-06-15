@@ -6,9 +6,10 @@ import localforage from 'localforage';
 export interface UserProfile {
   full_name: string | null;
   avatar_url: string | null;
+  username: string;
   avatar_lqip: string | null;
   can_upload_avatar: boolean;
-  can_use_gradient: boolean; 
+  can_use_gradient: boolean;
   use_gradient: boolean;
 }
 
@@ -42,7 +43,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { data } = await supabase
         .from('profiles')
         .select(
-          'full_name, avatar_url, avatar_lqip, can_upload_avatar, can_use_gradient, use_gradient',
+          'full_name, avatar_url, avatar_lqip, can_upload_avatar, can_use_gradient, use_gradient, username',
         )
         .eq('id', userId)
         .single();

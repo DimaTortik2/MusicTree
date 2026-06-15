@@ -364,19 +364,15 @@ export const UserProfileMenu = () => {
           forceGradient={!!profile?.use_gradient}
           className="size-20 shrink-0 text-3xl font-medium shadow-sm sm:size-24"
         />
-
         {/* ДОБАВЛЕНО: flex-1 и min-w-0. 
             min-w-0 - это магия флексбоксов, которая позволяет дочерним элементам сжиматься, 
             даже если внутри них очень длинное слово без пробелов */}
         <div className="flex min-w-0 flex-1 flex-col items-start justify-center">
-          {/* ДОБАВЛЕНО: w-full или max-w-full, чтобы этот контейнер не выходил за рамки родителя */}
           <div className="flex w-full items-center gap-3">
-            {/* ДОБАВЛЕНО: truncate (обрезает текст троеточием: overflow-hidden + text-overflow: ellipsis + whitespace-nowrap) */}
             <span className="truncate text-2xl font-medium text-text sm:text-3xl">
               {currentName}
             </span>
 
-            {/* ДОБАВЛЕНО: shrink-0, чтобы иконка карандаша никогда не сплющивалась из-за длинного текста */}
             <button
               onClick={() => {
                 setNewNickname(currentName);
@@ -388,10 +384,19 @@ export const UserProfileMenu = () => {
             </button>
           </div>
 
-          {/* На email тоже имеет смысл повесить truncate, вдруг кто-то зайдет с очень длинной почты */}
-          <span className="mt-1 w-full truncate text-base text-text/40 sm:text-lg">
-            {userEmail}
-          </span>
+          {/* === ВЫВОД ЮЗЕРНЕЙМА С КОПИРОВАНИЕМ === */}
+          {profile?.username && (
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(`@${profile.username}`);
+                toast.success('Юзернейм скопирован!');
+              }}
+              className="group mt-1 flex max-w-full cursor-pointer items-center text-base text-text/70 transition-colors outline-none hover:text-text sm:text-lg"
+              title="Нажмите, чтобы скопировать"
+            >
+              <span className="truncate">@{profile.username}</span>
+            </button>
+          )}
 
           <button
             onClick={() => {

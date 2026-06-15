@@ -33,7 +33,7 @@ export const Toggle: React.FC<ToggleProps> = ({
     >
       <span
         className={cn(
-          'inline-block size-5 transform rounded-full bg-white shadow transition-transform duration-200 ease-in-out',
+          'inline-block size-5 transform rounded-full bg-text shadow transition-transform duration-200 ease-in-out',
           checked ? 'translate-x-6' : 'translate-x-1',
         )}
       />

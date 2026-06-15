@@ -24,9 +24,9 @@ const TAB_ROUTES: Record<string, string> = {
   chains: '/app/chains',
   vocal: '/app/mic',
   tests: '/app/tests',
-  exam: '/app/exam',
   debug: '/app/debug',
   settings: '/app/settings',
+  friends: '/app/friends',
 };
 
 const DESKTOP_NAV_ITEMS = [
@@ -36,7 +36,7 @@ const DESKTOP_NAV_ITEMS = [
   'chains',
   'vocal',
   'tests',
-  'exam',
+  'friends',
   'debug',
   'settings',
 ];
@@ -165,7 +165,7 @@ export const AppLayout = () => {
       chains: 'Цепь распевки',
       vocal: 'Вокальный тренажер',
       tests: 'Тесты',
-      exam: 'Экзамен',
+      friends: 'Друзья',
       debug: 'Дебаг',
       settings: 'Настройки',
       customize: 'Настроить вкладки',

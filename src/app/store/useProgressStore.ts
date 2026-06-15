@@ -133,7 +133,7 @@ export const useProgressStore = create<AppState>()(
       uiSize: 'md',
 
       activeTabs: ['tree', 'lesson', 'homeworks', 'vocal', 'piano'],
-      inactiveTabs: ['chains', 'tests', 'debug', 'settings', 'customize'],
+      inactiveTabs: ['chains', 'tests', 'friends', 'debug', 'settings', 'customize'],
       audioRecordIds: [],
 
       isKeyboardPianoActive: false,
@@ -153,11 +153,10 @@ export const useProgressStore = create<AppState>()(
           passedLessons: [...new Set([...state.passedLessons, id])],
         })),
 
-
       setLessonScrollPosition: (id, position) =>
         set((state) => ({
           lessonScrollPositions: {
-            ...(state.lessonScrollPositions || {}), 
+            ...(state.lessonScrollPositions || {}),
             [id]: position,
           },
         })),
@@ -294,8 +293,16 @@ export const useProgressStore = create<AppState>()(
         state.setHasHydrated(true);
       },
       migrate: (persistedState: any, version) => {
-        console.log(version);
-        return persistedState as AppState;
+        const state = persistedState as AppState;
+
+        // МИГРАЦИЯ: Если юзер пришел с версии 1, добавляем ему вкладку friends в неактивные
+        if (version < 2) {
+          if (!state.activeTabs.includes('friends') && !state.inactiveTabs.includes('friends')) {
+            state.inactiveTabs = ['friends', ...state.inactiveTabs];
+          }
+        }
+
+        return state;
       },
     },
   ),

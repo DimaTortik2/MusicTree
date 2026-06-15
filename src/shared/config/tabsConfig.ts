@@ -9,6 +9,7 @@ import {
   Wrench,
   Gear,
   PencilSimple,
+  Users, 
 } from '@phosphor-icons/react';
 
 export const TABS_INFO: Record<string, { icon: any; title: string; desc: string }> = {
@@ -34,6 +35,11 @@ export const TABS_INFO: Record<string, { icon: any; title: string; desc: string 
     icon: GraduationCap,
     title: 'Тесты',
     desc: 'Проверяйте усвоение материала, проходя тесты',
+  },
+  friends: {
+    icon: Users,
+    title: 'Друзья',
+    desc: 'Ваши друзья и заявки',
   },
   debug: { icon: Wrench, title: 'Для разработчиков', desc: 'Симуляция любой ситуации' },
   settings: { icon: Gear, title: 'Настройки', desc: 'Громкость, хоткеи, данные и т.д.' },

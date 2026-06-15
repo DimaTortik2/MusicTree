@@ -20,41 +20,48 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
   const [torchAvailable, setTorchAvailable] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
 
-  // Ref для блокировки спама (чтобы сканер не читал 60 раз в секунду)
+  // Отдельный стейт для отложенного запуска камеры (чинит баг повторного открытия)
+  const [isCameraActive, setIsCameraActive] = useState(false);
+
   const isProcessingScan = useRef(false);
-  // Локальный ref для безопасного поиска <video>, а не по всему document
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Безопасное закрытие с очисткой стейтов
-  const handleClose = useCallback(() => {
-    // Гасим фонарик перед размонтированием (для iOS)
-    setTorchOn(false);
-    onClose();
+  // Централизованное управление монтированием и очисткой
+  useEffect(() => {
+    let mountTimer: ReturnType<typeof setTimeout>;
 
-    setTimeout(() => {
+    if (isOpen) {
+      // Даем 300мс форы:
+      // 1. Анимация модалки пройдет без лагов.
+      // 2. ОС успеет 100% освободить аппаратную камеру от предыдущей сессии.
+      mountTimer = setTimeout(() => {
+        setIsCameraActive(true);
+        isProcessingScan.current = false;
+      }, 300);
+    } else {
+      // Как только модалка закрывается — мгновенно всё тушим
+      setIsCameraActive(false);
       setCameraError(null);
       setTorchAvailable(false);
-      isProcessingScan.current = false;
-    }, 300);
-  }, [onClose]);
-
-  useEffect(() => {
-    if (!isOpen) {
-      isProcessingScan.current = false;
-      return;
+      setTorchOn(false);
     }
+
+    return () => clearTimeout(mountTimer);
+  }, [isOpen]);
+
+  // Эффект фонарика запускается ТОЛЬКО когда камера реально включилась
+  useEffect(() => {
+    if (!isCameraActive) return;
 
     let attempts = 0;
     const checkTorchInterval = setInterval(() => {
       attempts++;
-      // Прекращаем попытки найти фонарик через 10 секунд (20 попыток)
       if (attempts > 20) {
         clearInterval(checkTorchInterval);
         return;
       }
 
       const video = containerRef.current?.querySelector('video');
-      // Проверяем readyState >= 1 (HAVE_METADATA), чтобы поток точно успел инициализироваться
       if (video && video.readyState >= 1 && video.srcObject) {
         const stream = video.srcObject as MediaStream;
         const track = stream.getVideoTracks()[0];
@@ -66,14 +73,13 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
           if (capabilities.torch) {
             setTorchAvailable(true);
           }
-          // Поток загружен, возможности проверены - убиваем интервал
           clearInterval(checkTorchInterval);
         }
       }
     }, 500);
 
     return () => clearInterval(checkTorchInterval);
-  }, [isOpen]);
+  }, [isCameraActive]);
 
   const toggleTorch = async () => {
     const video = containerRef.current?.querySelector('video');
@@ -94,7 +100,15 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
     }
   };
 
+  const handleClose = useCallback(() => {
+    onClose(); // Закрываем, стейты сбросятся через useEffect выше
+  }, [onClose]);
+
   const handleCameraError = (error: unknown) => {
+    // ИГНОРИРУЕМ любые ошибки, если модалка уже закрывается
+    // (предотвращает ложные ошибки из-за прерывания видеопотока)
+    if (!isOpen) return;
+
     const err = error as Error;
     console.error('Ошибка камеры:', err);
     if (err?.name === 'NotAllowedError') {
@@ -121,13 +135,9 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
       const scannedUsername = parsedUrl.searchParams.get('add');
 
       if (scannedUsername) {
-        // Блокируем дальнейшие сканирования
         isProcessingScan.current = true;
 
-        // Выключаем фонарик, чтобы не слепить пользователя пока идет загрузка
         if (torchOn) toggleTorch().catch(() => {});
-
-        // Моментально закрываем модалку для идеального UX
         handleClose();
 
         onScanSuccess(scannedUsername).finally(() => {
@@ -143,13 +153,12 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
     }
   };
 
-  // Функция для предотвращения спама тостами, если человек держит камеру на неправильном QR
   const triggerCooldownError = (message: string) => {
     isProcessingScan.current = true;
     toast.error(message);
     setTimeout(() => {
       isProcessingScan.current = false;
-    }, 2500); // Кулдаун равен примерному времени отображения тоста
+    }, 2500);
   };
 
   return (
@@ -176,23 +185,20 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
         <div className="relative h-full w-full bg-black">
           {cameraError ? (
             <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-surface p-6 text-center">
-              <CameraSlash size={56} className="mb-4 text-primary"  />
+              <CameraSlash size={56} className="mb-4 text-primary" />
               <p className="mb-2 text-xl font-medium text-text">Камера недоступна</p>
               <p className="mb-8 text-sm leading-relaxed text-text/60">{cameraError}</p>
               <Button variant="solid" color="primary" onClick={handleClose}>
                 Понятно
               </Button>
               <p className="mt-6 px-4 text-xs text-text/40">
-               Быть может Вы не давали своему браузеру доступ к камере
+                Быть может Вы не давали своему браузеру доступ к камере
               </p>
             </div>
           ) : (
-            isOpen && (
+            /* РЕНДЕРИМ СКАНЕР ТОЛЬКО КОГДА ПРОШЛА ЗАДЕРЖКА (isCameraActive) */
+            isCameraActive && (
               <>
-                {/* 
-                  Ref добавлен в обертку. 
-                  formats={['qr_code']} отключает поиск баркодов и ускоряет сканирование в 10 раз.
-                */}
                 <div ref={containerRef} className="absolute inset-0 z-0 [&_video]:object-cover">
                   <Scanner
                     onScan={handleScan}
@@ -206,7 +212,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
                   />
                 </div>
 
-                {/* Вырез по центру как в Telegram */}
+                {/* Вырез по центру */}
                 <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center overflow-hidden">
                   <div className="relative size-[260px] rounded-3xl shadow-[0_0_0_4000px_rgba(0,0,0,0.55)] sm:size-[300px]">
                     <div className="absolute -top-1 -left-1 size-14 rounded-tl-[24px] border-t-[4px] border-l-[4px] border-white" />

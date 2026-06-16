@@ -143,19 +143,39 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
         isProcessingScan.current = true;
 
         try {
+          // 🔥 1. Вручную и гарантированно достаем самый свежий токен!
+          const {
+            data: { session },
+            error: sessionError,
+          } = await supabase.auth.getSession();
+          if (sessionError || !session?.access_token) {
+            throw new Error('Локальная сессия не найдена. Попробуйте перезайти в аккаунт.');
+          }
+
+          // 🔥 2. Насильно передаем токен в заголовки (обходим баг supabase-js)
           const { data, error } = await supabase.functions.invoke('qr-login', {
-            body: { session_token: loginToken, redirect_to: `${parsedUrl.origin}/app/settings` },
+            body: {
+              session_token: loginToken,
+              redirect_to: `${parsedUrl.origin}/app/tree`,
+            },
+            headers: {
+              Authorization: `Bearer ${session.access_token}`, // Вшиваем руками!
+            },
           });
 
           if (error || (data && data.error)) {
-            throw new Error(data?.error || 'Ошибка входа');
+            throw new Error(data?.error || error?.message || 'Ошибка входа');
           }
 
           toast.success('Успешный вход на новом устройстве!');
           if (torchOn) toggleTorch().catch(() => {});
           handleClose();
         } catch (err: any) {
-          triggerCooldownError(`Ошибка: ${err.message}`);
+          triggerCooldownError(
+            err.message === 'Нет доступа к этой функции'
+              ? 'У вас нет Premium прав для QR входа'
+              : `Ошибка: ${err.message}`,
+          );
         } finally {
           setTimeout(() => {
             isProcessingScan.current = false;

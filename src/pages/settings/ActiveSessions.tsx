@@ -25,20 +25,44 @@ export const ActiveSessions = () => {
 
   const currentDeviceId = localStorage.getItem('music-tree-device-id');
 
-  useEffect(() => {
-    // Если нет прав, даже не делаем запрос в базу за списком сессий
-    if (!user || !profile?.can_use_qr_login) return;
+useEffect(() => {
+  if (!user || !profile?.can_use_qr_login) return;
 
-    const fetchDevices = async () => {
-      const { data } = await supabase
-        .from('active_devices')
-        .select('*')
-        .order('last_active', { ascending: false });
-      if (data) setDevices(data);
-    };
+  // Функция загрузки устройств
+  const fetchDevices = async () => {
+    const { data } = await supabase
+      .from('active_devices')
+      .select('*')
+      .order('last_active', { ascending: false });
+    if (data) setDevices(data);
+  };
 
-    fetchDevices();
-  }, [user, profile?.can_use_qr_login]);
+  // Первичная загрузка
+  fetchDevices();
+
+  // 🔥 ПОДПИСКА НА REALTIME (Авто-обновление списка)
+  const channel = supabase
+    .channel('active_devices_changes')
+    .on(
+      'postgres_changes',
+      {
+        event: '*', // Слушаем всё: INSERT, UPDATE, DELETE
+        schema: 'public',
+        table: 'active_devices',
+        filter: `user_id=eq.${user.id}`, // Только наши устройства
+      },
+      () => {
+        // Как только что-то изменилось в БД - перезапрашиваем список
+        fetchDevices();
+      },
+    )
+    .subscribe();
+
+  // Отписываемся при закрытии
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [user, profile?.can_use_qr_login]);
 
   if (!user || !profile?.can_use_qr_login) {
     return null;

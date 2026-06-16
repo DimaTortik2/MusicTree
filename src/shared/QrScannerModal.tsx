@@ -155,11 +155,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
           if (torchOn) toggleTorch().catch(() => {});
           handleClose();
         } catch (err: any) {
-          triggerCooldownError(
-            err.message === 'Нет доступа к этой функции'
-              ? 'У вас нет Premium прав для QR входа'
-              : 'Ошибка или QR-код устарел',
-          );
+          triggerCooldownError(`Ошибка: ${err.message}`);
         } finally {
           setTimeout(() => {
             isProcessingScan.current = false;

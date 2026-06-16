@@ -25,44 +25,54 @@ export const ActiveSessions = () => {
 
   const currentDeviceId = localStorage.getItem('music-tree-device-id');
 
-useEffect(() => {
-  if (!user || !profile?.can_use_qr_login) return;
+  useEffect(() => {
+    if (!user || !profile?.can_use_qr_login) return;
 
-  // Функция загрузки устройств
-  const fetchDevices = async () => {
-    const { data } = await supabase
-      .from('active_devices')
-      .select('*')
-      .order('last_active', { ascending: false });
-    if (data) setDevices(data);
-  };
+    const fetchDevices = async () => {
+      const { data } = await supabase
+        .from('active_devices')
+        .select('*')
+        .order('last_active', { ascending: false });
+      if (data) setDevices(data);
+    };
 
-  // Первичная загрузка
-  fetchDevices();
+    fetchDevices();
 
-  // 🔥 ПОДПИСКА НА REALTIME (Авто-обновление списка)
-  const channel = supabase
-    .channel('active_devices_changes')
-    .on(
-      'postgres_changes',
-      {
-        event: '*', // Слушаем всё: INSERT, UPDATE, DELETE
-        schema: 'public',
-        table: 'active_devices',
-        filter: `user_id=eq.${user.id}`, // Только наши устройства
-      },
-      () => {
-        // Как только что-то изменилось в БД - перезапрашиваем список
-        fetchDevices();
-      },
-    )
-    .subscribe();
+    // 🔥 ПОДПИСКА НА REALTIME (Авто-обновление списка)
+    const channel = supabase
+      .channel('active_devices_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'active_devices',
+          // УБРАЛИ фильтр "user_id=eq...", так как RLS и так нас защищает,
+          // а при DELETE supabase не присылает ничего кроме id устройства.
+        },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            // Моментально добавляем устройство в начало списка
+            setDevices((prev) => {
+              if (prev.some((d) => d.id === payload.new.id)) return prev;
+              return [payload.new as Device, ...prev].sort(
+                (a, b) => new Date(b.last_active).getTime() - new Date(a.last_active).getTime(),
+              );
+            });
+          } else if (payload.eventType === 'DELETE') {
+            // Моментально убираем выкинутое устройство из списка
+            setDevices((prev) => prev.filter((d) => d.id !== payload.old.id));
+          } else if (payload.eventType === 'UPDATE') {
+            fetchDevices(); // Если обновилось время активности - надежнее просто перезапросить
+          }
+        },
+      )
+      .subscribe();
 
-  // Отписываемся при закрытии
-  return () => {
-    supabase.removeChannel(channel);
-  };
-}, [user, profile?.can_use_qr_login]);
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, profile?.can_use_qr_login]);
 
   if (!user || !profile?.can_use_qr_login) {
     return null;

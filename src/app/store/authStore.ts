@@ -91,7 +91,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await supabase.from("active_devices").delete().eq("id", deviceId);
     }
 
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: 'local' });
 
     // 1. Очищаем IndexedDB (все локальные аудиозаписи)
     await localforage.clear();

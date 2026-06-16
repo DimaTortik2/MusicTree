@@ -50,7 +50,7 @@ export function FriendsPage() {
     }
     prevNotifsLength.current = notifications.length;
   }, [notifications.length, isQrShareOpen]);
-  
+
   const displayList = searchQuery.trim() ? searchResults : friends;
   const isSearchMode = !!searchQuery.trim();
 

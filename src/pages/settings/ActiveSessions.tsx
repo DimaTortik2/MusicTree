@@ -60,6 +60,7 @@ export const ActiveSessions = () => {
                 (a, b) => new Date(b.last_active).getTime() - new Date(a.last_active).getTime(),
               );
             });
+            toast.success('Вход выполнен');
             setIsShowQrModalOpen(false);
           } else if (payload.eventType === 'DELETE') {
             setDevices((prev) => prev.filter((d) => d.id !== payload.old.id));
@@ -115,16 +116,35 @@ export const ActiveSessions = () => {
   if (!user || !profile?.can_use_qr_login) return null;
 
   const terminateDevice = async (id: string) => {
-    const { error } = await supabase.from('active_devices').delete().eq('id', id);
-    if (!error) toast.success('Сеанс завершен');
-    else toast.error('Не удалось завершить сеанс');
+    if (!currentDeviceId) return;
+
+    // Вызываем безопасную функцию на стороне БД
+    const { error } = await supabase.rpc('terminate_device', {
+      target_device_id: id,
+      current_device_id: currentDeviceId,
+    });
+
+    if (!error) {
+      toast.success('Сеанс завершен');
+    } else {
+      // Выводим текст ошибки, который нам вернула база (про 24 часа)
+      toast.error(error.message || 'Не удалось завершить сеанс');
+    }
     setDeviceToRemove(null);
   };
 
   const terminateAllOther = async () => {
-    const { error } = await supabase.from('active_devices').delete().neq('id', currentDeviceId);
-    if (!error) toast.success('Все остальные сеансы завершены');
-    else toast.error('Не удалось завершить сеансы');
+    if (!currentDeviceId) return;
+
+    const { error } = await supabase.rpc('terminate_all_other_devices', {
+      current_device_id: currentDeviceId,
+    });
+
+    if (!error) {
+      toast.success('Все остальные сеансы завершены');
+    } else {
+      toast.error(error.message || 'Не удалось завершить сеансы');
+    }
     setIsConfirmingTerminateAll(false);
   };
 

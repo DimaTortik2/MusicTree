@@ -5,6 +5,7 @@ import { Monitor, DeviceMobileCamera, SignOut, QrCode } from '@phosphor-icons/re
 import { toast } from '@/app/utils/toast';
 import { Modal } from '@/shared/Modal';
 import { QrScannerModal } from '@/shared/QrScannerModal';
+import { useAuthStore } from '@/app/store/authStore'; // ДОБАВИЛИ ИМПОРТ
 
 interface Device {
   id: string;
@@ -14,18 +15,20 @@ interface Device {
 }
 
 export const ActiveSessions = () => {
-  const [devices, setDevices] = useState<Device[]>([]);
+  const user = useAuthStore((state) => state.user);
+  const profile = useAuthStore((state) => state.profile);
 
-  // Стейты для модалок
+  const [devices, setDevices] = useState<Device[]>([]);
   const [deviceToRemove, setDeviceToRemove] = useState<Device | null>(null);
   const [isConfirmingTerminateAll, setIsConfirmingTerminateAll] = useState(false);
-
-  // Стейт для сканера
   const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   const currentDeviceId = localStorage.getItem('music-tree-device-id');
 
   useEffect(() => {
+    // Если нет прав, даже не делаем запрос в базу за списком сессий
+    if (!user || !profile?.can_use_qr_login) return;
+
     const fetchDevices = async () => {
       const { data } = await supabase
         .from('active_devices')
@@ -35,7 +38,11 @@ export const ActiveSessions = () => {
     };
 
     fetchDevices();
-  }, []);
+  }, [user, profile?.can_use_qr_login]);
+
+  if (!user || !profile?.can_use_qr_login) {
+    return null;
+  }
 
   const terminateDevice = async (id: string) => {
     const { error } = await supabase.from('active_devices').delete().eq('id', id);
@@ -66,12 +73,11 @@ export const ActiveSessions = () => {
         <h3 className="text-xl font-medium text-text">Активные сеансы</h3>
       </div>
 
-      {/* --- КНОПКА ПОДКЛЮЧЕНИЯ НОВОГО УСТРОЙСТВА --- */}
       <Button
         variant="solid"
         color="primary"
         onClick={() => setIsScannerOpen(true)}
-        className="md:hidden mb-2 w-full gap-2 rounded-2xl py-4"
+        className="mb-2 w-full gap-2 rounded-2xl py-4 md:hidden"
       >
         <QrCode size={24} weight="bold" />
         Подключить устройство
@@ -129,14 +135,13 @@ export const ActiveSessions = () => {
         })}
       </div>
 
-      {/* Сканнер. Передаем пустой промис для друзей, так как тут мы ждем только QR для авторизации */}
       <QrScannerModal
         isOpen={isScannerOpen}
         onClose={() => setIsScannerOpen(false)}
-        onScanSuccess={async () => {}} // Оставляем пустым, так как логика входа внутри самого сканера
+        onScanSuccess={async () => {}}
       />
 
-      {/* --- МОДАЛКИ УДАЛЕНИЯ (ОСТАЛИСЬ БЕЗ ИЗМЕНЕНИЙ) --- */}
+      {/* Модалки удаления */}
       <Modal
         isOpen={!!deviceToRemove}
         onClose={() => setDeviceToRemove(null)}

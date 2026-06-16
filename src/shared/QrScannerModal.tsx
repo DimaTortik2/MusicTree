@@ -4,7 +4,7 @@ import { X, CameraSlash, Flashlight } from '@phosphor-icons/react';
 import { Modal } from '@/shared/Modal';
 import { Button } from '@/shared/buttons/Button';
 import { toast } from '@/app/utils/toast';
-import { supabase } from '@/shared/lib/supabase'; 
+import { supabase } from '@/shared/lib/supabase';
 
 interface QrScannerModalProps {
   isOpen: boolean;
@@ -144,7 +144,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
 
         try {
           const { data, error } = await supabase.functions.invoke('qr-login', {
-            body: { session_token: loginToken },
+            body: { session_token: loginToken, redirect_to: `${parsedUrl.origin}/app/tree` },
           });
 
           if (error || (data && data.error)) {
@@ -213,6 +213,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
                     onScan={handleScan}
                     onError={handleCameraError}
                     formats={['qr_code']}
+                    sound={false}
                     components={{ finder: false, torch: false, zoom: false }}
                     styles={{
                       container: { width: '100%', height: '100%' },

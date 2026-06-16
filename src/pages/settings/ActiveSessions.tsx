@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/shared/lib/supabase';
 import { Button } from '@/shared/buttons/Button';
-import { Monitor, DeviceMobileCamera, SignOut, QrCode } from '@phosphor-icons/react';
+import { Monitor, DeviceMobileCamera, SignOut, QrCode, X } from '@phosphor-icons/react';
 import { toast } from '@/app/utils/toast';
 import { Modal } from '@/shared/Modal';
 import { QrScannerModal } from '@/shared/QrScannerModal';
-import { useAuthStore } from '@/app/store/authStore'; // ДОБАВИЛИ ИМПОРТ
+import { useAuthStore } from '@/app/store/authStore';
+import { Avatar } from '@/shared/Avatar';
+import { GradientQrCode } from '@/shared/GradientQrCode';
+import { motion } from 'framer-motion';
 
 interface Device {
   id: string;
@@ -21,7 +24,13 @@ export const ActiveSessions = () => {
   const [devices, setDevices] = useState<Device[]>([]);
   const [deviceToRemove, setDeviceToRemove] = useState<Device | null>(null);
   const [isConfirmingTerminateAll, setIsConfirmingTerminateAll] = useState(false);
+
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+
+  // Стейты для "ПК -> Телефон"
+  const [isShowQrModalOpen, setIsShowQrModalOpen] = useState(false);
+  const [phoneQrLink, setPhoneQrLink] = useState<string | null>(null);
+  const [isGeneratingQr, setIsGeneratingQr] = useState(false);
 
   const currentDeviceId = localStorage.getItem('music-tree-device-id');
 
@@ -38,21 +47,13 @@ export const ActiveSessions = () => {
 
     fetchDevices();
 
-    // 🔥 ПОДПИСКА НА REALTIME (Авто-обновление списка)
     const channel = supabase
       .channel('active_devices_changes')
       .on(
         'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'active_devices',
-          // УБРАЛИ фильтр "user_id=eq...", так как RLS и так нас защищает,
-          // а при DELETE supabase не присылает ничего кроме id устройства.
-        },
+        { event: '*', schema: 'public', table: 'active_devices' },
         (payload) => {
           if (payload.eventType === 'INSERT') {
-            // Моментально добавляем устройство в начало списка
             setDevices((prev) => {
               if (prev.some((d) => d.id === payload.new.id)) return prev;
               return [payload.new as Device, ...prev].sort(
@@ -60,10 +61,9 @@ export const ActiveSessions = () => {
               );
             });
           } else if (payload.eventType === 'DELETE') {
-            // Моментально убираем выкинутое устройство из списка
             setDevices((prev) => prev.filter((d) => d.id !== payload.old.id));
           } else if (payload.eventType === 'UPDATE') {
-            fetchDevices(); // Если обновилось время активности - надежнее просто перезапросить
+            fetchDevices();
           }
         },
       )
@@ -74,30 +74,56 @@ export const ActiveSessions = () => {
     };
   }, [user, profile?.can_use_qr_login]);
 
-  if (!user || !profile?.can_use_qr_login) {
-    return null;
-  }
+  // ЭФФЕКТ ДЛЯ ГЕНЕРАЦИИ КОДА ДЛЯ ТЕЛЕФОНА
+  useEffect(() => {
+    if (isShowQrModalOpen) {
+      const generateQr = async () => {
+        setIsGeneratingQr(true);
+        try {
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
+          if (!session) throw new Error('Нет сессии');
+
+          const { data, error } = await supabase.functions.invoke('qr-login', {
+            body: {
+              redirect_to: `${window.location.origin}/app/tree`,
+              return_link_only: true, // Требуем прямую ссылку без записи в БД
+            },
+            headers: { Authorization: `Bearer ${session.access_token}` },
+          });
+
+          if (error || !data?.action_link) throw new Error('Ошибка генерации');
+
+          // Вшиваем чистую магическую ссылку прямо в QR-код
+          setPhoneQrLink(data.action_link);
+        } catch (e) {
+          toast.error('Не удалось создать код');
+          setIsShowQrModalOpen(false);
+        } finally {
+          // Даем анимации прокрутиться хотя бы секунду для красоты
+          setTimeout(() => setIsGeneratingQr(false), 800);
+        }
+      };
+      generateQr();
+    } else {
+      setPhoneQrLink(null);
+    }
+  }, [isShowQrModalOpen]);
+
+  if (!user || !profile?.can_use_qr_login) return null;
 
   const terminateDevice = async (id: string) => {
     const { error } = await supabase.from('active_devices').delete().eq('id', id);
-    if (!error) {
-      setDevices((prev) => prev.filter((d) => d.id !== id));
-      toast.success('Сеанс завершен');
-    } else {
-      toast.error('Не удалось завершить сеанс');
-    }
+    if (!error) toast.success('Сеанс завершен');
+    else toast.error('Не удалось завершить сеанс');
     setDeviceToRemove(null);
   };
 
   const terminateAllOther = async () => {
     const { error } = await supabase.from('active_devices').delete().neq('id', currentDeviceId);
-
-    if (!error) {
-      setDevices((prev) => prev.filter((d) => d.id === currentDeviceId));
-      toast.success('Все остальные сеансы завершены');
-    } else {
-      toast.error('Не удалось завершить сеансы');
-    }
+    if (!error) toast.success('Все остальные сеансы завершены');
+    else toast.error('Не удалось завершить сеансы');
     setIsConfirmingTerminateAll(false);
   };
 
@@ -107,6 +133,7 @@ export const ActiveSessions = () => {
         <h3 className="text-xl font-medium text-text">Активные сеансы</h3>
       </div>
 
+      {/* Кнопка сканера для мобилок */}
       <Button
         variant="solid"
         color="primary"
@@ -115,6 +142,17 @@ export const ActiveSessions = () => {
       >
         <QrCode size={24} weight="bold" />
         Подключить устройство
+      </Button>
+
+      {/* Кнопка "Показать QR" для ПК */}
+      <Button
+        variant="solid"
+        color="primary"
+        onClick={() => setIsShowQrModalOpen(true)}
+        className="mb-2 hidden w-full gap-2 md:flex"
+      >
+        <QrCode size={24} weight="bold" />
+        Показать QR-код для входа с телефона
       </Button>
 
       {devices.length > 1 && (
@@ -131,7 +169,6 @@ export const ActiveSessions = () => {
       <div className="flex flex-col gap-3">
         {devices.map((device) => {
           const isCurrent = device.id === currentDeviceId;
-
           return (
             <div
               key={device.id}
@@ -155,7 +192,6 @@ export const ActiveSessions = () => {
                   </span>
                 </div>
               </div>
-
               {!isCurrent && (
                 <button
                   onClick={() => setDeviceToRemove(device)}
@@ -169,13 +205,66 @@ export const ActiveSessions = () => {
         })}
       </div>
 
-      <QrScannerModal
-        isOpen={isScannerOpen}
-        onClose={() => setIsScannerOpen(false)}
-        onScanSuccess={async () => {}}
-      />
+      {/* --- МОДАЛКИ --- */}
+      <QrScannerModal isOpen={isScannerOpen} onClose={() => setIsScannerOpen(false)} />
 
-      {/* Модалки удаления */}
+      {/* 🔥 МОДАЛКА ПК -> ТЕЛЕФОН (Оставили только одну!) */}
+      <Modal
+        isOpen={isShowQrModalOpen}
+        onClose={() => setIsShowQrModalOpen(false)}
+        layout="vertical"
+        className="max-w-sm rounded-[32px] bg-surface p-6 text-center"
+      >
+        <div className="relative flex w-full flex-col items-center">
+          <div className="absolute -top-16 left-1/2 -translate-x-1/2">
+            <Avatar
+              name={profile?.full_name || profile?.username || 'User'}
+              src={profile?.avatar_url}
+              lqip={profile?.avatar_lqip}
+              forceGradient={profile?.use_gradient}
+              className="size-20"
+            />
+          </div>
+
+          <button
+            onClick={() => setIsShowQrModalOpen(false)}
+            className="absolute top-0 right-0 cursor-pointer p-2 text-text/40 transition-colors hover:text-text"
+          >
+            <X size={24} weight="bold" />
+          </button>
+
+          {isGeneratingQr ? (
+            <div className="mt-12 mb-6 flex size-[250px] items-center justify-center [perspective:800px]">
+              {/* Точная копия твоей CSS-анимации через Framer Motion */}
+              <motion.div
+                style={{ transformOrigin: 'center' }}
+                animate={{
+                  rotateX: [0, 70, 75, 75, 0],
+                  rotateY: [0, 50, 55, 55, 0],
+                }}
+                transition={{
+                  duration: 3,
+                  ease: 'linear',
+                  times: [0, 0.45, 0.5, 0.52, 1], // Повторяет твои keyframes 0%, 45%, 50%, 52%, 100%
+                  repeat: Infinity,
+                }}
+              >
+                <svg viewBox="0 0 200 200" stroke="currentColor" className="size-52.5 text-primary">
+                  <circle cx="100" cy="100" r="80" fill="none" strokeWidth="4" />
+                </svg>
+              </motion.div>
+            </div>
+          ) : (
+            <GradientQrCode value={phoneQrLink} size={200} className="mt-12 mb-6" />
+          )}
+
+          <p className="max-w-[260px] text-center text-sm leading-relaxed text-text/60">
+            Откройте страницу входа на телефоне и нажмите{' '}
+            <span className="font-semibold text-text">"Войти по QR-коду"</span>.
+          </p>
+        </div>
+      </Modal>
+
       <Modal
         isOpen={!!deviceToRemove}
         onClose={() => setDeviceToRemove(null)}
@@ -186,23 +275,6 @@ export const ActiveSessions = () => {
           <span className="text-base font-normal text-text">
             Вы действительно хотите выйти из аккаунта на этом устройстве?
           </span>
-          {deviceToRemove && (
-            <div className="flex items-center gap-4 border-l-3 border-primary pl-4">
-              <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-text/5 text-text">
-                {deviceToRemove.device_type === 'mobile' ? (
-                  <DeviceMobileCamera size={24} />
-                ) : (
-                  <Monitor size={24} />
-                )}
-              </div>
-              <div className="flex flex-col">
-                <span className="text-lg font-medium text-text">{deviceToRemove.device_name}</span>
-                <span className="text-sm text-text/40">
-                  Активность: {new Date(deviceToRemove.last_active).toLocaleString('ru-RU')}
-                </span>
-              </div>
-            </div>
-          )}
           <div className="mt-4 flex w-full flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <Button
               variant="outline"
@@ -236,14 +308,6 @@ export const ActiveSessions = () => {
           <span className="text-base font-normal text-text">
             Вы действительно хотите завершить <b>все другие</b> сеансы?
           </span>
-          <div className="flex items-center gap-4 border-l-3 border-primary pl-4">
-            <div className="flex flex-col">
-              <span className="text-lg font-medium text-text">Безопасность аккаунта</span>
-              <span className="text-sm text-text/40">
-                Это приведет к выходу из аккаунта на всех устройствах, кроме текущего.
-              </span>
-            </div>
-          </div>
           <div className="mt-4 flex w-full flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <Button
               variant="outline"

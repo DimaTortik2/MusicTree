@@ -9,7 +9,7 @@ import { supabase } from '@/shared/lib/supabase';
 interface QrScannerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onScanSuccess: (username: string) => Promise<void>;
+  onScanSuccess?: (username: string) => Promise<void>; // Сделал опциональным
 }
 
 export const QrScannerModal: React.FC<QrScannerModalProps> = ({
@@ -100,7 +100,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
     } else if (err?.name === 'OverconstrainedError') {
       setCameraError('Не удалось запустить основную (заднюю) камеру.');
     } else {
-      setCameraError('Браузер блокирует камеру. Откройте в Safari или Chrome.');
+      setCameraError('Браузер блокирует камеру. Откройте в Safari или Chrome. Дайте приложению браузера доступ к камере');
     }
   };
 
@@ -112,7 +112,6 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
     }, 2500);
   };
 
-  // --- ОБНОВЛЕННЫЙ ОБРАБОТЧИК СКАНА ---
   const handleScan = async (detectedCodes: IDetectedBarcode[]) => {
     if (isProcessingScan.current || !detectedCodes || detectedCodes.length === 0) return;
 
@@ -120,12 +119,23 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
     if (!url) return;
 
     try {
+       if (url.includes('/auth/v1/verify')) {
+         isProcessingScan.current = true;
+         toast.success('Успешно! Входим в аккаунт...');
+         if (torchOn) toggleTorch().catch(() => {});
+         handleClose();
+
+         // Просто перенаправляем браузер по этой ссылке, она сама всё сделает
+         window.location.href = url;
+         return;
+       }
       const parsedUrl = new URL(url);
       const scannedUsername = parsedUrl.searchParams.get('add');
       const loginToken = parsedUrl.searchParams.get('login_token');
+      const phoneLoginToken = parsedUrl.searchParams.get('phone_login');
 
-      // 1. ЛОГИКА ДРУЗЕЙ (Осталась как была)
-      if (scannedUsername) {
+      // 1. ЛОГИКА ДРУЗЕЙ
+      if (scannedUsername && onScanSuccess) {
         isProcessingScan.current = true;
         if (torchOn) toggleTorch().catch(() => {});
         handleClose();
@@ -138,12 +148,10 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
         return;
       }
 
-      // 2. ЛОГИКА АВТОРИЗАЦИИ ПО QR (НОВАЯ)
+      // 2. ЛОГИКА АВТОРИЗАЦИИ ПК (Телефон сканирует ПК для входа ПК)
       if (loginToken) {
         isProcessingScan.current = true;
-
         try {
-          // 🔥 1. Вручную и гарантированно достаем самый свежий токен!
           const {
             data: { session },
             error: sessionError,
@@ -152,14 +160,13 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
             throw new Error('Локальная сессия не найдена. Попробуйте перезайти в аккаунт.');
           }
 
-          // 🔥 2. Насильно передаем токен в заголовки (обходим баг supabase-js)
           const { data, error } = await supabase.functions.invoke('qr-login', {
             body: {
               session_token: loginToken,
               redirect_to: `${parsedUrl.origin}/app/tree`,
             },
             headers: {
-              Authorization: `Bearer ${session.access_token}`, // Вшиваем руками!
+              Authorization: `Bearer ${session.access_token}`,
             },
           });
 
@@ -176,6 +183,37 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
               ? 'У вас нет Premium прав для QR входа'
               : `Ошибка: ${err.message}`,
           );
+        } finally {
+          setTimeout(() => {
+            isProcessingScan.current = false;
+          }, 1000);
+        }
+        return;
+      }
+
+      // 3. 🔥 НОВАЯ ЛОГИКА: АВТОРИЗАЦИЯ ТЕЛЕФОНА (Телефон сканирует ПК для входа Телефона)
+      if (phoneLoginToken) {
+        isProcessingScan.current = true;
+        try {
+          // Ищем готовую ссылку в базе (которую ПК туда любезно положил)
+          const { data, error } = await supabase
+            .from('qr_auth_sessions')
+            .select('status, action_link')
+            .eq('id', phoneLoginToken)
+            .single();
+
+          if (error || !data) throw new Error('QR-код устарел или не существует');
+          if (data.status !== 'approved' || !data.action_link)
+            throw new Error('QR-код еще не готов');
+
+          toast.success('Успешно! Входим в аккаунт...');
+          if (torchOn) toggleTorch().catch(() => {});
+          handleClose();
+
+          // Редиректим телефон по магической ссылке
+          window.location.href = data.action_link;
+        } catch (err: any) {
+          triggerCooldownError(`Ошибка: ${err.message}`);
         } finally {
           setTimeout(() => {
             isProcessingScan.current = false;
@@ -205,7 +243,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
           </span>
           <button
             onClick={handleClose}
-            className="rounded-full bg-white/10 p-2 text-white backdrop-blur-md transition-colors hover:bg-white/20"
+            className="cursor-pointer rounded-full bg-white/10 p-2 text-white backdrop-blur-md transition-colors hover:bg-white/20"
           >
             <X size={20} weight="bold" />
           </button>
@@ -237,7 +275,6 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
                     }}
                   />
                 </div>
-                {/* Вырез по центру */}
                 <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center overflow-hidden">
                   <div className="relative size-[260px] rounded-3xl shadow-[0_0_0_4000px_rgba(0,0,0,0.55)] sm:size-[300px]">
                     <div className="absolute -top-1 -left-1 size-14 rounded-tl-[24px] border-t-[4px] border-l-[4px] border-white" />
@@ -246,12 +283,11 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
                     <div className="absolute -right-1 -bottom-1 size-14 rounded-br-[24px] border-r-[4px] border-b-[4px] border-white" />
                   </div>
                 </div>
-                {/* Фонарик */}
                 {torchAvailable && (
                   <div className="absolute right-0 bottom-10 left-0 z-30 flex justify-center pb-[env(safe-area-inset-bottom)]">
                     <button
                       onClick={toggleTorch}
-                      className={`flex size-14 items-center justify-center rounded-full backdrop-blur-md transition-all active:scale-95 ${torchOn ? 'bg-white text-black' : 'bg-black/40 text-white hover:bg-black/60'}`}
+                      className={`flex size-14 cursor-pointer items-center justify-center rounded-full backdrop-blur-md transition-all active:scale-95 ${torchOn ? 'bg-white text-black' : 'bg-black/40 text-white hover:bg-black/60'}`}
                     >
                       <Flashlight size={28} weight={torchOn ? 'fill' : 'regular'} />
                     </button>

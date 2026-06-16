@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { GithubLogo, GoogleLogo, ArrowLeft, Eye, EyeSlash } from '@phosphor-icons/react';
+import { GithubLogo, GoogleLogo, ArrowLeft, Eye, EyeSlash, QrCode } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Turnstile, type TurnstileInstance } from '@marsidev/react-turnstile';
 import { supabase } from '@/shared/lib/supabase';
@@ -30,7 +30,12 @@ const getFriendlyErrorMessage = (message: string): string => {
   return 'Что-то пошло не так. Пожалуйста, попробуйте позже.';
 };
 
-export const RegisterForm = () => {
+// 🔥 ДОБАВЛЯЕМ ПРОПСЫ ДЛЯ СВЯЗИ СО СКАНЕРОМ ИЗ AuthPage
+interface RegisterFormProps {
+  onOpenQrScanner?: () => void;
+}
+
+export const RegisterForm: React.FC<RegisterFormProps> = ({ onOpenQrScanner }) => {
   const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(false);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
@@ -39,14 +44,11 @@ export const RegisterForm = () => {
   const [fullName, setFullName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Состояние для глазика
   const [showPassword, setShowPassword] = useState(false);
 
-  // Капча
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const turnstileRef = useRef<TurnstileInstance>(null);
 
-  // Письмо и таймер
   const [isEmailSent, setIsEmailSent] = useState(false);
   const [isResetEmailSent, setIsResetEmailSent] = useState(false);
   const [cooldown, setCooldown] = useState(0);
@@ -57,13 +59,12 @@ export const RegisterForm = () => {
     return () => clearTimeout(timer);
   }, [cooldown]);
 
-  // Сбрасываем состояния при переключении табов
   useEffect(() => {
     setCaptchaToken(null);
     setIsForgotPassword(false);
     setIsResetEmailSent(false);
     setFullName('');
-    setShowPassword(false); // Скрываем пароль при переключении табов
+    setShowPassword(false);
   }, [isLogin]);
 
   useEffect(() => {
@@ -359,7 +360,6 @@ export const RegisterForm = () => {
       </div>
 
       <form onSubmit={(e) => executeAction(e, 'email')} className="flex w-full flex-1 flex-col">
-        {/* ИЗМЕНЕНИЕ 1: Использование flex и gap вместо space-y, чтобы анимация не прыгала */}
         <div className="flex flex-col">
           <AnimatePresence initial={false}>
             {!isLogin && (
@@ -370,7 +370,6 @@ export const RegisterForm = () => {
                 transition={{ duration: 0.3, ease: 'easeInOut' }}
                 className="overflow-hidden"
               >
-                {/* Свободное пространство (gap) теперь внутри анимируемого контейнера */}
                 <div className="pb-6 sm:pb-8">
                   <Input
                     type="text"
@@ -384,7 +383,6 @@ export const RegisterForm = () => {
             )}
           </AnimatePresence>
 
-          {/* Почта и Пароль сгруппированы отдельно и имеют свой независимый gap */}
           <div className="flex flex-col gap-6 sm:gap-8">
             <Input
               type="email"
@@ -435,6 +433,7 @@ export const RegisterForm = () => {
           <div className="h-px flex-1 bg-line"></div>
         </div>
 
+        {/* 🔥 НОВАЯ СЕКЦИЯ КНОПОК */}
         <div className="space-y-4">
           <Button
             type="button"
@@ -456,6 +455,20 @@ export const RegisterForm = () => {
           >
             <GithubLogo className="absolute left-6 h-5 w-5" /> Войти через Github
           </Button>
+
+          {/* 🔥 Кнопка QR входа. Скрыта на десктопах через md:hidden */}
+          {onOpenQrScanner && (
+            <Button
+              type="button"
+              variant="solid"
+              color="primary"
+              size="md"
+              className="relative flex w-full justify-center border-none font-medium md:hidden"
+              onClick={onOpenQrScanner}
+            >
+              <QrCode className="absolute left-6 h-5 w-5" /> Войти по QR-коду
+            </Button>
+          )}
         </div>
 
         {renderCaptcha()}

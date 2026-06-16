@@ -144,7 +144,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
 
         try {
           const { data, error } = await supabase.functions.invoke('qr-login', {
-            body: { session_token: loginToken, redirect_to: `${parsedUrl.origin}/app/tree` },
+            body: { session_token: loginToken, redirect_to: `${parsedUrl.origin}/app/settings` },
           });
 
           if (error || (data && data.error)) {

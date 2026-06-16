@@ -55,34 +55,45 @@ export const AuthPage = () => {
 
   const [qrToken, setQrToken] = useState<string | null>(null);
 
-  useEffect(() => {
-    const token = crypto.randomUUID();
-    setQrToken(token);
+useEffect(() => {
+  const token = crypto.randomUUID();
+  setQrToken(token);
 
-    supabase.from('qr_auth_sessions').insert({ id: token }).then();
+  // 1. Создаем заявку
+  supabase.from('qr_auth_sessions').insert({ id: token }).then();
 
-    const channel = supabase
-      .channel(`qr_session_${token}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'qr_auth_sessions',
-          filter: `id=eq.${token}`,
-        },
-        (payload) => {
-          if (payload.new.status === 'approved' && payload.new.action_link) {
-            window.location.href = payload.new.action_link;
-          }
-        },
-      )
-      .subscribe();
+  // 2. Пытаемся слушать через WebSockets (быстрый путь)
+  const channel = supabase
+    .channel(`qr_session_${token}`)
+    .on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'qr_auth_sessions', filter: `id=eq.${token}` },
+      (payload) => {
+        if (payload.new.status === 'approved' && payload.new.action_link) {
+          window.location.href = payload.new.action_link;
+        }
+      },
+    )
+    .subscribe();
 
-    return () => {
-      channel.unsubscribe();
-    };
-  }, []);
+  // 3. FALLBACK: Опрос каждые 3 секунды (надежный путь для тех, у кого VPN/AdBlock режет сокеты)
+  const fallbackInterval = setInterval(async () => {
+    const { data } = await supabase
+      .from('qr_auth_sessions')
+      .select('status, action_link')
+      .eq('id', token)
+      .single();
+
+    if (data && data.status === 'approved' && data.action_link) {
+      window.location.href = data.action_link;
+    }
+  }, 3000);
+
+  return () => {
+    channel.unsubscribe();
+    clearInterval(fallbackInterval);
+  };
+}, []);
 
   return (
     <div className="relative flex min-h-dvh w-full overflow-hidden bg-background font-sans text-text">

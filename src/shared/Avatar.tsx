@@ -54,6 +54,8 @@ export const Avatar: React.FC<AvatarProps> = React.memo(
     const [highResLoaded, setHighResLoaded] = useState(false);
     const [hasError, setHasError] = useState(false);
 
+   const highResRef = useRef<HTMLImageElement>(null);
+
     // Стейт для цикличного цвета
     const [autoColorIndex, setAutoColorIndex] = useState(1);
 
@@ -74,6 +76,10 @@ export const Avatar: React.FC<AvatarProps> = React.memo(
     useEffect(() => {
       setHighResLoaded(false);
       setHasError(false);
+
+       if (highResRef.current?.complete) {
+         setHighResLoaded(true);
+       }
     }, [src]);
 
     useEffect(() => {
@@ -181,10 +187,10 @@ export const Avatar: React.FC<AvatarProps> = React.memo(
               />
             )}
             <img
+              ref={highResRef}
               src={src}
               alt={name}
               decoding="async"
-              loading="lazy"
               onLoad={() => setHighResLoaded(true)}
               onError={() => setHasError(true)}
               className={cn(

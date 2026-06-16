@@ -60,6 +60,7 @@ export const ActiveSessions = () => {
                 (a, b) => new Date(b.last_active).getTime() - new Date(a.last_active).getTime(),
               );
             });
+            setIsShowQrModalOpen(false);
           } else if (payload.eventType === 'DELETE') {
             setDevices((prev) => prev.filter((d) => d.id !== payload.old.id));
           } else if (payload.eventType === 'UPDATE') {

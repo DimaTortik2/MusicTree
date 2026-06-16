@@ -41,6 +41,16 @@ export function FriendsPage() {
   const [isQrShareOpen, setIsQrShareOpen] = useState(false);
   const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
 
+  const prevNotifsLength = useRef(notifications.length);
+  useEffect(() => {
+    // Если массив уведомлений стал больше, значит пришла новая заявка в друзья
+    if (isQrShareOpen && notifications.length > prevNotifsLength.current) {
+      setIsQrShareOpen(false);
+      toast.success('Кто-то отсканировал ваш код и добавился в друзья!');
+    }
+    prevNotifsLength.current = notifications.length;
+  }, [notifications.length, isQrShareOpen]);
+  
   const displayList = searchQuery.trim() ? searchResults : friends;
   const isSearchMode = !!searchQuery.trim();
 

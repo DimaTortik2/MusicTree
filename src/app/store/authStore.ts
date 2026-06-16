@@ -88,10 +88,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   signOut: async () => {
     const deviceId = localStorage.getItem("music-tree-device-id");
     if (deviceId) {
-      await supabase.from("active_devices").delete().eq("id", deviceId);
+      await supabase.rpc("terminate_device", {
+        target_device_id: deviceId,
+        current_device_id: deviceId,
+      });
     }
 
-    await supabase.auth.signOut({ scope: 'local' });
+    await supabase.auth.signOut({ scope: "local" });
 
     // 1. Очищаем IndexedDB (все локальные аудиозаписи)
     await localforage.clear();

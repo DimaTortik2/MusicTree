@@ -25,6 +25,7 @@ import { TransferRule } from '@/components/TransferRule';
 import { MdxImage } from '@/shared/MdxImage';
 import { useAuthStore } from '@/app/store/authStore';
 import { useCloudSync } from '@/shared/hooks/useCloudSync';
+import { useDeviceTracker } from '@/app/hooks/useDeviceTracker';
 
 const mdxComponents = {
   Metronome,
@@ -46,6 +47,7 @@ const App = () => {
   const initializeAuth = useAuthStore((state) => state.initialize);
 
   useCloudSync();
+  useDeviceTracker();
 
   useEffect(() => {
     // Инициализируем сессию Supabase и запускаем слушатель событий

@@ -2,14 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/shared/lib/supabase';
-import {
-  UserMinus,
-  UserPlus,
-  MagnifyingGlass,
-  QrCode,
-  Check,
-  X,
-} from '@phosphor-icons/react';
+import { UserMinus, UserPlus, MagnifyingGlass, QrCode, Check, X } from '@phosphor-icons/react';
 import { useAuthStore } from '@/app/store/authStore';
 // 1. ИМПОРТИРУЕМ НАШ НОВЫЙ UserAvatar ВМЕСТО Avatar
 import { UserAvatar } from '@/shared/UserAvatar';
@@ -19,7 +12,7 @@ import { useFriends, type FriendProfile } from '@/features/friends/hooks/useFrie
 import { MobileSidebarPortal } from '@/shared/MobileSidebarPortal';
 import { toast } from '@/app/utils/toast';
 import { QrShareModal } from '@/pages/FriendsPage/QrShareModal';
-import { QrScannerModal } from '@/pages/FriendsPage/QrScannerModal';
+import { QrScannerModal } from '@/shared/QrScannerModal';
 import { ControlButton } from '@/shared/buttons/ControlButton';
 import { SidebarIcon } from '@/shared/icons/sidebarIcon';
 // 2. ИМПОРТ usePresenceStore БОЛЬШЕ НЕ НУЖЕН, УДАЛИЛИ ЕГО!
@@ -109,7 +102,7 @@ export function FriendsPage() {
           layout="horizontal"
           title="Раздел друзей доступен только зарегистрированным пользователям"
           description="Войдите или создайте аккаунт, чтобы добавлять друзей и проходить совместное дерево."
-          icon={<UserPlus className="size-8 sm:size-10 text-text" weight="regular" />}
+          icon={<UserPlus className="size-8 text-text sm:size-10" weight="regular" />}
           onIconClick={() => navigate('/auth')}
           iconContainerClassName="bg-primary text-surface"
         />

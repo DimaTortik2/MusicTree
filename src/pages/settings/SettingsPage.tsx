@@ -17,6 +17,7 @@ import { useAuthStore } from '@/app/store/authStore';
 import { supabase } from '@/shared/lib/supabase';
 import localforage from 'localforage';
 import { AuthButton } from '@/shared/buttons/AuthButton';
+import { ActiveSessions } from '@/pages/settings/ActiveSessions';
 
 // Форматирование клавиш
 const formatKeyName = (code: string | null) => {
@@ -347,6 +348,8 @@ export default function SettingsPage() {
     <div className="relative min-h-screen w-full p-6 pb-[50vh] text-text md:p-10 md:pb-[50vh]">
       <AuthButton/>
       <UserProfileMenu />
+
+    <ActiveSessions/>
 
       <div className="mb-10 md:hidden">
         <h2 className="mb-1 text-2xl">Тап-бар</h2>

@@ -4,6 +4,7 @@ import { X, CameraSlash, Flashlight } from '@phosphor-icons/react';
 import { Modal } from '@/shared/Modal';
 import { Button } from '@/shared/buttons/Button';
 import { toast } from '@/app/utils/toast';
+import { supabase } from '@/shared/lib/supabase'; 
 
 interface QrScannerModalProps {
   isOpen: boolean;
@@ -19,40 +20,29 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [torchAvailable, setTorchAvailable] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
-
-  // Отдельный стейт для отложенного запуска камеры (чинит баг повторного открытия)
   const [isCameraActive, setIsCameraActive] = useState(false);
 
   const isProcessingScan = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Централизованное управление монтированием и очисткой
   useEffect(() => {
     let mountTimer: ReturnType<typeof setTimeout>;
-
     if (isOpen) {
-      // Даем 300мс форы:
-      // 1. Анимация модалки пройдет без лагов.
-      // 2. ОС успеет 100% освободить аппаратную камеру от предыдущей сессии.
       mountTimer = setTimeout(() => {
         setIsCameraActive(true);
         isProcessingScan.current = false;
       }, 300);
     } else {
-      // Как только модалка закрывается — мгновенно всё тушим
       setIsCameraActive(false);
       setCameraError(null);
       setTorchAvailable(false);
       setTorchOn(false);
     }
-
     return () => clearTimeout(mountTimer);
   }, [isOpen]);
 
-  // Эффект фонарика запускается ТОЛЬКО когда камера реально включилась
   useEffect(() => {
     if (!isCameraActive) return;
-
     let attempts = 0;
     const checkTorchInterval = setInterval(() => {
       attempts++;
@@ -60,12 +50,10 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
         clearInterval(checkTorchInterval);
         return;
       }
-
       const video = containerRef.current?.querySelector('video');
       if (video && video.readyState >= 1 && video.srcObject) {
         const stream = video.srcObject as MediaStream;
         const track = stream.getVideoTracks()[0];
-
         if (track) {
           const capabilities = (
             typeof track.getCapabilities === 'function' ? track.getCapabilities() : {}
@@ -77,7 +65,6 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
         }
       }
     }, 500);
-
     return () => clearInterval(checkTorchInterval);
   }, [isCameraActive]);
 
@@ -88,12 +75,9 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
       const track = stream.getVideoTracks()[0];
       if (track) {
         try {
-          await track.applyConstraints({
-            advanced: [{ torch: !torchOn } as any],
-          });
+          await track.applyConstraints({ advanced: [{ torch: !torchOn } as any] });
           setTorchOn(!torchOn);
         } catch (e) {
-          console.error('Ошибка при включении фонарика:', e);
           toast.error('Не удалось включить фонарик');
         }
       }
@@ -101,16 +85,12 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
   };
 
   const handleClose = useCallback(() => {
-    onClose(); // Закрываем, стейты сбросятся через useEffect выше
+    onClose();
   }, [onClose]);
 
   const handleCameraError = (error: unknown) => {
-    // ИГНОРИРУЕМ любые ошибки, если модалка уже закрывается
-    // (предотвращает ложные ошибки из-за прерывания видеопотока)
     if (!isOpen) return;
-
     const err = error as Error;
-    console.error('Ошибка камеры:', err);
     if (err?.name === 'NotAllowedError') {
       setCameraError('Доступ к камере запрещен. Разрешите его в настройках браузера.');
     } else if (err?.name === 'NotFoundError') {
@@ -124,7 +104,16 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
     }
   };
 
-  const handleScan = (detectedCodes: IDetectedBarcode[]) => {
+  const triggerCooldownError = (message: string) => {
+    isProcessingScan.current = true;
+    toast.error(message);
+    setTimeout(() => {
+      isProcessingScan.current = false;
+    }, 2500);
+  };
+
+  // --- ОБНОВЛЕННЫЙ ОБРАБОТЧИК СКАНА ---
+  const handleScan = async (detectedCodes: IDetectedBarcode[]) => {
     if (isProcessingScan.current || !detectedCodes || detectedCodes.length === 0) return;
 
     const url = detectedCodes[0].rawValue;
@@ -133,10 +122,11 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
     try {
       const parsedUrl = new URL(url);
       const scannedUsername = parsedUrl.searchParams.get('add');
+      const loginToken = parsedUrl.searchParams.get('login_token');
 
+      // 1. ЛОГИКА ДРУЗЕЙ (Осталась как была)
       if (scannedUsername) {
         isProcessingScan.current = true;
-
         if (torchOn) toggleTorch().catch(() => {});
         handleClose();
 
@@ -145,20 +135,43 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
             isProcessingScan.current = false;
           }, 1000);
         });
-      } else {
-        triggerCooldownError('Это не QR-код Music Tree');
+        return;
       }
+
+      // 2. ЛОГИКА АВТОРИЗАЦИИ ПО QR (НОВАЯ)
+      if (loginToken) {
+        isProcessingScan.current = true;
+
+        try {
+          const { data, error } = await supabase.functions.invoke('qr-login', {
+            body: { session_token: loginToken },
+          });
+
+          if (error || (data && data.error)) {
+            throw new Error(data?.error || 'Ошибка входа');
+          }
+
+          toast.success('Успешный вход на новом устройстве!');
+          if (torchOn) toggleTorch().catch(() => {});
+          handleClose();
+        } catch (err: any) {
+          triggerCooldownError(
+            err.message === 'Нет доступа к этой функции'
+              ? 'У вас нет Premium прав для QR входа'
+              : 'Ошибка или QR-код устарел',
+          );
+        } finally {
+          setTimeout(() => {
+            isProcessingScan.current = false;
+          }, 1000);
+        }
+        return;
+      }
+
+      triggerCooldownError('Это не QR-код Music Tree');
     } catch {
       triggerCooldownError('Неверный формат QR-кода');
     }
-  };
-
-  const triggerCooldownError = (message: string) => {
-    isProcessingScan.current = true;
-    toast.error(message);
-    setTimeout(() => {
-      isProcessingScan.current = false;
-    }, 2500);
   };
 
   return (
@@ -191,12 +204,8 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
               <Button variant="solid" color="primary" onClick={handleClose}>
                 Понятно
               </Button>
-              <p className="mt-6 px-4 text-xs text-text/40">
-                Быть может Вы не давали своему браузеру доступ к камере
-              </p>
             </div>
           ) : (
-            /* РЕНДЕРИМ СКАНЕР ТОЛЬКО КОГДА ПРОШЛА ЗАДЕРЖКА (isCameraActive) */
             isCameraActive && (
               <>
                 <div ref={containerRef} className="absolute inset-0 z-0 [&_video]:object-cover">
@@ -211,7 +220,6 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
                     }}
                   />
                 </div>
-
                 {/* Вырез по центру */}
                 <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center overflow-hidden">
                   <div className="relative size-[260px] rounded-3xl shadow-[0_0_0_4000px_rgba(0,0,0,0.55)] sm:size-[300px]">
@@ -221,15 +229,12 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
                     <div className="absolute -right-1 -bottom-1 size-14 rounded-br-[24px] border-r-[4px] border-b-[4px] border-white" />
                   </div>
                 </div>
-
                 {/* Фонарик */}
                 {torchAvailable && (
                   <div className="absolute right-0 bottom-10 left-0 z-30 flex justify-center pb-[env(safe-area-inset-bottom)]">
                     <button
                       onClick={toggleTorch}
-                      className={`flex size-14 items-center justify-center rounded-full backdrop-blur-md transition-all active:scale-95 ${
-                        torchOn ? 'bg-white text-black' : 'bg-black/40 text-white hover:bg-black/60'
-                      }`}
+                      className={`flex size-14 items-center justify-center rounded-full backdrop-blur-md transition-all active:scale-95 ${torchOn ? 'bg-white text-black' : 'bg-black/40 text-white hover:bg-black/60'}`}
                     >
                       <Flashlight size={28} weight={torchOn ? 'fill' : 'regular'} />
                     </button>

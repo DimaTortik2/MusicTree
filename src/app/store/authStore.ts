@@ -1,7 +1,7 @@
-import { supabase } from '@/shared/lib/supabase';
-import type { Session, User } from '@supabase/supabase-js';
-import { create } from 'zustand';
-import localforage from 'localforage';
+import { supabase } from "@/shared/lib/supabase";
+import type { Session, User } from "@supabase/supabase-js";
+import { create } from "zustand";
+import localforage from "localforage";
 
 export interface UserProfile {
   full_name: string | null;
@@ -42,11 +42,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // Вспомогательная функция для загрузки кастомных данных профиля из БД
     const fetchProfile = async (userId: string) => {
       const { data } = await supabase
-        .from('profiles')
+        .from("profiles")
         .select(
-          'full_name, avatar_url, avatar_lqip, can_upload_avatar, can_use_gradient, use_gradient, username, can_use_presence',
+          "full_name, avatar_url, avatar_lqip, can_upload_avatar, can_use_gradient, use_gradient, username, can_use_presence",
         )
-        .eq('id', userId)
+        .eq("id", userId)
         .single();
 
       if (data) {
@@ -85,17 +85,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   signOut: async () => {
+    const deviceId = localStorage.getItem("music-tree-device-id");
+    if (deviceId) {
+      await supabase.from("active_devices").delete().eq("id", deviceId);
+    }
+
     await supabase.auth.signOut();
 
     // 1. Очищаем IndexedDB (все локальные аудиозаписи)
     await localforage.clear();
 
     // 2. Очищаем LocalStorage (прогресс и шорткаты)
-    localStorage.removeItem('music-tree-progress');
-    localStorage.removeItem('app-shortcuts-storage');
-
+    localStorage.removeItem("music-tree-progress");
+    localStorage.removeItem("app-shortcuts-storage");
+    localStorage.removeItem("music-tree-device-id");
     // 3. Делаем хард-редирект на главную (или в /app/tree).
     // Это гарантированно выгрузит старые данные из оперативной памяти Zustand.
-    window.location.href = '/';
+    window.location.href = "/";
   },
 }));

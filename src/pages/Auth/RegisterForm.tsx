@@ -435,6 +435,18 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onOpenQrScanner }) =
 
         {/* 🔥 НОВАЯ СЕКЦИЯ КНОПОК */}
         <div className="space-y-4">
+          {onOpenQrScanner && (
+            <Button
+              type="button"
+              variant="solid"
+              color="primary"
+              size="md"
+              className="relative flex w-full justify-center border-none font-medium md:hidden"
+              onClick={onOpenQrScanner}
+            >
+              <QrCode className="absolute left-6 h-5 w-5" /> Войти по QR-коду
+            </Button>
+          )}
           <Button
             type="button"
             variant="solid"
@@ -455,20 +467,6 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onOpenQrScanner }) =
           >
             <GithubLogo className="absolute left-6 h-5 w-5" /> Войти через Github
           </Button>
-
-          {/* 🔥 Кнопка QR входа. Скрыта на десктопах через md:hidden */}
-          {onOpenQrScanner && (
-            <Button
-              type="button"
-              variant="solid"
-              color="primary"
-              size="md"
-              className="relative flex w-full justify-center border-none font-medium md:hidden"
-              onClick={onOpenQrScanner}
-            >
-              <QrCode className="absolute left-6 h-5 w-5" /> Войти по QR-коду
-            </Button>
-          )}
         </div>
 
         {renderCaptcha()}

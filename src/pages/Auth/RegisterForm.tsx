@@ -322,7 +322,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onOpenQrScanner }) =
         <ArrowLeft className="h-5 w-5" />
       </button>
 
-      <div className="relative mt-4 mb-12 flex w-fit rounded-2xl bg-surface p-1.5 sm:mt-0">
+      <div className="relative mt-4 mb-12 flex w-fit rounded-2xl p-1.5 sm:mt-0">
         <button
           type="button"
           onClick={() => setIsLogin(false)}
@@ -426,8 +426,25 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onOpenQrScanner }) =
             </div>
           </div>
         </div>
-
-        <div className="my-8 flex items-center gap-4 sm:my-10">
+        <p className="mt-6 text-center text-xs leading-relaxed text-text/40">
+          Создавая аккаунт или авторизуясь, вы соглашаетесь с{' '}
+          <button
+            type="button"
+            onClick={() => navigate('/terms')}
+            className="cursor-pointer text-text/60 underline decoration-text/30 underline-offset-2 transition-colors hover:text-primary hover:decoration-primary"
+          >
+            Условиями использования
+          </button>{' '}
+          и{' '}
+          <button
+            type="button"
+            onClick={() => navigate('/privacy')}
+            className="cursor-pointer text-text/60 underline decoration-text/30 underline-offset-2 transition-colors hover:text-primary hover:decoration-primary"
+          >
+            Политикой конфиденциальности
+          </button>
+        </p>
+        <div className="my-4 flex items-center gap-4 sm:my-6">
           <div className="h-px flex-1 bg-line"></div>
           <span className="text-sm text-text/40">или</span>
           <div className="h-px flex-1 bg-line"></div>

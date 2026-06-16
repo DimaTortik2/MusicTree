@@ -151,7 +151,7 @@ export const AuthPage = () => {
         }}
       />
 
-      <div className="relative z-20 flex w-full flex-col bg-surface p-6 sm:p-12 md:w-[480px] xl:w-[540px]">
+      <div className="relative z-20 flex w-full flex-col bg-surface/40 backdrop-blur-lg p-6 sm:p-12 md:w-[480px] xl:w-[540px]">
         <RegisterForm onOpenQrScanner={() => setIsPhoneScannerOpen(true)} />
       </div>
 

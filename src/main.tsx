@@ -26,6 +26,7 @@ import { MdxImage } from '@/shared/MdxImage';
 import { useAuthStore } from '@/app/store/authStore';
 import { useCloudSync } from '@/shared/hooks/useCloudSync';
 import { useDeviceTracker } from '@/app/hooks/useDeviceTracker';
+import { CookieBanner } from '@/shared/CookieBanner';
 
 const mdxComponents = {
   Metronome,
@@ -77,6 +78,7 @@ const App = () => {
           pauseOnHover
           theme="dark"
         />
+        <CookieBanner/>
         <ShortcutManager />
       </ThemeProvider>
     </MDXProvider>

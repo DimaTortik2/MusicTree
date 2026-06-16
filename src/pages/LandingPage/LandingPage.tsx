@@ -150,14 +150,13 @@ export function LandingPage() {
       </div>
 
       <main className="relative z-10 flex w-full flex-1 flex-col justify-center px-6 pt-20 pb-10 sm:items-center">
-       
         <div className="z-20 flex w-full flex-col items-center justify-center">
           <p className="mb-2 text-center text-xl font-light sm:mb-4 sm:text-left sm:text-3xl">
             Добро пожаловать на
           </p>
           <Logo className="mb-8 h-auto w-[85%] max-w-[320px] drop-shadow-sm sm:mb-12 sm:w-full sm:max-w-120" />
           {/* Mobile MIC */}
-          <div className="relative mb-10 flex max-w-[20rem] self-end sm:hidden -right-8">
+          <div className="relative -right-8 mb-10 flex max-w-[20rem] self-end sm:hidden">
             <Microphone className="h-auto w-[120%] rotate-[-20deg]" />
           </div>
           {/* Кнопка */}
@@ -165,6 +164,20 @@ export function LandingPage() {
             Начать
           </Button>
         </div>
+        <footer className="absolute bottom-0 left-0 z-20 flex flex-col md:flex-row w-full justify-center gap-6 pb-6 text-xs text-text/40 sm:pb-8 sm:text-sm">
+          <button
+            onClick={() => navigate('/terms')}
+            className="cursor-pointer transition-colors hover:text-primary"
+          >
+            Условия использования
+          </button>
+          <button
+            onClick={() => navigate('/privacy')}
+            className="cursor-pointer transition-colors hover:text-primary"
+          >
+            Конфиденциальность
+          </button>
+        </footer>
       </main>
     </div>
   );

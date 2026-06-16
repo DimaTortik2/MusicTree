@@ -16,6 +16,8 @@ import { PublicRoute } from '@/app/providers/AuthRoutes';
 import { AuthPage } from '@/pages/Auth/AuthPage';
 import { UpdatePasswordPage } from '@/pages/Auth/UpdatePasswordPage';
 import { FriendsPage } from '@/pages/FriendsPage/FriendsPage';
+import { TermsPage } from '@/pages/Legal/TermsPage';
+import { PrivacyPage } from '@/pages/Legal/PrivacyPage';
 
 export const router = createBrowserRouter([
   {
@@ -33,6 +35,14 @@ export const router = createBrowserRouter([
   {
     path: '/update-password',
     element: <UpdatePasswordPage />,
+  },
+  {
+    path: '/terms',
+    element: <TermsPage />,
+  },
+  {
+    path: '/privacy',
+    element: <PrivacyPage />,
   },
   {
     path: '/app',

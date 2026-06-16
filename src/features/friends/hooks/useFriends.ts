@@ -82,6 +82,16 @@ export const useFriends = () => {
         },
         () => loadData(),
       )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'friends',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => loadData(),
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);

@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '@/shared/lib/supabase';
-import { useAuthStore, type UserProfile } from '@/app/store/authStore';
-import { toast } from '@/app/utils/toast';
+import { useEffect, useState } from "react";
+import { supabase } from "@/shared/lib/supabase";
+import { useAuthStore, type UserProfile } from "@/app/store/authStore";
+import { toast } from "@/app/utils/toast";
 
 export interface FriendProfile extends UserProfile {
   id: string;
@@ -9,7 +9,11 @@ export interface FriendProfile extends UserProfile {
 
 export interface AppNotification {
   id: string;
-  type: 'friend_request' | 'friend_removed';
+  type:
+    | "friend_request"
+    | "friend_removed"
+    | "shared_tree_created"
+    | "shared_tree_deleted";
   sender_id: string;
   created_at: string;
   sender: FriendProfile;
@@ -17,7 +21,7 @@ export interface AppNotification {
 
 // ДОБАВИЛИ username
 const PROFILE_FIELDS =
-  'id, full_name, avatar_url, avatar_lqip, username, can_upload_avatar, can_use_gradient, use_gradient, can_use_presence';
+  "id, full_name, avatar_url, avatar_lqip, username, can_upload_avatar, can_use_gradient, use_gradient, can_use_presence";
 
 export const useFriends = () => {
   const { user } = useAuthStore();
@@ -26,15 +30,40 @@ export const useFriends = () => {
   const [searchResults, setSearchResults] = useState<FriendProfile[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [sharedTrees, setSharedTrees] = useState<
+    { id: string; user1_id: string; user2_id: string }[]
+  >([]);
+
+  const deleteSharedTree = async (treeId: string) => {
+    const { error } = await supabase
+      .from("shared_trees")
+      .delete()
+      .eq("id", treeId);
+
+    if (!error) {
+      setSharedTrees((prev) => prev.filter((t) => t.id !== treeId));
+      toast.success("Совместное дерево удалено");
+    } else {
+      toast.error("Не удалось удалить дерево");
+    }
+  };
 
   const loadData = async () => {
     if (!user) return;
     setIsLoading(true);
 
+    const { data: treesData } = await supabase
+      .from("shared_trees")
+      .select("id, user1_id, user2_id");
+
+    if (treesData) {
+      setSharedTrees(treesData);
+    }
+
     const { data: friendsData } = await supabase
-      .from('friends')
+      .from("friends")
       .select(`friend_id, profiles!friends_friend_id_fkey(${PROFILE_FIELDS})`)
-      .eq('user_id', user.id);
+      .eq("user_id", user.id);
 
     if (friendsData) {
       const mappedFriends = friendsData.map((f: any) => {
@@ -45,12 +74,12 @@ export const useFriends = () => {
     }
 
     const { data: notifData } = await supabase
-      .from('notifications')
+      .from("notifications")
       .select(
         `id, type, sender_id, created_at, sender:profiles!notifications_sender_id_fkey(${PROFILE_FIELDS})`,
       )
-      .eq('recipient_id', user.id)
-      .order('created_at', { ascending: false });
+      .eq("recipient_id", user.id)
+      .order("created_at", { ascending: false });
 
     if (notifData) {
       const mappedNotifs = notifData.map((n: any) => {
@@ -71,24 +100,32 @@ export const useFriends = () => {
     loadData();
     if (!user) return;
     const channel = supabase
-      .channel('schema-db-changes')
+      .channel("schema-db-changes")
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: '*',
-          schema: 'public',
-          table: 'notifications',
+          event: "*",
+          schema: "public",
+          table: "notifications",
           filter: `recipient_id=eq.${user.id}`,
         },
         () => loadData(),
       )
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: '*',
-          schema: 'public',
-          table: 'friends',
+          event: "*",
+          schema: "public",
+          table: "friends",
           filter: `user_id=eq.${user.id}`,
+        },
+        () => loadData(),
+      ).on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "shared_trees",
         },
         () => loadData(),
       )
@@ -108,7 +145,7 @@ export const useFriends = () => {
     }
 
     setIsSearching(true);
-    const { data } = await supabase.rpc('search_users_secure', {
+    const { data } = await supabase.rpc("search_users_secure", {
       search_query: trimmedQuery,
     });
 
@@ -119,9 +156,13 @@ export const useFriends = () => {
   const sendRequest = async (recipientId: string) => {
     if (!user) return;
     const { error } = await supabase
-      .from('notifications')
-      .insert([{ recipient_id: recipientId, sender_id: user.id, type: 'friend_request' }]);
-    if (!error) toast.success('Заявка отправлена!');
+      .from("notifications")
+      .insert([{
+        recipient_id: recipientId,
+        sender_id: user.id,
+        type: "friend_request",
+      }]);
+    if (!error) toast.success("Заявка отправлена!");
   };
 
   // 4. Принять заявку (теперь через безопасный RPC)
@@ -129,21 +170,21 @@ export const useFriends = () => {
     if (!user) return;
 
     // Вызываем нашу транзакцию на стороне БД
-    const { error } = await supabase.rpc('accept_friend_request', {
+    const { error } = await supabase.rpc("accept_friend_request", {
       notif_id: notificationId,
       sender: senderId,
     });
 
     if (error) {
-      console.error('Ошибка при добавлении в друзья:', error);
-      toast.error('Не удалось добавить в друзья');
+      console.error("Ошибка при добавлении в друзья:", error);
+      toast.error("Не удалось добавить в друзья");
       return;
     }
 
     // Успех! Очищаем UI локально и перезагружаем
     setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
     loadData();
-    toast.success('Пользователь добавлен в друзья!');
+    toast.success("Пользователь добавлен в друзья!");
   };
 
   // 5. Удалить из друзей
@@ -152,31 +193,35 @@ export const useFriends = () => {
 
     // Пытаемся удалить перекрестно
     const { error: err1 } = await supabase
-      .from('friends')
+      .from("friends")
       .delete()
       .match({ user_id: user.id, friend_id: friendId });
     const { error: err2 } = await supabase
-      .from('friends')
+      .from("friends")
       .delete()
       .match({ user_id: friendId, friend_id: user.id });
 
     if (err1 || err2) {
-      console.error('Ошибка при удалении из друзей:', err1 || err2);
-      toast.error('Не удалось удалить пользователя');
+      console.error("Ошибка при удалении из друзей:", err1 || err2);
+      toast.error("Не удалось удалить пользователя");
       return;
     }
 
     // Отправляем уведомление об удалении
     await supabase
-      .from('notifications')
-      .insert([{ recipient_id: friendId, sender_id: user.id, type: 'friend_removed' }]);
+      .from("notifications")
+      .insert([{
+        recipient_id: friendId,
+        sender_id: user.id,
+        type: "friend_removed",
+      }]);
 
     loadData();
-    toast.success('Пользователь удален из друзей');
+    toast.success("Пользователь удален из друзей");
   };
 
   const dismissNotification = async (notificationId: string) => {
-    await supabase.from('notifications').delete().eq('id', notificationId);
+    await supabase.from("notifications").delete().eq("id", notificationId);
     setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
   };
 
@@ -191,5 +236,7 @@ export const useFriends = () => {
     acceptRequest,
     removeFriend,
     dismissNotification,
+    sharedTrees,
+    deleteSharedTree,
   };
 };

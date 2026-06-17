@@ -17,6 +17,9 @@ import { AmbientGlow } from '@/shared/AmbientGlow';
 import { useCloudSync } from '@/shared/hooks/useCloudSync';
 import { AuthLoader } from '@/app/providers/AuthRoutes';
 import { useAppPresence } from '@/app/hooks/useAppPresence';
+import { SharedTreeBanner } from '@/shared/SharedTreeBanner';
+import { useAppModeStore } from '@/app/store/useAppModeStore';
+import { useSharedTreeSync } from '@/shared/hooks/useSharedTreeSync';
 
 const TAB_ROUTES: Record<string, string> = {
   tree: '/app/tree',
@@ -68,11 +71,13 @@ const pageTransitionVariants: Variants = {
 
 export const AppLayout = () => {
   const { isSyncing } = useCloudSync();
-
+  const { activeSharedFriend } = useAppModeStore();
   const [isPianoActive, setIsPianoActive] = useState(false);
   const [isOverflowOpen, setIsOverflowOpen] = useState(false);
   const [isCustomizing, setIsCustomizing] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useSharedTreeSync();
 
   const overflowRef = useRef<HTMLDivElement>(null);
   const toggleBtnRef = useRef<HTMLButtonElement>(null);
@@ -112,6 +117,14 @@ export const AppLayout = () => {
   // ✨ Логика вычисления направления (вперед = 1, назад = -1)
   const prevTabIdRef = useRef<string | null>(currentTabId);
   const directionRef = useRef(1);
+
+  const desktopNavItems = useMemo(() => {
+    if (activeSharedFriend) {
+      const others = DESKTOP_NAV_ITEMS.filter((i) => i !== 'friends' && i !== 'chats');
+      return ['friends', 'chats', ...others];
+    }
+    return DESKTOP_NAV_ITEMS;
+  }, [activeSharedFriend]);
 
   if (currentTabId && currentTabId !== prevTabIdRef.current) {
     // В зависимости от платформы берем нужный порядок вкладок
@@ -228,22 +241,30 @@ export const AppLayout = () => {
     }
 
     const route = TAB_ROUTES[id] || '/app';
+    const isChats = id === 'chats';
+    const isChatsDisabled = isChats && !activeSharedFriend;
 
     return (
       <Tooltip key={id} content={label} shortcutAction={shortcutAction} position={tooltipPosition}>
         <NavLink
           to={route}
-          onClick={() => setIsOverflowOpen(false)}
+          onClick={(e) => {
+            if (isChatsDisabled)
+              e.preventDefault(); // Запрещаем переход
+            else setIsOverflowOpen(false);
+          }}
           className={({ isActive }) =>
-            `flex items-center justify-center transition-colors duration-150 ${
-              isMobileView ? 'p-1.5' : 'rounded-lg p-2'
-            } ${
-              isActive
-                ? 'text-text'
-                : isMobileView
-                  ? 'text-text/40 hover:text-text'
-                  : 'text-text/40 hover:bg-surface/40 hover:text-text'
-            }`
+            cn(
+              'flex items-center justify-center transition-colors duration-150 outline-none',
+              isMobileView ? 'p-1.5' : 'rounded-lg p-2',
+              isActive && !isChatsDisabled ? 'text-text' : 'text-text/40',
+              !isChatsDisabled && isMobileView && 'hover:text-text',
+              !isChatsDisabled &&
+                !isMobileView &&
+                !isActive &&
+                'hover:bg-surface/40 hover:text-text',
+              isChatsDisabled && 'pointer-events-none cursor-not-allowed opacity-30', // Делаем серым и некликабельным
+            )
           }
         >
           <Icon size={isMobileView ? 24 : 22} />
@@ -276,7 +297,7 @@ export const AppLayout = () => {
       {/* 1. Десктопный Сайдбар (z-20) */}
       <aside className="z-20 hidden h-full w-16 flex-col items-center justify-between border-r-[3px] border-text/18 bg-background py-4 select-none md:flex">
         <nav className="flex w-full flex-col items-center gap-5">
-          {DESKTOP_NAV_ITEMS.map((id) => renderTabIcon(id, false))}
+          {desktopNavItems.map((id) => renderTabIcon(id, false))}
         </nav>
         <div className="flex w-full flex-col items-center">{renderTabIcon('piano', false)}</div>
       </aside>
@@ -288,6 +309,7 @@ export const AppLayout = () => {
       <main className="relative z-10 flex-1 overflow-hidden bg-transparent transition-all duration-300">
         {/* Обертка теперь relative для абсолютного позиционирования страниц */}
         <div className="relative h-full w-full">
+          <SharedTreeBanner />
           <AudioUnlockOverlay />
 
           {/* ✨ mode="wait" заставляет старую страницу исчезнуть до появления новой */}

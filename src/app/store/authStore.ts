@@ -13,6 +13,7 @@ export interface UserProfile {
   use_gradient: boolean;
   can_use_presence: boolean;
   can_use_qr_login: boolean;
+  can_use_friends: boolean;
 }
 
 interface AuthState {
@@ -45,7 +46,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { data } = await supabase
         .from("profiles")
         .select(
-          "full_name, avatar_url, avatar_lqip, can_upload_avatar, can_use_gradient, use_gradient, username, can_use_presence, can_use_qr_login",
+          "full_name, avatar_url, avatar_lqip, can_upload_avatar, can_use_gradient, use_gradient, username, can_use_presence, can_use_qr_login, can_use_friends",
         )
         .eq("id", userId)
         .single();
@@ -103,6 +104,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     localStorage.removeItem("music-tree-progress");
     localStorage.removeItem("app-shortcuts-storage");
     localStorage.removeItem("music-tree-device-id");
+    localStorage.removeItem("music-tree-app-mode");
     // 3. Делаем хард-редирект на главную (или в /app/tree).
     // Это гарантированно выгрузит старые данные из оперативной памяти Zustand.
     window.location.href = "/";

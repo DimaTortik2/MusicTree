@@ -2,7 +2,16 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/shared/lib/supabase';
-import { UserMinus, UserPlus, MagnifyingGlass, QrCode, Check, X } from '@phosphor-icons/react';
+import {
+  UserMinus,
+  UserPlus,
+  MagnifyingGlass,
+  QrCode,
+  Check,
+  X,
+  GitFork,
+  Trash,
+} from '@phosphor-icons/react';
 import { useAuthStore } from '@/app/store/authStore';
 // 1. ИМПОРТИРУЕМ НАШ НОВЫЙ UserAvatar ВМЕСТО Avatar
 import { UserAvatar } from '@/shared/UserAvatar';
@@ -15,6 +24,10 @@ import { QrShareModal } from '@/pages/FriendsPage/QrShareModal';
 import { QrScannerModal } from '@/shared/QrScannerModal';
 import { ControlButton } from '@/shared/buttons/ControlButton';
 import { SidebarIcon } from '@/shared/icons/sidebarIcon';
+import { useAppModeStore } from '@/app/store/useAppModeStore';
+import { useProgressStore } from '@/app/store/useProgressStore';
+import { useSharedProgressStore } from '@/app/store/useSharedProgressStore';
+import { cn } from '@/app/utils/cn';
 // 2. ИМПОРТ usePresenceStore БОЛЬШЕ НЕ НУЖЕН, УДАЛИЛИ ЕГО!
 
 export function FriendsPage() {
@@ -31,15 +44,134 @@ export function FriendsPage() {
     acceptRequest,
     removeFriend,
     dismissNotification,
+    deleteSharedTree,
+    sharedTrees,
   } = useFriends();
 
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [userToRemove, setUserToRemove] = useState<FriendProfile | null>(null);
+  const [treeToDelete, setTreeToDelete] = useState<{
+    friend: FriendProfile;
+    treeId: string;
+  } | null>(null);
 
   const [isQrShareOpen, setIsQrShareOpen] = useState(false);
   const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
+
+  const { activeSharedFriend, setSharedMode, exitSharedMode } = useAppModeStore();
+  const personalProgress = useProgressStore();
+
+  const [isCreatingShared, setIsCreatingShared] = useState<FriendProfile | null>(null);
+  const [isSyncingModalOpen, setIsSyncingModalOpen] = useState(false);
+
+  // 1. НАЖАТИЕ НА ДРУГА
+  const handleFriendClick = async (friend: FriendProfile) => {
+    // Проверяем, есть ли уже дерево с этим другом
+    const { data } = await supabase
+      .from('shared_trees')
+      .select('id, progress_state')
+      .or(
+        `and(user1_id.eq.${user?.id},user2_id.eq.${friend.id}),and(user1_id.eq.${friend.id},user2_id.eq.${user?.id})`,
+      )
+      .single();
+
+    if (data) {
+      // Дерево есть! Загружаем его в стор и переходим
+      useSharedProgressStore.setState(data.progress_state || {});
+      setSharedMode(friend, data.id);
+      navigate('/app/tree');
+    } else {
+      // Дерева нет, открываем модалку создания
+      setIsCreatingShared(friend);
+    }
+  };
+
+  // 2. СОЗДАНИЕ ДЕРЕВА
+  const handleCreateTree = async (type: 'empty' | 'min') => {
+    if (!isCreatingShared || !user) return;
+
+    let initialState = {};
+
+    if (type === 'min') {
+      // Ищем прогресс друга
+      const { data: friendProfile } = await supabase
+        .from('profiles')
+        .select('progress_state')
+        .eq('id', isCreatingShared.id)
+        .single();
+
+      const friendState = friendProfile?.progress_state || {};
+
+      // Пересечение массивов
+      const intersect = (arr1: any[] = [], arr2: any[] = []) =>
+        arr1.filter((x) => arr2.includes(x));
+
+      initialState = {
+        passedLessons: intersect(personalProgress.passedLessons, friendState.passedLessons),
+        passedHomeworks: intersect(personalProgress.passedHomeworks, friendState.passedHomeworks),
+        // Тесты объединять сложнее, оставим пустые или можно написать логику пересечения
+      };
+    }
+
+    const { data } = await supabase
+      .from('shared_trees')
+      .insert([{ user1_id: user.id, user2_id: isCreatingShared.id, progress_state: initialState }])
+      .select()
+      .single();
+
+    if (data) {
+      useSharedProgressStore.setState(initialState);
+      setSharedMode(isCreatingShared, data.id);
+      setIsCreatingShared(null);
+      navigate('/app/tree');
+    } else {
+      toast.error('Не удалось создать совместное дерево');
+    }
+  };
+
+  // 3. ВОЗВРАТ К СВОЕМУ ДЕРЕВУ
+  const handleReturnToPersonal = () => {
+    const sharedProgress = useSharedProgressStore.getState();
+
+    // Сравниваем прогресс
+    const hasMoreLessons =
+      sharedProgress.passedLessons.length > personalProgress.passedLessons.length;
+    const hasMoreHW =
+      sharedProgress.passedHomeworks.length > personalProgress.passedHomeworks.length;
+    const hasMoreTests =
+      Object.keys(sharedProgress.passedTests).length >
+      Object.keys(personalProgress.passedTests).length;
+
+    if (hasMoreLessons || hasMoreHW || hasMoreTests) {
+      setIsSyncingModalOpen(true);
+    } else {
+      exitSharedMode();
+      navigate('/app/tree');
+    }
+  };
+
+  // 4. ПЕРЕНОС ПРОГРЕССА
+  const handleSyncProgress = (sync: boolean) => {
+    if (sync) {
+      const sharedProgress = useSharedProgressStore.getState();
+      useProgressStore.setState({
+        passedLessons: [
+          ...new Set([...personalProgress.passedLessons, ...sharedProgress.passedLessons]),
+        ],
+        passedHomeworks: [
+          ...new Set([...personalProgress.passedHomeworks, ...sharedProgress.passedHomeworks]),
+        ],
+        passedTests: { ...personalProgress.passedTests, ...sharedProgress.passedTests },
+      });
+      toast.success('Прогресс успешно перенесен к вам!');
+    }
+
+    exitSharedMode();
+    setIsSyncingModalOpen(false);
+    navigate('/app/tree');
+  };
 
   const prevNotifsLength = useRef(notifications.length);
   useEffect(() => {
@@ -104,16 +236,24 @@ export function FriendsPage() {
     }
   }, [searchParams, profile, setSearchParams]);
 
-  if (initialized && !user) {
+  if (initialized && (!user || !profile?.can_use_friends)) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center p-6 md:p-12">
         <Modal
           inline
           layout="horizontal"
-          title="Раздел друзей доступен только зарегистрированным пользователям"
-          description="Войдите или создайте аккаунт, чтобы добавлять друзей и проходить совместное дерево."
+          title={
+            !user
+              ? 'Раздел друзей может быть доступен только зарегистрированным пользователям'
+              : 'Доступ к разделу Друзья закрыт'
+          }
+          description={
+            !user
+              ? 'Войдите или создайте аккаунт, чтобы добавлять друзей.'
+              : 'Ваш аккаунт пока не имеет доступа к функции совместных деревьев.'
+          }
           icon={<UserPlus className="size-8 text-text sm:size-10" weight="regular" />}
-          onIconClick={() => navigate('/auth')}
+          onIconClick={!user ? () => navigate('/auth') : undefined}
           iconContainerClassName="bg-primary text-surface"
         />
       </div>
@@ -188,7 +328,53 @@ export function FriendsPage() {
                       <X weight="bold" size={20} />
                     </button>
                   </>
+                ) : notif.type === 'shared_tree_created' ? (
+                  // 🔥 НОВЫЙ ТИП: Уведомление о создании совместного дерева
+                  <>
+                    <span className="text-sm font-medium text-text/60">
+                      Создал совместное дерево!
+                    </span>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => {
+                          // Быстрый бесшовный вход в созданное дерево прямо из уведомления!
+                          handleFriendClick(notif.sender);
+                          dismissNotification(notif.id);
+                        }}
+                        className="group flex cursor-pointer items-center gap-1.5 outline-none"
+                      >
+                        <Check
+                          weight="bold"
+                          size={18}
+                          className="text-primary transition-opacity group-hover:opacity-40"
+                        />
+                        <span className="text-sm font-medium text-primary transition-opacity group-hover:opacity-40">
+                          Войти
+                        </span>
+                      </button>
+                      <button
+                        onClick={() => dismissNotification(notif.id)}
+                        className="cursor-pointer text-primary/60 transition-opacity outline-none hover:text-primary"
+                      >
+                        <X weight="bold" size={18} />
+                      </button>
+                    </div>
+                  </>
+                ) : notif.type === 'shared_tree_deleted' ? (
+                  // 🔥 НОВЫЙ ТИП: Уведомление об удалении совместного дерева
+                  <>
+                    <span className="text-sm font-medium text-text/60">
+                      Удалил совместное дерево
+                    </span>
+                    <button
+                      onClick={() => dismissNotification(notif.id)}
+                      className="cursor-pointer text-primary transition-opacity outline-none hover:opacity-40"
+                    >
+                      <X weight="bold" size={20} />
+                    </button>
+                  </>
                 ) : (
+                  // Обычное удаление из друзей
                   <>
                     <span className="text-sm font-medium text-text/60">Удалил вас из друзей</span>
                     <button
@@ -260,8 +446,30 @@ export function FriendsPage() {
               </motion.div>
             )}
 
+            {activeSharedFriend && !isSearchMode && (
+              <motion.div
+                layout="position"
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex cursor-pointer items-center justify-start gap-4 rounded-2xl border-3 border-primary p-3 transition-colors hover:bg-primary/20 sm:p-4"
+                onClick={handleReturnToPersonal}
+              >
+                <div className="flex size-12 shrink-0 items-center justify-center rounded-full text-text sm:size-14">
+                  <GitFork size={28} weight="bold" />
+                </div>
+                <span className="text-base font-medium text-text sm:text-lg">
+                  Вернуться к своему дереву
+                </span>
+              </motion.div>
+            )}
+
             {displayList.map((person) => {
               const isAlreadyFriend = friends.some((f) => f.id === person.id);
+
+              // Находим совместное дерево с этим другом, если оно есть
+              const activeTree = sharedTrees.find(
+                (t) => t.user1_id === person.id || t.user2_id === person.id,
+              );
 
               return (
                 <motion.div
@@ -270,11 +478,19 @@ export function FriendsPage() {
                   initial={{ opacity: 0, scale: 0.98 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.98 }}
-                  className="flex items-center justify-between rounded-2xl border-3 border-primary bg-transparent p-3 sm:p-4"
+                  onClick={() => {
+                    if (isAlreadyFriend) {
+                      handleFriendClick(person);
+                    } else {
+                      toast.info('Сначала отправьте заявку в друзья!');
+                    }
+                  }}
+                  className={cn(
+                    'flex items-center justify-between rounded-2xl border-3 border-primary bg-transparent p-3 transition-colors sm:p-4',
+                    isAlreadyFriend ? 'cursor-pointer hover:bg-primary/20' : 'cursor-default',
+                  )}
                 >
                   <div className="flex items-center gap-4 overflow-hidden">
-                    {/* ЗАМЕНА 2: Главный список друзей.
-                        Убрали isOnline={isOnline}, просто передали userId={person.id} */}
                     <UserAvatar
                       userId={person.id}
                       name={person.full_name || 'User'}
@@ -291,21 +507,43 @@ export function FriendsPage() {
                     </div>
                   </div>
 
-                  {isSearchMode && !isAlreadyFriend ? (
-                    <button
-                      onClick={() => sendRequest(person.id)}
-                      className="cursor-pointer p-2 text-primary transition-opacity outline-none hover:opacity-40"
-                    >
-                      <UserPlus size={24} weight="bold" />
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => setUserToRemove(person)}
-                      className="cursor-pointer p-2 text-primary transition-opacity outline-none hover:opacity-40"
-                    >
-                      <UserMinus size={24} weight="bold" />
-                    </button>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {/* КНОПКА УДАЛЕНИЯ ДЕРЕВА (Показывается только друзьям и только если дерево создано) */}
+                    {isAlreadyFriend && activeTree && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation(); // 🛡 Останавливаем переход в дерево
+                          setTreeToDelete({ friend: person, treeId: activeTree.id });
+                        }}
+                        className="cursor-pointer p-2 text-primary transition-colors outline-none hover:text-primary/40"
+                        title="Удалить совместное дерево"
+                      >
+                        <Trash size={24} weight="bold" />
+                      </button>
+                    )}
+
+                    {isSearchMode && !isAlreadyFriend ? (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          sendRequest(person.id);
+                        }}
+                        className="cursor-pointer p-2 text-primary transition-opacity outline-none hover:opacity-40"
+                      >
+                        <UserPlus size={24} weight="bold" />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation(); // 🛡 Останавливаем переход в дерево
+                          setUserToRemove(person);
+                        }}
+                        className="cursor-pointer p-2 text-primary transition-opacity outline-none hover:opacity-40"
+                      >
+                        <UserMinus size={24} weight="bold" />
+                      </button>
+                    )}
+                  </div>
                 </motion.div>
               );
             })}
@@ -374,6 +612,91 @@ export function FriendsPage() {
               className="w-full sm:w-auto"
             >
               Удалить
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* МОДАЛКА: Создание совместного дерева */}
+      <Modal isOpen={!!isCreatingShared} onClose={() => setIsCreatingShared(null)}>
+        <h2 className="text-xl font-medium text-text">Создать совместное дерево</h2>
+        <p className="mb-6 text-sm text-text/60">
+          У вас еще нет совместного дерева с {isCreatingShared?.full_name}. Вы можете создать его с
+          нуля или объединить ваши уже пройденные лекции (возьмется минимальный общий прогресс).
+        </p>
+        <div className="flex flex-col gap-3">
+          <Button variant="solid" onClick={() => handleCreateTree('min')}>
+            Объединить прогресс
+          </Button>
+          <Button variant="outline" onClick={() => handleCreateTree('empty')}>
+            Создать пустое
+          </Button>
+          <Button variant="outline" color="text" onClick={() => setIsCreatingShared(null)}>
+            Отмена
+          </Button>
+        </div>
+      </Modal>
+
+      {/* МОДАЛКА: Перенос прогресса при возврате */}
+      <Modal isOpen={isSyncingModalOpen} onClose={() => setIsSyncingModalOpen(false)}>
+        <h2 className="text-xl font-medium text-text">Перенести результаты?</h2>
+        <p className="mb-6 text-sm text-text/60">
+          Вместе с {activeSharedFriend?.full_name} вы прошли больше лекций и заданий, чем на вашем
+          личном дереве. Хотите перенести эти результаты себе, чтобы не проходить их заново?
+        </p>
+        <div className="flex flex-col justify-end gap-3 sm:flex-row">
+          <Button variant="outline" onClick={() => handleSyncProgress(false)}>
+            Не переносить
+          </Button>
+          <Button variant="solid" onClick={() => handleSyncProgress(true)}>
+            Да, перенести
+          </Button>
+        </div>
+      </Modal>
+
+      {/* Модалка подтверждения удаления совместного дерева */}
+      <Modal
+        isOpen={!!treeToDelete}
+        onClose={() => setTreeToDelete(null)}
+        layout="vertical"
+        className="max-w-[500px]"
+      >
+        <div className="flex flex-col gap-6 text-left">
+          <span className="text-xl font-medium text-text">Удалить совместное дерево?</span>
+          <p className="text-sm leading-relaxed text-text/60">
+            Это действие полностью сбросит совместный прогресс с{' '}
+            <strong className="text-text">{treeToDelete?.friend.full_name}</strong>. Все пройденные
+            вместе лекции, тесты и домашки в рамках этого дерева будут стерты. Ваши личные прогрессы
+            останутся нетронутыми.
+          </p>
+
+          <div className="flex w-full flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <Button
+              variant="outline"
+              onClick={() => setTreeToDelete(null)}
+              className="w-full sm:w-auto"
+            >
+              Отмена
+            </Button>
+            <Button
+              variant="solid"
+              color="primary"
+              onClick={async () => {
+                if (treeToDelete) {
+                  // Удаляем дерево из БД
+                  await deleteSharedTree(treeToDelete.treeId);
+
+                  // Если мы прямо сейчас находимся в режиме этого дерева — выходим из него
+                  if (activeSharedFriend?.id === treeToDelete.friend.id) {
+                    exitSharedMode();
+                  }
+
+                  setTreeToDelete(null);
+                }
+              }}
+              className="w-full sm:w-auto"
+            >
+              Удалить дерево
             </Button>
           </div>
         </div>

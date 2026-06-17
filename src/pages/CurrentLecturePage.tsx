@@ -1,12 +1,12 @@
 import React, { useMemo, useState, useEffect, useLayoutEffect, Suspense, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useProgressStore } from '@/app/store/useProgressStore';
 import { contentConfig } from '@/contentConfig';
 import { FireSimple } from '@phosphor-icons/react';
 import { Button } from '@/shared/buttons/Button';
 import { MdxSkeleton } from '@/shared/MdxSkeleton';
 import confetti from 'canvas-confetti';
 import { motion } from 'framer-motion';
+import { useCurrentProgress } from '@/app/hooks/useCurrentProgress';
 
 const mdxLectures = import.meta.glob('/src/content/**/*.mdx');
 
@@ -50,7 +50,7 @@ const MdxContentWrapper = ({
     if (!el) return;
 
     const scrollNode = getScrollNode(el);
-    const savedY = useProgressStore.getState().lessonScrollPositions[lessonId] || 0;
+    const savedY = useCurrentProgress.getState().lessonScrollPositions[lessonId] || 0;
 
     let isRestoring = true;
     let isUnmounting = false; // 🛡 Защита от сохранения 0 при схлопывании страницы
@@ -85,7 +85,7 @@ const MdxContentWrapper = ({
       clearTimeout(timeoutId);
       timeoutId = setTimeout(() => {
         if (!isUnmounting) {
-          useProgressStore.getState().setLessonScrollPosition(lessonId, latestValidY);
+          useCurrentProgress.getState().setLessonScrollPosition(lessonId, latestValidY);
         }
       }, 300);
     };
@@ -102,7 +102,7 @@ const MdxContentWrapper = ({
 
       // Сохраняем последний валидный Y без риска записать 0
       if (!isRestoring) {
-        useProgressStore.getState().setLessonScrollPosition(lessonId, latestValidY);
+        useCurrentProgress.getState().setLessonScrollPosition(lessonId, latestValidY);
       }
     };
   }, [lessonId]);
@@ -118,7 +118,7 @@ export const CurrentLecturePage = () => {
   const navigate = useNavigate();
   const pageRef = useRef<HTMLDivElement>(null);
 
-  const { currentLesson, passLesson, passedLessons } = useProgressStore();
+  const { currentLesson, passLesson, passedLessons } = useCurrentProgress();
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -134,7 +134,7 @@ export const CurrentLecturePage = () => {
   useLayoutEffect(() => {
     if (!pageRef.current) return;
     const scrollNode = getScrollNode(pageRef.current);
-    const savedY = useProgressStore.getState().lessonScrollPositions[lesson.id] || 0;
+    const savedY = useCurrentProgress.getState().lessonScrollPositions[lesson.id] || 0;
 
     if (scrollNode === window) window.scrollTo({ top: savedY, left: 0, behavior: 'instant' });
     else (scrollNode as HTMLElement).scrollTop = savedY;

@@ -3,10 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { TreeElement } from '@/shared/TreeElement';
 import type { TreeElementState } from '@/shared/TreeElement';
 import { contentConfig, type LessonConfig } from '@/contentConfig';
-import { useProgressStore } from '@/app/store/useProgressStore';
 import { cn } from '@/app/utils/cn';
 // @ts-expect-error
 import { showCongratulationsModal } from '@/app/utils/celebration';
+import { useCurrentProgress } from '@/app/hooks/useCurrentProgress';
 
 const BASE_WIDTH = 1000;
 const ROW_HEIGHT = 200;
@@ -25,7 +25,7 @@ interface Line {
 export const TreePage = () => {
   const navigate = useNavigate();
   const { passedLessons, lastUncompletedLesson, setCurrentLesson, _hasHydrated } =
-    useProgressStore();
+    useCurrentProgress();
   const containerRef = useRef<HTMLDivElement>(null);
   const [lines, setLines] = useState<Line[]>([]);
 

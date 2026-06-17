@@ -52,7 +52,14 @@ export const Button: React.FC<ButtonProps> = ({
 }) => {
   return (
     <button
-      className={cn(baseStyles, sizeStyles[size], colorStyles[variant][color], className, disabled && 'opacity-40')}
+      disabled={disabled}
+      className={cn(
+        baseStyles,
+        sizeStyles[size],
+        colorStyles[variant][color],
+        className,
+        disabled && 'opacity-40',
+      )}
       {...props}
     >
       {children}

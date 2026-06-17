@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/shared/lib/supabase';
 import { Button } from '@/shared/buttons/Button';
-import { Monitor, DeviceMobileCamera, SignOut, QrCode, X } from '@phosphor-icons/react';
+import { Monitor, DeviceMobileCamera, SignOut, QrCode, X, CircleNotch } from '@phosphor-icons/react';
 import { toast } from '@/app/utils/toast';
 import { Modal } from '@/shared/Modal';
 import { QrScannerModal } from '@/shared/QrScannerModal';
@@ -24,6 +24,9 @@ export const ActiveSessions = () => {
   const [devices, setDevices] = useState<Device[]>([]);
   const [deviceToRemove, setDeviceToRemove] = useState<Device | null>(null);
   const [isConfirmingTerminateAll, setIsConfirmingTerminateAll] = useState(false);
+
+  const [isTerminating, setIsTerminating] = useState(false);
+  const [isTerminatingAll, setIsTerminatingAll] = useState(false);
 
   const [isScannerOpen, setIsScannerOpen] = useState(false);
 
@@ -115,10 +118,11 @@ export const ActiveSessions = () => {
 
   if (!user || !profile?.can_use_qr_login) return null;
 
-  const terminateDevice = async (id: string) => {
-    if (!currentDeviceId) return;
+const terminateDevice = async (id: string) => {
+  if (!currentDeviceId) return;
 
-    // Вызываем безопасную функцию на стороне БД
+  setIsTerminating(true); // Включаем лоадер
+  try {
     const { error } = await supabase.rpc('terminate_device', {
       target_device_id: id,
       current_device_id: currentDeviceId,
@@ -127,15 +131,19 @@ export const ActiveSessions = () => {
     if (!error) {
       toast.success('Сеанс завершен');
     } else {
-      // Выводим текст ошибки, который нам вернула база (про 24 часа)
       toast.error(error.message || 'Не удалось завершить сеанс');
     }
-    setDeviceToRemove(null);
-  };
+  } finally {
+    setIsTerminating(false); // Выключаем лоадер
+    setDeviceToRemove(null); // Модалка закрывается в любом случае
+  }
+};
 
-  const terminateAllOther = async () => {
-    if (!currentDeviceId) return;
+const terminateAllOther = async () => {
+  if (!currentDeviceId) return;
 
+  setIsTerminatingAll(true); // Включаем лоадер
+  try {
     const { error } = await supabase.rpc('terminate_all_other_devices', {
       current_device_id: currentDeviceId,
     });
@@ -145,8 +153,11 @@ export const ActiveSessions = () => {
     } else {
       toast.error(error.message || 'Не удалось завершить сеансы');
     }
-    setIsConfirmingTerminateAll(false);
-  };
+  } finally {
+    setIsTerminatingAll(false); // Выключаем лоадер
+    setIsConfirmingTerminateAll(false); // Модалка закрывается в любом случае
+  }
+};
 
   return (
     <div className="mb-6 flex w-full max-w-[700px] flex-col gap-4 rounded-[24px]">
@@ -301,6 +312,7 @@ export const ActiveSessions = () => {
               variant="outline"
               color="text"
               onClick={() => setDeviceToRemove(null)}
+              disabled={isTerminating} // Блокируем отмену во время загрузки
               className="w-full sm:w-auto"
             >
               Отмена
@@ -311,9 +323,12 @@ export const ActiveSessions = () => {
               onClick={() => {
                 if (deviceToRemove) terminateDevice(deviceToRemove.id);
               }}
-              className="w-full sm:w-auto"
+              disabled={isTerminating} // Блокируем кнопку
+              className="w-full gap-2 sm:w-auto"
             >
-              Завершить
+              {/* Показываем крутилку, если грузится */}
+              {isTerminating && <CircleNotch weight="bold" size={20} className="animate-spin" />}
+              {isTerminating ? 'Завершение...' : 'Завершить'}
             </Button>
           </div>
         </div>
@@ -334,6 +349,7 @@ export const ActiveSessions = () => {
               variant="outline"
               color="text"
               onClick={() => setIsConfirmingTerminateAll(false)}
+              disabled={isTerminatingAll}
               className="w-full sm:w-auto"
             >
               Отмена
@@ -342,9 +358,11 @@ export const ActiveSessions = () => {
               variant="solid"
               color="primary"
               onClick={terminateAllOther}
-              className="w-full sm:w-auto"
+              disabled={isTerminatingAll}
+              className="w-full gap-2 sm:w-auto"
             >
-              Завершить все
+              {isTerminatingAll && <CircleNotch weight="bold" size={20} className="animate-spin" />}
+              {isTerminatingAll ? 'Завершение...' : 'Завершить все'}
             </Button>
           </div>
         </div>

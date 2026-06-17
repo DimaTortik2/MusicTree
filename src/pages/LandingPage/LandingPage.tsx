@@ -164,7 +164,7 @@ export function LandingPage() {
             Начать
           </Button>
         </div>
-        <footer className="absolute bottom-0 left-0 z-20 flex flex-col md:flex-row w-full justify-center gap-6 pb-6 text-xs text-text/40 sm:pb-8 sm:text-sm">
+        <footer className="absolute bottom-0 left-0 z-20 flex w-full justify-center gap-6 pb-6 text-xs text-text/40 text-[0.65rem] sm:pb-8 sm:text-sm">
           <button
             onClick={() => navigate('/terms')}
             className="cursor-pointer transition-colors hover:text-primary"

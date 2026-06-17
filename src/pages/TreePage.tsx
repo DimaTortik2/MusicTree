@@ -24,8 +24,16 @@ interface Line {
 
 export const TreePage = () => {
   const navigate = useNavigate();
-  const { passedLessons, lastUncompletedLesson, setCurrentLesson, _hasHydrated } =
-    useCurrentProgress();
+
+  // 🔥 ДОБАВИЛИ halfPassedLessons СЮДА:
+  const {
+    passedLessons,
+    halfPassedLessons,
+    lastUncompletedLesson,
+    setCurrentLesson,
+    _hasHydrated,
+  } = useCurrentProgress();
+
   const containerRef = useRef<HTMLDivElement>(null);
   const [lines, setLines] = useState<Line[]>([]);
 
@@ -119,29 +127,25 @@ export const TreePage = () => {
   const maxRow = Math.max(0, ...contentConfig.map((l) => l.position.row));
   const dynamicContainerHeight = getY(maxRow) + ROW_HEIGHT;
 
- useEffect(() => {
-   if (!_hasHydrated) return;
+  useEffect(() => {
+    if (!_hasHydrated) return;
 
-   const totalLessons = contentConfig.length;
+    const totalLessons = contentConfig.length;
+    console.log(`[Debug] Пройдено лекций: ${passedLessons.length} из ${totalLessons}`);
 
-   // Выводим в консоль для дебага:
-   console.log(`[Debug] Пройдено лекций: ${passedLessons.length} из ${totalLessons}`);
+    const isAllPassed = totalLessons > 0 && passedLessons.length >= totalLessons;
 
-   // Используем >= на случай, если в стейте застрял какой-то старый удаленный урок
-   const isAllPassed = totalLessons > 0 && passedLessons.length >= totalLessons;
+    if (isAllPassed) {
+      console.log('[Debug] Условие выполнено! Вызываем конфетти...');
 
-   if (isAllPassed) {
-     console.log('[Debug] Условие выполнено! Вызываем конфетти...');
+      const timer = setTimeout(() => {
+        showCongratulationsModal();
+      }, 600);
 
-     const timer = setTimeout(() => {
-       showCongratulationsModal();
-     }, 600);
+      return () => clearTimeout(timer);
+    }
+  }, [_hasHydrated, passedLessons.length]);
 
-     return () => clearTimeout(timer);
-   }
- }, [_hasHydrated, passedLessons.length]);
-
- 
   return (
     <div className="flex min-h-screen w-full justify-center overflow-x-hidden py-10 pb-[50vh]">
       <div
@@ -165,6 +169,9 @@ export const TreePage = () => {
         {contentConfig.map((lesson) => {
           const state = getLessonState(lesson);
 
+          // 🔥 Проверяем, нажал ли кто-то кнопку, но лекция еще не завершена полностью
+          const isWaiting = !!halfPassedLessons?.[lesson.id] && !passedLessons.includes(lesson.id);
+
           return (
             <div
               key={lesson.id}
@@ -176,7 +183,11 @@ export const TreePage = () => {
                 transform: 'translate(-50%, -50%)',
               }}
             >
-              <TreeElement state={state} onClick={() => handleLessonClick(lesson.id)} />
+              <TreeElement
+                state={state}
+                isWaitingForFriend={isWaiting} // 🔥 Передаем признак ожидания друга
+                onClick={() => handleLessonClick(lesson.id)}
+              />
 
               <div
                 className={cn(

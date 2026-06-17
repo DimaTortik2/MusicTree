@@ -1,13 +1,18 @@
-// src/shared/TreeElement.tsx
 import React from 'react';
-import { MicrophoneStage } from '@phosphor-icons/react';
+import { MicrophoneStage, Clock } from '@phosphor-icons/react';
 import { cn } from '@/app/utils/cn';
 
-export type TreeElementState = 'current' | 'completed' | 'ordinary' | 'locked' | 'current_completed';
+export type TreeElementState =
+  | 'current'
+  | 'completed'
+  | 'ordinary'
+  | 'locked'
+  | 'current_completed';
 
 export interface TreeElementProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   state?: TreeElementState;
   iconSize?: number | string;
+  isWaitingForFriend?: boolean; // 🔥 НОВОЕ
 }
 
 const stateStyles: Record<TreeElementState, string> = {
@@ -19,16 +24,16 @@ const stateStyles: Record<TreeElementState, string> = {
 };
 
 export const TreeElement = React.forwardRef<HTMLButtonElement, TreeElementProps>(
-  ({ state = 'ordinary', iconSize, className, ...props }, ref) => {
+  ({ state = 'ordinary', iconSize, isWaitingForFriend, className, ...props }, ref) => {
     return (
       <button
         disabled={state === 'locked'}
         ref={ref}
         type="button"
         className={cn(
-          'inline-flex items-center justify-center rounded-2xl border-4 bg-surface text-text/40 transition-all duration-200 hover:cursor-pointer hover:text-text',
+          'relative inline-flex items-center justify-center rounded-2xl border-4 bg-surface text-text/40 transition-all duration-200',
           state !== 'locked'
-            ? 'cursor-pointer hover:scale-105 active:scale-95'
+            ? 'cursor-pointer hover:scale-105 hover:text-text active:scale-95'
             : 'pointer-events-none',
           'h-14 w-14 sm:h-20 sm:w-20',
           stateStyles[state],
@@ -41,6 +46,13 @@ export const TreeElement = React.forwardRef<HTMLButtonElement, TreeElementProps>
           className={cn(!iconSize && 'h-6 w-6 sm:h-9 sm:w-9')}
           weight="regular"
         />
+
+        {/* Индикатор ожидания друга */}
+        {isWaitingForFriend && (
+          <div className="absolute -right-2.5 -bottom-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-surface sm:h-7 sm:w-7">
+            <Clock weight="fill" className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+          </div>
+        )}
       </button>
     );
   },

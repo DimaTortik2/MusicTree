@@ -1,14 +1,14 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import localforage from 'localforage';
-import { contentConfig } from '@/contentConfig';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import localforage from "localforage";
+import { contentConfig } from "@/contentConfig";
 
 export interface TestResult {
   score: number;
   maxScore: number;
   userAnswers: number[][];
 }
-export type UISize = 'xs' | 'sm' | 'md' | 'lg';
+export type UISize = "xs" | "sm" | "md" | "lg";
 
 export interface AppState {
   // Прогресс
@@ -18,9 +18,9 @@ export interface AppState {
   passedTests: Record<string, TestResult>;
   currentLesson: string | null;
   lastUncompletedLesson: string | null; // <-- НОВОЕ ПОЛЕ
-
+  halfPassedLessons: Record<string, string>;
   // Настройки
-  theme: 'dark' | 'light';
+  theme: "dark" | "light";
   mediaVolume: number;
   pianoVolume: number;
   pianoBindings: Record<string, string | null>;
@@ -45,8 +45,8 @@ export interface AppState {
   leftOctaveShift: number;
   rightOctaveShift: number;
 
-  pianoSoundType: 'synth' | 'acoustic';
-  setPianoSoundType: (type: 'synth' | 'acoustic') => void;
+  pianoSoundType: "synth" | "acoustic";
+  setPianoSoundType: (type: "synth" | "acoustic") => void;
 
   // Техническое
   _hasHydrated: boolean;
@@ -54,6 +54,7 @@ export interface AppState {
 
   // Экшены
   passLesson: (id: string) => void;
+  halfPassLesson: (id: string, userId: string) => void;
   setCurrentLesson: (id: string) => void;
   passTest: (testId: string, result: TestResult) => void;
   clearTestResult: (testId: string) => void;
@@ -87,30 +88,30 @@ export interface AppState {
 
 // Дефолтная раскладка по ТЗ (q2w3... и zsxd...)
 const DEFAULT_PIANO_BINDINGS: Record<string, string | null> = {
-  C4: 'KeyZ',
-  'C#4': 'KeyS',
-  D4: 'KeyX',
-  'D#4': 'KeyD',
-  E4: 'KeyC',
-  F4: 'KeyV',
-  'F#4': 'KeyG',
-  G4: 'KeyB',
-  'G#4': 'KeyH',
-  A4: 'KeyN',
-  'A#4': 'KeyJ',
-  B4: 'KeyM',
-  C5: 'KeyY',
-  'C#5': 'Digit7',
-  D5: 'KeyU',
-  'D#5': 'Digit8',
-  E5: 'KeyI',
-  F5: 'KeyO',
-  'F#5': 'Digit0',
-  G5: 'KeyP',
-  'G#5': 'Minus', // Клавиша "-"
-  A5: 'BracketLeft', // Клавиша "[" (Левая квадратная скобка)
-  'A#5': 'Equal', // Клавиша "="
-  B5: 'BracketRight', // Клавиша "]" (Правая квадратная скобка)
+  C4: "KeyZ",
+  "C#4": "KeyS",
+  D4: "KeyX",
+  "D#4": "KeyD",
+  E4: "KeyC",
+  F4: "KeyV",
+  "F#4": "KeyG",
+  G4: "KeyB",
+  "G#4": "KeyH",
+  A4: "KeyN",
+  "A#4": "KeyJ",
+  B4: "KeyM",
+  C5: "KeyY",
+  "C#5": "Digit7",
+  D5: "KeyU",
+  "D#5": "Digit8",
+  E5: "KeyI",
+  F5: "KeyO",
+  "F#5": "Digit0",
+  G5: "KeyP",
+  "G#5": "Minus", // Клавиша "-"
+  A5: "BracketLeft", // Клавиша "[" (Левая квадратная скобка)
+  "A#5": "Equal", // Клавиша "="
+  B5: "BracketRight", // Клавиша "]" (Правая квадратная скобка)
 };
 
 export const useProgressStore = create<AppState>()(
@@ -121,19 +122,27 @@ export const useProgressStore = create<AppState>()(
       passedHomeworks: [],
       unlockedChains: [],
       passedTests: {},
-      currentLesson: 'lesson_1', // Начинаем с Введения
-      lastUncompletedLesson: 'lesson_1', // <-- Инициализируем первым уроком
+      currentLesson: "lesson_1", // Начинаем с Введения
+      lastUncompletedLesson: "lesson_1", // <-- Инициализируем первым уроком
+      halfPassedLessons: {},
 
-      theme: 'dark', // Жесткий старт с темной темы по ТЗ
+      theme: "dark", // Жесткий старт с темной темы по ТЗ
       mediaVolume: 50,
       pianoVolume: 50,
       isPianoMuted: false,
       previousPianoVolume: 50,
       pianoBindings: DEFAULT_PIANO_BINDINGS,
-      uiSize: 'md',
+      uiSize: "md",
 
-      activeTabs: ['tree', 'lesson', 'homeworks', 'vocal', 'piano'],
-      inactiveTabs: ['chains', 'tests', 'friends', 'debug', 'settings', 'customize'],
+      activeTabs: ["tree", "lesson", "homeworks", "vocal", "piano"],
+      inactiveTabs: [
+        "chains",
+        "tests",
+        "friends",
+        "debug",
+        "settings",
+        "customize",
+      ],
       audioRecordIds: [],
 
       isKeyboardPianoActive: false,
@@ -149,8 +158,18 @@ export const useProgressStore = create<AppState>()(
       setHasHydrated: (state) => set({ _hasHydrated: state }),
       setUiSize: (size) => set({ uiSize: size }),
       passLesson: (id) =>
+        set((state) => {
+          const newHalf = { ...state.halfPassedLessons };
+          delete newHalf[id];
+          return {
+            passedLessons: [...new Set([...state.passedLessons, id])],
+            halfPassedLessons: newHalf,
+          };
+        }),
+
+      halfPassLesson: (id, userId) =>
         set((state) => ({
-          passedLessons: [...new Set([...state.passedLessons, id])],
+          halfPassedLessons: { ...state.halfPassedLessons, [id]: userId },
         })),
 
       setLessonScrollPosition: (id, position) =>
@@ -198,7 +217,8 @@ export const useProgressStore = create<AppState>()(
         })),
 
       setKeyboardPianoActive: (state) => set({ isKeyboardPianoActive: state }),
-      setPianoVolume: (volume) => set({ pianoVolume: volume, isPianoMuted: false }),
+      setPianoVolume: (volume) =>
+        set({ pianoVolume: volume, isPianoMuted: false }),
       setLeftOctaveShift: (shift) => set({ leftOctaveShift: shift }),
       setRightOctaveShift: (shift) => set({ rightOctaveShift: shift }),
       setMediaVolume: (volume) => set({ mediaVolume: volume }),
@@ -218,24 +238,28 @@ export const useProgressStore = create<AppState>()(
           return { pianoBindings: newBindings };
         }),
 
-      pianoSoundType: 'synth', // по умолчанию синтезатор
+      pianoSoundType: "synth", // по умолчанию синтезатор
       setPianoSoundType: (type) => set({ pianoSoundType: type }),
       enableAmbientGlow: true,
       setEnableAmbientGlow: (state) => set({ enableAmbientGlow: state }),
 
       wallpaperMouseTracking: true,
-      setWallpaperMouseTracking: (state) => set({ wallpaperMouseTracking: state }),
+      setWallpaperMouseTracking: (state) =>
+        set({ wallpaperMouseTracking: state }),
 
       resetPianoBindings: () => set({ pianoBindings: DEFAULT_PIANO_BINDINGS }),
       setShowPianoHints: (state) => set({ showPianoHints: state }),
       togglePianoMute: () =>
         set((state) => {
           // Считаем пианино "замьюченным", если включен флаг ИЛИ громкость вручную скручена в 0
-          const effectivelyMuted = state.isPianoMuted || state.pianoVolume === 0;
+          const effectivelyMuted = state.isPianoMuted ||
+            state.pianoVolume === 0;
 
           if (effectivelyMuted) {
             // РАЗМЬЮТ: возвращаем предыдущую громкость (если она была 0, ставим дефолтные 50)
-            const restoreVol = state.previousPianoVolume > 0 ? state.previousPianoVolume : 50;
+            const restoreVol = state.previousPianoVolume > 0
+              ? state.previousPianoVolume
+              : 50;
             return {
               isPianoMuted: false,
               pianoVolume: restoreVol,
@@ -251,7 +275,7 @@ export const useProgressStore = create<AppState>()(
         }),
     }),
     {
-      name: 'music-tree-progress',
+      name: "music-tree-progress",
       version: 1, // Версионирование по ТЗ
       onRehydrateStorage: () => (state) => {
         if (!state) return;
@@ -263,13 +287,19 @@ export const useProgressStore = create<AppState>()(
 
         // --- 2. Фильтрация "мертвых" ID из localStorage ---
         const validLessonIds = new Set(contentConfig.map((c) => c.id));
-        const validTestIds = new Set(contentConfig.flatMap((c) => c.linkedTests));
+        const validTestIds = new Set(
+          contentConfig.flatMap((c) => c.linkedTests),
+        );
 
         let needsUpdate = false;
 
         // Чистим уроки
-        const cleanPassedLessons = state.passedLessons.filter((id) => validLessonIds.has(id));
-        if (cleanPassedLessons.length !== state.passedLessons.length) needsUpdate = true;
+        const cleanPassedLessons = state.passedLessons.filter((id) =>
+          validLessonIds.has(id)
+        );
+        if (cleanPassedLessons.length !== state.passedLessons.length) {
+          needsUpdate = true;
+        }
 
         // Чистим тесты
         const cleanPassedTests: Record<string, TestResult> = {};
@@ -297,8 +327,11 @@ export const useProgressStore = create<AppState>()(
 
         // МИГРАЦИЯ: Если юзер пришел с версии 1, добавляем ему вкладку friends в неактивные
         if (version < 2) {
-          if (!state.activeTabs.includes('friends') && !state.inactiveTabs.includes('friends')) {
-            state.inactiveTabs = ['friends', ...state.inactiveTabs];
+          if (
+            !state.activeTabs.includes("friends") &&
+            !state.inactiveTabs.includes("friends")
+          ) {
+            state.inactiveTabs = ["friends", ...state.inactiveTabs];
           }
         }
 

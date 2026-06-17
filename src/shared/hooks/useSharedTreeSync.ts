@@ -1,9 +1,16 @@
 import { useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom'; // Импортируем навигацию!
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/shared/lib/supabase';
 import { useSharedProgressStore } from '@/app/store/useSharedProgressStore';
 import { useAppModeStore } from '@/app/store/useAppModeStore';
 import { toast } from '@/app/utils/toast';
+
+// Вырезаем локальную навигацию перед отправкой в БД
+const stripNav = (fullState: any) => {
+  if (!fullState) return {};
+  const { currentLesson, lastUncompletedLesson, lessonScrollPositions, ...stateToSave } = fullState;
+  return stateToSave;
+};
 
 export const useSharedTreeSync = () => {
   const { sharedTreeId, exitSharedMode } = useAppModeStore();
@@ -25,15 +32,23 @@ export const useSharedTreeSync = () => {
         .single();
 
       if (data && data.progress_state) {
-        lastSavedState.current = JSON.stringify(data.progress_state);
-        useSharedProgressStore.setState(data.progress_state);
+        const localState = useSharedProgressStore.getState();
+        const mergedState = {
+          ...data.progress_state,
+          currentLesson: localState.currentLesson,
+          lastUncompletedLesson: localState.lastUncompletedLesson,
+          lessonScrollPositions: localState.lessonScrollPositions,
+        };
+        lastSavedState.current = JSON.stringify(stripNav(mergedState));
+        useSharedProgressStore.setState(mergedState);
       } else {
-        lastSavedState.current = JSON.stringify(useSharedProgressStore.getState());
+        lastSavedState.current = JSON.stringify(stripNav(useSharedProgressStore.getState()));
       }
 
-      // 1. ОТПРАВЛЯЕМ НАШИ ИЗМЕНЕНИЯ В БАЗУ
+      // 1. ОТПРАВКА В БАЗУ (Безопасный таймер 1000мс)
       unsubStore = useSharedProgressStore.subscribe((state) => {
-        const currentStateStr = JSON.stringify(state);
+        const stateToSave = stripNav(state);
+        const currentStateStr = JSON.stringify(stateToSave);
         if (currentStateStr === lastSavedState.current) return;
 
         clearTimeout(timeout);
@@ -42,38 +57,70 @@ export const useSharedTreeSync = () => {
           await supabase
             .from('shared_trees')
             .update({ 
-              progress_state: state,
+              progress_state: stateToSave,
               updated_at: new Date().toISOString()
             })
             .eq('id', sharedTreeId);
-        }, 1000);
+        }, 1000); // Оставили 1 секунду, чтобы беречь лимиты!
       });
 
-      // 2. СЛУШАЕМ ИЗМЕНЕНИЯ ДРУГА В РЕАЛЬНОМ ВРЕМЕНИ
+      // 2. ПРИЁМ ИЗ БАЗЫ (УМНЫЙ MERGE)
       channel = supabase
         .channel(`shared_tree_${sharedTreeId}`)
-        // Слушаем обновления (друг прошел лекцию)
         .on(
           'postgres_changes',
           { event: 'UPDATE', schema: 'public', table: 'shared_trees', filter: `id=eq.${sharedTreeId}` },
           (payload) => {
             if (payload.new && payload.new.progress_state) {
-              const newStateStr = JSON.stringify(payload.new.progress_state);
-              if (newStateStr !== lastSavedState.current) {
-                lastSavedState.current = newStateStr;
-                useSharedProgressStore.setState(payload.new.progress_state);
+              const dbState = payload.new.progress_state;
+              const incomingStateStr = JSON.stringify(stripNav(dbState));
+              
+              if (incomingStateStr !== lastSavedState.current) {
+                lastSavedState.current = incomingStateStr;
+                const localState = useSharedProgressStore.getState();
+                
+                // 🔥 УМНЫЙ MERGE: объединяем БД и то, что юзер успел накликать
+                const mergedPassedLessons = [...new Set([
+                  ...(localState.passedLessons || []),
+                  ...(dbState.passedLessons || [])
+                ])];
+
+                const mergedPassedHomeworks = [...new Set([
+                  ...(localState.passedHomeworks || []),
+                  ...(dbState.passedHomeworks || [])
+                ])];
+
+                const mergedHalfPassed = {
+                  ...(localState.halfPassedLessons || {}),
+                  ...(dbState.halfPassedLessons || {})
+                };
+
+                // Если урок пройден полностью - вычищаем его из "половинок"
+                mergedPassedLessons.forEach(id => {
+                  delete mergedHalfPassed[id];
+                });
+
+                useSharedProgressStore.setState({
+                  ...dbState,
+                  passedLessons: mergedPassedLessons,
+                  passedHomeworks: mergedPassedHomeworks,
+                  halfPassedLessons: mergedHalfPassed,
+                  // Сохраняем локальные данные скролла и навигации
+                  currentLesson: localState.currentLesson,
+                  lastUncompletedLesson: localState.lastUncompletedLesson,
+                  lessonScrollPositions: localState.lessonScrollPositions,
+                });
               }
             }
           }
         )
-        // 🔥 БЕСШОВНОСТЬ: Слушаем удаление совместного дерева другом!
         .on(
           'postgres_changes',
           { event: 'DELETE', schema: 'public', table: 'shared_trees', filter: `id=eq.${sharedTreeId}` },
           () => {
-            exitSharedMode(); // Сбрасываем режим друга в LocalStorage
-            navigate('/app/tree'); // Мягко возвращаем на свое дерево
-            toast.info('Совместное дерево было удалено вашим другом');
+            exitSharedMode();
+            navigate('/app/tree');
+            toast.info('Совместное дерево удалено вашим другом');
           }
         )
         .subscribe();

@@ -1,12 +1,14 @@
 import React, { useMemo, useState, useEffect, useLayoutEffect, Suspense, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { contentConfig } from '@/contentConfig';
-import { FireSimple } from '@phosphor-icons/react';
+import { FireSimple, Check } from '@phosphor-icons/react'; // 🔥 Добавили Check
 import { Button } from '@/shared/buttons/Button';
 import { MdxSkeleton } from '@/shared/MdxSkeleton';
 import confetti from 'canvas-confetti';
 import { motion } from 'framer-motion';
 import { useCurrentProgress } from '@/app/hooks/useCurrentProgress';
+import { useAppModeStore } from '@/app/store/useAppModeStore'; // 🔥
+import { useAuthStore } from '@/app/store/authStore'; // 🔥
 
 const mdxLectures = import.meta.glob('/src/content/**/*.mdx');
 
@@ -17,7 +19,6 @@ for (const path in mdxLectures) {
   );
 }
 
-// Утилита для поиска реального контейнера со скроллом
 const getScrollNode = (element: HTMLElement | null): HTMLElement | Window => {
   let scrollNode: HTMLElement | Window = window;
   let parent = element?.parentElement;
@@ -53,7 +54,7 @@ const MdxContentWrapper = ({
     const savedY = useCurrentProgress.getState().lessonScrollPositions[lessonId] || 0;
 
     let isRestoring = true;
-    let isUnmounting = false; // 🛡 Защита от сохранения 0 при схлопывании страницы
+    let isUnmounting = false;
     let latestValidY = savedY;
 
     const applyScroll = (y: number) => {
@@ -65,22 +66,21 @@ const MdxContentWrapper = ({
       });
     };
 
-    // Делаем серию прыжков, чтобы перебить анимации Framer Motion и ленивые картинки
     applyScroll(savedY);
     const t1 = setTimeout(() => applyScroll(savedY), 50);
     const t2 = setTimeout(() => applyScroll(savedY), 150);
     const t3 = setTimeout(() => {
       applyScroll(savedY);
-      isRestoring = false; // 🔓 СНИМАЕМ БЛОКИРОВКУ только через 500мс
+      isRestoring = false;
     }, 500);
 
     let timeoutId: ReturnType<typeof setTimeout>;
     const handleScroll = () => {
-      if (isRestoring || isUnmounting) return; // Игнорируем технические сдвиги
+      if (isRestoring || isUnmounting) return;
 
       const currentY =
         scrollNode === window ? window.scrollY : (scrollNode as HTMLElement).scrollTop;
-      latestValidY = currentY; // Фиксируем последнюю честную позицию
+      latestValidY = currentY;
 
       clearTimeout(timeoutId);
       timeoutId = setTimeout(() => {
@@ -93,14 +93,13 @@ const MdxContentWrapper = ({
     scrollNode.addEventListener('scroll', handleScroll, { passive: true });
 
     return () => {
-      isUnmounting = true; // Блокируем новые записи скролла
+      isUnmounting = true;
       scrollNode.removeEventListener('scroll', handleScroll);
       clearTimeout(timeoutId);
       clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
 
-      // Сохраняем последний валидный Y без риска записать 0
       if (!isRestoring) {
         useCurrentProgress.getState().setLessonScrollPosition(lessonId, latestValidY);
       }
@@ -118,7 +117,11 @@ export const CurrentLecturePage = () => {
   const navigate = useNavigate();
   const pageRef = useRef<HTMLDivElement>(null);
 
-  const { currentLesson, passLesson, passedLessons } = useCurrentProgress();
+  const { currentLesson, passLesson, passedLessons, halfPassedLessons, halfPassLesson } =
+    useCurrentProgress();
+  const { activeSharedFriend } = useAppModeStore();
+  const { user } = useAuthStore();
+
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -129,8 +132,6 @@ export const CurrentLecturePage = () => {
   const isPassed = useMemo(() => passedLessons.includes(lesson.id), [passedLessons, lesson.id]);
   const LazyMdxContent = lesson ? mdxLecturesCache[lesson.mdxPath] : null;
 
-  // ✨ ЭФФЕКТ #2: Мгновенно отматываем скролл на этапе Скелетона,
-  // чтобы пользователь не видел страницу с середины из-за скролла с прошлой страницы.
   useLayoutEffect(() => {
     if (!pageRef.current) return;
     const scrollNode = getScrollNode(pageRef.current);
@@ -139,6 +140,11 @@ export const CurrentLecturePage = () => {
     if (scrollNode === window) window.scrollTo({ top: savedY, left: 0, behavior: 'instant' });
     else (scrollNode as HTMLElement).scrollTop = savedY;
   }, [lesson.id]);
+
+  const isSharedMode = !!activeSharedFriend;
+  const whoFinishedFirst = halfPassedLessons?.[lesson.id];
+  const iFinishedFirst = isSharedMode && whoFinishedFirst === user?.id;
+  const friendFinishedFirst = isSharedMode && whoFinishedFirst && whoFinishedFirst !== user?.id;
 
   const fireConfetti = () => {
     const root = getComputedStyle(document.documentElement);
@@ -156,9 +162,16 @@ export const CurrentLecturePage = () => {
 
   const handleFinish = () => {
     if (timerRef.current) clearTimeout(timerRef.current);
-    passLesson(lesson.id);
     setShowSuccessOverlay(false);
-    navigate('/app/tree');
+
+    if (isSharedMode && !friendFinishedFirst && !iFinishedFirst) {
+      // 1. Становимся первопроходцем: ставим отметку и остаемся на странице (кнопка переключится на "Я дочитал")
+      if (user) halfPassLesson(lesson.id, user.id);
+    } else {
+      // 2. Либо соло-режим, либо мы вторые завершаем урок — улетаем на дерево
+      passLesson(lesson.id);
+      navigate('/app/tree');
+    }
   };
 
   const handleCompleteClick = () => {
@@ -210,16 +223,48 @@ export const CurrentLecturePage = () => {
 
           <div className="mt-16 flex justify-center">
             {!isPassed ? (
-              <Button variant="outline" onClick={handleCompleteClick}>
-                Завершить урок
-              </Button>
+              iFinishedFirst ? (
+                // Я уже нажал "Дочитать" первым. Жду друга.
+                <Button
+                  variant="outline"
+                  className="pointer-events-none flex items-center gap-2 opacity-70"
+                >
+                  <span>Я дочитал</span>
+                  <div className="relative ml-1 flex h-5 w-5 items-center justify-center">
+                    <Check
+                      size={18}
+                      weight="bold"
+                      className="absolute left-0 text-current opacity-40"
+                    />
+                    <Check size={18} weight="bold" className="absolute left-1.5 text-current" />
+                  </div>
+                </Button>
+              ) : friendFinishedFirst ? (
+                // Друг нажал "Дочитать" первым. У меня кнопка "Завершить" с галочками
+                <Button
+                  variant="outline"
+                  onClick={handleCompleteClick}
+                  className="flex items-center gap-2"
+                >
+                  <span>Завершить урок</span>
+                  <div className="relative ml-1 flex h-5 w-5 items-center justify-center">
+                    <Check
+                      size={18}
+                      weight="bold"
+                      className="absolute left-0 text-current opacity-40"
+                    />
+                    <Check size={18} weight="bold" className="absolute left-1.5 text-current" />
+                  </div>
+                </Button>
+              ) : (
+                // Никто еще не читал. Первопроходец видит "Дочитать" (если режим совместный)
+                <Button variant="outline" onClick={handleCompleteClick}>
+                  {isSharedMode ? 'Дочитать' : 'Завершить урок'}
+                </Button>
+              )
             ) : (
-              <Button
-                variant="outline"
-                onClick={() => {
-                  navigate('/app/tree');
-                }}
-              >
+              // Урок пройден полностью
+              <Button variant="outline" onClick={() => navigate('/app/tree')}>
                 Вернуться к дереву
               </Button>
             )}

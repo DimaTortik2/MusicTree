@@ -165,7 +165,7 @@ export function FriendsPage() {
         ],
         passedTests: { ...personalProgress.passedTests, ...sharedProgress.passedTests },
       });
-      toast.success('Прогресс успешно перенесен к вам!');
+      toast.success('Прогресс успешно перенесен!');
     }
 
     exitSharedMode();

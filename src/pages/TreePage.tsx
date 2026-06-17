@@ -147,7 +147,7 @@ export const TreePage = () => {
   }, [_hasHydrated, passedLessons.length]);
 
   return (
-    <div className="flex min-h-screen w-full justify-center overflow-x-hidden py-10 pb-[50vh]">
+    <div className="flex min-h-screen w-full justify-center overflow-x-hidden pt-15 pb-[50vh]">
       <div
         ref={containerRef}
         className="relative w-full max-w-250"

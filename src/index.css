@@ -39,20 +39,19 @@
   --toastify-font-family: var(--font-sans);
   --toastify-border-radius: 16px;
 
-  --glow-opacity: 0.08; 
-  --glow-blend: screen; 
+  --glow-opacity: 0.08;
+  --glow-blend: screen;
 
-   --avatar-1: #e28743; 
-  --avatar-2: #eab308; 
-  --avatar-3: #22c55e; 
-  --avatar-4: #06b6d4; 
-  --avatar-5: #3b82f6; 
-  --avatar-6: #8b5cf6; 
-  --avatar-7: #ec4899; 
+  --avatar-1: #e28743;
+  --avatar-2: #eab308;
+  --avatar-3: #22c55e;
+  --avatar-4: #06b6d4;
+  --avatar-5: #3b82f6;
+  --avatar-6: #8b5cf6;
+  --avatar-7: #ec4899;
 }
 
 .Toastify__toast {
-  background-color: var(--background) !important;
   color: var(--text) !important;
   border-radius: 16px !important;
   box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5) !important;
@@ -63,6 +62,15 @@
   gap: 16px !important;
   position: relative !important;
   overflow: hidden !important;
+
+  background-color: color-mix(in srgb, var(--surface) 80%, transparent) !important;
+
+  /* backdrop-blur-md: размытие заднего плана */
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+
+  /* shadow-2xl: используем готовую переменную Tailwind v4 или её CSS-эквивалент */
+  box-shadow: var(--shadow-2xl, 0 25px 50px -12px rgba(0, 0, 0, 0.25)) !important;
 }
 
 .Toastify__progress-bar {

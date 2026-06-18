@@ -28,6 +28,7 @@ import { useAppModeStore } from '@/app/store/useAppModeStore';
 import { useProgressStore } from '@/app/store/useProgressStore';
 import { useSharedProgressStore } from '@/app/store/useSharedProgressStore';
 import { cn } from '@/app/utils/cn';
+import { useBlobTransition } from '@/app/store/useBlobTransition';
 // 2. ИМПОРТ usePresenceStore БОЛЬШЕ НЕ НУЖЕН, УДАЛИЛИ ЕГО!
 
 export function FriendsPage() {
@@ -65,10 +66,10 @@ export function FriendsPage() {
 
   const [isCreatingShared, setIsCreatingShared] = useState<FriendProfile | null>(null);
   const [isSyncingModalOpen, setIsSyncingModalOpen] = useState(false);
+  const { startTransition } = useBlobTransition();
 
   // 1. НАЖАТИЕ НА ДРУГА
   const handleFriendClick = async (friend: FriendProfile) => {
-    // Проверяем, есть ли уже дерево с этим другом
     const { data } = await supabase
       .from('shared_trees')
       .select('id, progress_state')
@@ -78,12 +79,13 @@ export function FriendsPage() {
       .single();
 
     if (data) {
-      // Дерево есть! Загружаем его в стор и переходим
-      useSharedProgressStore.setState(data.progress_state || {});
-      setSharedMode(friend, data.id);
-      navigate('/app/tree');
+      // 🔥 ОБЕРНУЛИ В ТРАНЗИШЕН
+      startTransition(() => {
+        useSharedProgressStore.setState(data.progress_state || {});
+        setSharedMode(friend, data.id);
+        navigate('/app/tree');
+      });
     } else {
-      // Дерева нет, открываем модалку создания
       setIsCreatingShared(friend);
     }
   };
@@ -95,7 +97,6 @@ export function FriendsPage() {
     let initialState = {};
 
     if (type === 'min') {
-      // Ищем прогресс друга
       const { data: friendProfile } = await supabase
         .from('profiles')
         .select('progress_state')
@@ -103,15 +104,12 @@ export function FriendsPage() {
         .single();
 
       const friendState = friendProfile?.progress_state || {};
-
-      // Пересечение массивов
       const intersect = (arr1: any[] = [], arr2: any[] = []) =>
         arr1.filter((x) => arr2.includes(x));
 
       initialState = {
         passedLessons: intersect(personalProgress.passedLessons, friendState.passedLessons),
         passedHomeworks: intersect(personalProgress.passedHomeworks, friendState.passedHomeworks),
-        // Тесты объединять сложнее, оставим пустые или можно написать логику пересечения
       };
     }
 
@@ -122,10 +120,13 @@ export function FriendsPage() {
       .single();
 
     if (data) {
-      useSharedProgressStore.setState(initialState);
-      setSharedMode(isCreatingShared, data.id);
-      setIsCreatingShared(null);
-      navigate('/app/tree');
+      // 🔥 ОБЕРНУЛИ В ТРАНЗИШЕН
+      startTransition(() => {
+        useSharedProgressStore.setState(initialState);
+        setSharedMode(isCreatingShared, data.id);
+        setIsCreatingShared(null);
+        navigate('/app/tree');
+      });
     } else {
       toast.error('Не удалось создать совместное дерево');
     }
@@ -135,7 +136,6 @@ export function FriendsPage() {
   const handleReturnToPersonal = () => {
     const sharedProgress = useSharedProgressStore.getState();
 
-    // Сравниваем прогресс
     const hasMoreLessons =
       sharedProgress.passedLessons.length > personalProgress.passedLessons.length;
     const hasMoreHW =
@@ -147,30 +147,36 @@ export function FriendsPage() {
     if (hasMoreLessons || hasMoreHW || hasMoreTests) {
       setIsSyncingModalOpen(true);
     } else {
-      exitSharedMode();
-      navigate('/app/tree');
+      // 🔥 ОБЕРНУЛИ В ТРАНЗИШЕН
+      startTransition(() => {
+        exitSharedMode();
+        navigate('/app/tree');
+      });
     }
   };
 
   // 4. ПЕРЕНОС ПРОГРЕССА
   const handleSyncProgress = (sync: boolean) => {
-    if (sync) {
-      const sharedProgress = useSharedProgressStore.getState();
-      useProgressStore.setState({
-        passedLessons: [
-          ...new Set([...personalProgress.passedLessons, ...sharedProgress.passedLessons]),
-        ],
-        passedHomeworks: [
-          ...new Set([...personalProgress.passedHomeworks, ...sharedProgress.passedHomeworks]),
-        ],
-        passedTests: { ...personalProgress.passedTests, ...sharedProgress.passedTests },
-      });
-      toast.success('Прогресс успешно перенесен!');
-    }
+    // 🔥 ОБЕРНУЛИ В ТРАНЗИШЕН ВЕСЬ БЛОК
+    startTransition(() => {
+      if (sync) {
+        const sharedProgress = useSharedProgressStore.getState();
+        useProgressStore.setState({
+          passedLessons: [
+            ...new Set([...personalProgress.passedLessons, ...sharedProgress.passedLessons]),
+          ],
+          passedHomeworks: [
+            ...new Set([...personalProgress.passedHomeworks, ...sharedProgress.passedHomeworks]),
+          ],
+          passedTests: { ...personalProgress.passedTests, ...sharedProgress.passedTests },
+        });
+        toast.success('Прогресс успешно перенесен!');
+      }
 
-    exitSharedMode();
-    setIsSyncingModalOpen(false);
-    navigate('/app/tree');
+      exitSharedMode();
+      setIsSyncingModalOpen(false);
+      navigate('/app/tree');
+    });
   };
 
   const prevNotifsLength = useRef(notifications.length);
@@ -688,7 +694,10 @@ export function FriendsPage() {
 
                   // Если мы прямо сейчас находимся в режиме этого дерева — выходим из него
                   if (activeSharedFriend?.id === treeToDelete.friend.id) {
-                    exitSharedMode();
+                    startTransition(() => {
+                      exitSharedMode();
+                      navigate('/app/tree');
+                    });
                   }
 
                   setTreeToDelete(null);

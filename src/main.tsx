@@ -27,6 +27,7 @@ import { useAuthStore } from '@/app/store/authStore';
 import { useCloudSync } from '@/shared/hooks/useCloudSync';
 import { useDeviceTracker } from '@/app/hooks/useDeviceTracker';
 import { CookieBanner } from '@/shared/CookieBanner';
+import { BlobTransitionOverlay } from '@/shared/BlobTransitionOverlay';
 
 const mdxComponents = {
   Metronome,
@@ -66,6 +67,7 @@ const App = () => {
     <MDXProvider components={mdxComponents}>
       <ThemeProvider>
         <RouterProvider router={router} />
+        <BlobTransitionOverlay />
         <ToastContainer
           position="top-right"
           autoClose={3500}
@@ -78,7 +80,7 @@ const App = () => {
           pauseOnHover
           theme="dark"
         />
-        <CookieBanner/>
+        <CookieBanner />
         <ShortcutManager />
       </ThemeProvider>
     </MDXProvider>

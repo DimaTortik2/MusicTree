@@ -177,7 +177,7 @@ export const ActiveSessions = () => {
         className="group relative flex w-full cursor-pointer items-center justify-between rounded-[20px] bg-surface px-6 py-4 transition-all duration-200 ease-out outline-none active:scale-[0.98]"
       >
         {/* ИЗМЕНЕНО: items-end и leading-none, чтобы прижать цифру к низу строки */}
-        <div className="flex items-end gap-3">
+        <div className="flex items-center gap-3">
           <h3 className="text-xl leading-none font-medium text-text transition-colors group-hover:text-text/80">
             Активные сеансы
           </h3>

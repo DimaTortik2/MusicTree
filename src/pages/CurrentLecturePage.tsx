@@ -1,4 +1,12 @@
-import React, { useMemo, useState, useEffect, useLayoutEffect, Suspense, useRef } from 'react';
+import React, {
+  useMemo,
+  useState,
+  useEffect,
+  useLayoutEffect,
+  Suspense,
+  useRef,
+  useCallback,
+} from 'react';
 import { useNavigate } from 'react-router-dom';
 import { contentConfig } from '@/contentConfig';
 import { FireSimple, Check } from '@phosphor-icons/react';
@@ -7,13 +15,11 @@ import { MdxSkeleton } from '@/shared/MdxSkeleton';
 import confetti from 'canvas-confetti';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// Твои сторы и хуки
 import { useCurrentProgress } from '@/app/hooks/useCurrentProgress';
 import { useAppModeStore } from '@/app/store/useAppModeStore';
 import { useAuthStore } from '@/app/store/authStore';
 import { cn } from '@/app/utils/cn';
 
-// --- НОВЫЕ ИМПОРТЫ ДЛЯ ЗАМЕТОК ---
 import { useNotesStore } from '@/features/notes/store/useNotesStore';
 import { NotesHighlighterEngine } from '@/features/notes/ui/NotesHighlighterEngine';
 import { CreateNoteModal } from '@/features/notes/ui/CreateNoteModal';
@@ -47,7 +53,6 @@ const getScrollNode = (element: HTMLElement | null): HTMLElement | Window => {
   return scrollNode;
 };
 
-// ... тут твой MdxContentWrapper (оставляем без изменений)
 const MdxContentWrapper = ({
   lessonId,
   children,
@@ -55,7 +60,6 @@ const MdxContentWrapper = ({
   lessonId: string;
   children: React.ReactNode;
 }) => {
-  // ... весь твой код скролла (не меняем)
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -89,7 +93,6 @@ const MdxContentWrapper = ({
     let timeoutId: ReturnType<typeof setTimeout>;
     const handleScroll = () => {
       if (isRestoring || isUnmounting) return;
-
       const currentY =
         scrollNode === window ? window.scrollY : (scrollNode as HTMLElement).scrollTop;
       latestValidY = currentY;
@@ -128,7 +131,7 @@ const MdxContentWrapper = ({
 export const CurrentLecturePage = () => {
   const navigate = useNavigate();
   const pageRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null); // Реф для контейнера контента
+  const contentRef = useRef<HTMLDivElement>(null);
 
   const { currentLesson, passLesson, passedLessons, halfPassedLessons, halfPassLesson } =
     useCurrentProgress();
@@ -138,7 +141,6 @@ export const CurrentLecturePage = () => {
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // --- Стейты для заметок ---
   const { notes, fetchNotes, subscribeToNotes, addNote } = useNotesStore();
   const [createModalData, setCreateModalData] = useState<{
     text: string;
@@ -150,10 +152,14 @@ export const CurrentLecturePage = () => {
     null,
   );
 
-  const lesson = useMemo(() => {
-    return contentConfig.find((l) => l.id === currentLesson) || contentConfig[0];
-  }, [currentLesson]);
+  // Стейты для умного позиционирования заметок
+  const [notePositions, setNotePositions] = useState<Record<string, number>>({});
+  const notesRef = useRef<Record<string, HTMLDivElement | null>>({});
 
+  const lesson = useMemo(
+    () => contentConfig.find((l) => l.id === currentLesson) || contentConfig[0],
+    [currentLesson],
+  );
   const isPassed = useMemo(() => passedLessons.includes(lesson.id), [passedLessons, lesson.id]);
   const LazyMdxContent = lesson ? mdxLecturesCache[lesson.mdxPath] : null;
 
@@ -161,7 +167,6 @@ export const CurrentLecturePage = () => {
     if (!pageRef.current) return;
     const scrollNode = getScrollNode(pageRef.current);
     const savedY = useCurrentProgress.getState().lessonScrollPositions[lesson.id] || 0;
-
     if (scrollNode === window) window.scrollTo({ top: savedY, left: 0, behavior: 'instant' });
     else (scrollNode as HTMLElement).scrollTop = savedY;
   }, [lesson.id]);
@@ -170,11 +175,8 @@ export const CurrentLecturePage = () => {
   const whoFinishedFirst = halfPassedLessons?.[lesson.id];
   const iFinishedFirst = isSharedMode && whoFinishedFirst === user?.id;
   const friendFinishedFirst = isSharedMode && whoFinishedFirst && whoFinishedFirst !== user?.id;
-
-  // Проверка прав на заметки: должен быть режим с другом и флаг в профиле
   const canUseNotes = isSharedMode && !!profile?.can_use_notes;
 
-  // --- Загрузка заметок ---
   useEffect(() => {
     if (canUseNotes && sharedTreeId && lesson.id) {
       fetchNotes(sharedTreeId, lesson.id);
@@ -183,23 +185,67 @@ export const CurrentLecturePage = () => {
     }
   }, [canUseNotes, sharedTreeId, lesson.id, fetchNotes, subscribeToNotes]);
 
-  // Закрытие мобильного попапа (и сброс активной заметки) при скролле
   useEffect(() => {
     const handleScroll = () => {
       setMobilePopover(null);
-      // Сбрасываем активную заметку, чтобы с карточек тоже спадал фокус
       useNotesStore.getState().setActiveNoteId(null);
     };
-
-    // capture: true ловит скролл внутри любого контейнера страницы
     window.addEventListener('scroll', handleScroll, { passive: true, capture: true });
     return () => window.removeEventListener('scroll', handleScroll, { capture: true });
   }, []);
 
+  // АЛГОРИТМ УМНОГО ПОЗИЦИОНИРОВАНИЯ ЗАМЕТОК (Google Docs style)
+  const updateNotePositions = useCallback(() => {
+    if (!contentRef.current || notes.length === 0) return;
+
+    const positions: Record<string, number> = {};
+    let nextMinY = 0;
+    const GAP = 16; // Отступ между заметками, чтобы не слипались
+
+    // Идем сверху вниз по тексту
+    const sortedNotes = [...notes].sort((a, b) => a.text_offset - b.text_offset);
+
+    sortedNotes.forEach((note) => {
+      const mark = document.getElementById(`note-mark-${note.id}`);
+      const noteEl = notesRef.current[note.id];
+      let targetY = nextMinY;
+
+      if (mark) {
+        const contentRect = contentRef.current!.getBoundingClientRect();
+        const markRect = mark.getBoundingClientRect();
+        // Расстояние от верхнего края контента до выделения
+        targetY = markRect.top - contentRect.top;
+      }
+
+      // Если заметки накладываются, толкаем нижнюю ниже
+      const finalY = Math.max(targetY, nextMinY);
+      positions[note.id] = finalY;
+
+      // Обновляем следующий минимально допустимый Y
+      if (noteEl) {
+        nextMinY = finalY + noteEl.offsetHeight + GAP;
+      } else {
+        nextMinY = finalY + 100 + GAP; // fallback, если DOM еще не отрендерил
+      }
+    });
+
+    setNotePositions((prev) => {
+      const isDifferent = sortedNotes.some((n) => prev[n.id] !== positions[n.id]);
+      return isDifferent ? positions : prev;
+    });
+  }, [notes]);
+
+  // Следим за изменениями размера (например картинка загрузилась и сдвинула текст)
+  useEffect(() => {
+    if (!canUseNotes || !contentRef.current) return;
+    const observer = new ResizeObserver(() => updateNotePositions());
+    observer.observe(contentRef.current);
+    return () => observer.disconnect();
+  }, [canUseNotes, updateNotePositions]);
+
   const fireConfetti = () => {
     const root = getComputedStyle(document.documentElement);
     const colors = [root.getPropertyValue('--primary').trim() || '#ec4899'];
-
     confetti({
       particleCount: 500,
       spread: 200,
@@ -213,12 +259,9 @@ export const CurrentLecturePage = () => {
   const handleFinish = () => {
     if (timerRef.current) clearTimeout(timerRef.current);
     setShowSuccessOverlay(false);
-
-    if (isSharedMode && !friendFinishedFirst && !iFinishedFirst) {
-      if (user) {
-        halfPassLesson(lesson.id, user.id);
-        navigate('/app/tree');
-      }
+    if (isSharedMode && !friendFinishedFirst && !iFinishedFirst && user) {
+      halfPassLesson(lesson.id, user.id);
+      navigate('/app/tree');
     } else {
       passLesson(lesson.id);
       navigate('/app/tree');
@@ -232,9 +275,7 @@ export const CurrentLecturePage = () => {
 
   useEffect(() => {
     if (showSuccessOverlay) {
-      timerRef.current = setTimeout(() => {
-        handleFinish();
-      }, 3000);
+      timerRef.current = setTimeout(() => handleFinish(), 3000);
     }
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -246,123 +287,138 @@ export const CurrentLecturePage = () => {
       ref={pageRef}
       className="relative flex min-h-full w-full justify-center font-sans text-text selection:bg-primary/20"
     >
-      {/* 
-        ОБЁРТКА МЕНЯЕТСЯ ТОЛЬКО ПРИ canUseNotes 
-        Если это личная лекция, классы останутся как было: max-w-[1000px]
-      */}
-      <div
-        className={cn(
-          'flex w-full px-6 py-12 pb-[50vh] transition-all duration-300',
-          canUseNotes
-            ? 'max-w-[1300px] flex-col gap-10 lg:flex-row'
-            : 'max-w-[1000px] justify-center',
-        )}
-      >
-        {/* ЛЕВАЯ КОЛОНКА (САМ ТЕКСТ ЛЕКЦИИ) */}
+      <div className="flex w-full justify-center px-6 py-12 pb-[50vh] transition-all duration-300">
+        {/* Главный контейнер */}
         <div
           className={cn(
-            'w-full transition-all duration-300',
-            canUseNotes ? 'max-w-[800px]' : 'max-w-[1000px]',
+            'flex w-full flex-col transition-all duration-300',
+            canUseNotes ? 'max-w-[1100px]' : 'max-w-[1000px]',
           )}
         >
-          <header className="mb-5">
+          {/* Header ограничен шириной текста */}
+          <header className={cn('mb-5', canUseNotes && 'max-w-[800px]')}>
             <h1 className="text-3xl leading-tight font-normal tracking-tight text-text sm:text-4xl md:text-[42px]">
               {lesson.title}
             </h1>
           </header>
 
-          <main
-            ref={contentRef}
-            className="prose max-w-none prose-invert prose-headings:font-normal prose-headings:tracking-tight prose-h2:mt-12 prose-h2:mb-6 prose-h2:text-xl sm:prose-h2:text-2xl prose-p:text-[17px] prose-p:leading-relaxed prose-p:text-text/85 prose-hr:my-10 prose-hr:border-text/10"
-          >
-            {LazyMdxContent ? (
-              <Suspense fallback={<MdxSkeleton />}>
-                <MdxContentWrapper key={lesson.id} lessonId={lesson.id}>
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, ease: 'easeOut' }}
-                  >
-                    <LazyMdxContent />
-                  </motion.div>
-                </MdxContentWrapper>
-              </Suspense>
-            ) : (
-              <div className="font-sans text-red-500">
-                Файл лекции по пути {lesson.mdxPath} не найден.
-              </div>
-            )}
-
-            {/* --- БЛОК КНОПОК --- */}
-            <div className="mt-16 flex justify-center">
-              {!isPassed ? (
-                iFinishedFirst ? (
-                  <Button
-                    variant="outline"
-                    className="pointer-events-none flex items-center gap-2 opacity-70"
-                  >
-                    <span>Я дочитал</span>
-                    <div className="relative ml-1 flex h-5 w-5 items-center justify-center">
-                      <Check
-                        size={18}
-                        weight="bold"
-                        className="absolute left-0 text-current opacity-40"
-                      />
-                      <Check size={18} weight="bold" className="absolute left-1.5 text-current" />
-                    </div>
-                  </Button>
-                ) : friendFinishedFirst ? (
-                  <Button
-                    variant="outline"
-                    onClick={handleCompleteClick}
-                    className="flex items-center gap-2"
-                  >
-                    <span>Завершить урок</span>
-                    <div className="relative ml-1 flex h-5 w-5 items-center justify-center">
-                      <Check
-                        size={18}
-                        weight="bold"
-                        className="absolute left-0 text-current opacity-40"
-                      />
-                      <Check size={18} weight="bold" className="absolute left-1.5 text-current" />
-                    </div>
-                  </Button>
-                ) : (
-                  <Button variant="outline" onClick={handleCompleteClick}>
-                    {isSharedMode ? 'Дочитать' : 'Завершить урок'}
-                  </Button>
-                )
-              ) : (
-                <Button variant="outline" onClick={() => navigate('/app/tree')}>
-                  Вернуться к дереву
-                </Button>
+          {/* Контейнер лекции и заметок */}
+          <div className="relative flex w-full gap-8 lg:gap-12">
+            {/* ЛЕВАЯ КОЛОНКА */}
+            <main
+              ref={contentRef}
+              className={cn(
+                'prose max-w-none prose-invert prose-headings:font-normal prose-headings:tracking-tight prose-h2:mt-12 prose-h2:mb-6 prose-h2:text-xl sm:prose-h2:text-2xl prose-p:text-[17px] prose-p:leading-relaxed prose-p:text-text/85 prose-hr:my-10 prose-hr:border-text/10',
+                canUseNotes ? 'w-full max-w-[800px]' : 'w-full',
               )}
-            </div>
-          </main>
-        </div>
+            >
+              {LazyMdxContent ? (
+                <Suspense fallback={<MdxSkeleton />}>
+                  <MdxContentWrapper key={lesson.id} lessonId={lesson.id}>
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.4, ease: 'easeOut' }}
+                    >
+                      <LazyMdxContent />
+                    </motion.div>
+                  </MdxContentWrapper>
+                </Suspense>
+              ) : (
+                <div className="font-sans text-red-500">
+                  Файл лекции по пути {lesson.mdxPath} не найден.
+                </div>
+              )}
 
-        {/* ПРАВАЯ КОЛОНКА (ЗАМЕТКИ - ТОЛЬКО ДЕСКТОП И ТОЛЬКО ПРИ canUseNotes) */}
-        {canUseNotes && (
-          <aside className="custom-scroll sticky top-[100px] mt-[100px] hidden h-fit max-h-[80vh] w-[280px] shrink-0 flex-col gap-4 overflow-y-auto pr-2 lg:flex">
-            {notes.map((note) => (
-              <NoteCard key={note.id} note={note} />
-            ))}
-            {notes.length === 0 && (
-              <div className="mt-10 text-center text-sm text-text/30">
-                Выделите текст в лекции, чтобы оставить заметку.
+              {/* Блок кнопок */}
+              <div className="mt-16 flex justify-center">
+                {!isPassed ? (
+                  iFinishedFirst ? (
+                    <Button
+                      variant="outline"
+                      className="pointer-events-none flex items-center gap-2 opacity-70"
+                    >
+                      <span>Я дочитал</span>
+                      <div className="relative ml-1 flex h-5 w-5 items-center justify-center">
+                        <Check
+                          size={18}
+                          weight="bold"
+                          className="absolute left-0 text-current opacity-40"
+                        />
+                        <Check size={18} weight="bold" className="absolute left-1.5 text-current" />
+                      </div>
+                    </Button>
+                  ) : friendFinishedFirst ? (
+                    <Button
+                      variant="outline"
+                      onClick={handleCompleteClick}
+                      className="flex items-center gap-2"
+                    >
+                      <span>Завершить урок</span>
+                      <div className="relative ml-1 flex h-5 w-5 items-center justify-center">
+                        <Check
+                          size={18}
+                          weight="bold"
+                          className="absolute left-0 text-current opacity-40"
+                        />
+                        <Check size={18} weight="bold" className="absolute left-1.5 text-current" />
+                      </div>
+                    </Button>
+                  ) : (
+                    <Button variant="outline" onClick={handleCompleteClick}>
+                      {isSharedMode ? 'Дочитать' : 'Завершить урок'}
+                    </Button>
+                  )
+                ) : (
+                  <Button variant="outline" onClick={() => navigate('/app/tree')}>
+                    Вернуться к дереву
+                  </Button>
+                )}
               </div>
+            </main>
+
+            {/* ПРАВАЯ КОЛОНКА (Абсолютное позиционирование заметок) */}
+            {canUseNotes && (
+              <aside className="relative hidden w-[280px] shrink-0 border-l-[3px] border-text/10 lg:block">
+                {notes.length === 0 && (
+                  <div className="absolute top-0 left-6 text-sm text-text/30">
+                    Выделите текст в лекции, чтобы оставить заметку.
+                  </div>
+                )}
+                {notes.map((note) => {
+                  const isPositioned = notePositions[note.id] !== undefined;
+                  return (
+                    <motion.div
+                      key={note.id}
+                      ref={(el) => {
+                        if (el) notesRef.current[note.id] = el;
+                      }}
+                      initial={false}
+                      animate={{
+                        y: notePositions[note.id] || 0,
+                        opacity: isPositioned ? 1 : 0,
+                        scale: isPositioned ? 1 : 0.95,
+                      }}
+                      transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                      className="absolute top-0 right-0 left-6 will-change-transform"
+                    >
+                      <NoteCard note={note} />
+                    </motion.div>
+                  );
+                })}
+              </aside>
             )}
-          </aside>
-        )}
+          </div>
+        </div>
       </div>
 
-      {/* --- ИНСТРУМЕНТЫ ЗАМЕТОК (Рендерим только если есть права) --- */}
       {canUseNotes && (
         <>
           <NotesHighlighterEngine
             containerRef={contentRef}
             onOpenCreateModal={setCreateModalData}
             onMobileNoteTap={(id, rect) => setMobilePopover({ noteId: id, rect })}
+            onMarksRendered={updateNotePositions}
           />
 
           <CreateNoteModal
@@ -387,7 +443,6 @@ export const CurrentLecturePage = () => {
         </>
       )}
 
-      {/* МОБИЛЬНЫЙ ПОПОВЕР ДЛЯ ЗАМЕТОК */}
       {createPortal(
         <AnimatePresence>
           {mobilePopover && (
@@ -404,7 +459,6 @@ export const CurrentLecturePage = () => {
                 left: '50%',
               }}
             >
-              {/* Невидимый оверлей для закрытия при клике вокруг */}
               <div
                 className="fixed inset-0 z-[-1]"
                 onClick={() => {
@@ -420,4 +474,4 @@ export const CurrentLecturePage = () => {
       )}
     </div>
   );
-};;
+};

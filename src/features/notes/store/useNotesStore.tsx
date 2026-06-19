@@ -21,20 +21,22 @@ interface NotesState {
   notes: SharedNote[];
   activeNoteId: string | null;
   isLoading: boolean;
+  activeFocusMode: 'aside' | 'text' | null;
 
   fetchNotes: (treeId: string, lessonId: string) => Promise<void>;
   subscribeToNotes: (treeId: string, lessonId: string) => () => void;
   addNote: (note: Omit<SharedNote, 'id' | 'created_at'>) => Promise<void>;
   deleteNote: (noteId: string) => void;
-  setActiveNoteId: (id: string | null) => void;
+  setActiveNoteId: (id: string | null, mode?: 'aside' | 'text' | null) => void;
 }
 
 export const useNotesStore = create<NotesState>((set, get) => ({
   notes: [],
   activeNoteId: null,
   isLoading: false,
+  activeFocusMode: null,
 
-  setActiveNoteId: (id) => set({ activeNoteId: id }),
+  setActiveNoteId: (id, mode = null) => set({ activeNoteId: id, activeFocusMode: mode }),
 
   fetchNotes: async (treeId, lessonId) => {
     set({ isLoading: true });

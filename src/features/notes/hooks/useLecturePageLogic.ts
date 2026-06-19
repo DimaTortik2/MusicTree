@@ -26,14 +26,8 @@ export const useLecturePageLogic = () => {
   const { user, profile } = useAuthStore();
 
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
-  const {
-    notes,
-    fetchNotes,
-    subscribeToNotes,
-    addNote,
-    activeNoteId,
-    setActiveNoteId,
-  } = useNotesStore();
+   const { notes, fetchNotes, subscribeToNotes, addNote, activeNoteId, activeFocusMode, setActiveNoteId } = useNotesStore();
+
 
   const [createModalData, setCreateModalData] = useState<
     { text: string; prefix: string; suffix: string; offset: number } | null
@@ -207,6 +201,7 @@ export const useLecturePageLogic = () => {
       createModalData,
       noteLayout,
       activeNoteId,
+      activeFocusMode
     },
     computed: {
       lesson,

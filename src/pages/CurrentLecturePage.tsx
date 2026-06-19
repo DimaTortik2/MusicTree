@@ -114,7 +114,14 @@ export const CurrentLecturePage = () => {
 
   const {
     refs: { pageRef, contentRef, asideRef, notesRef },
-    state: { showSuccessOverlay, mobilePopover, createModalData, noteLayout, activeNoteId },
+    state: {
+      showSuccessOverlay,
+      mobilePopover,
+      createModalData,
+      noteLayout,
+      activeNoteId,
+      activeFocusMode,
+    },
     computed: { lesson, isPassed, isSharedMode, canUseNotes, iFinishedFirst, friendFinishedFirst },
     actions: {
       handleCompleteClick,
@@ -143,7 +150,7 @@ export const CurrentLecturePage = () => {
       onClick={handlePageClick}
       className="relative flex min-h-full w-full justify-center font-sans text-text selection:bg-primary/20"
     >
-      <div className="flex w-full justify-center px-6 py-12 pb-[50vh] transition-all duration-300">
+      <div className="flex w-full justify-center px-6 pb-[50vh] transition-all duration-300">
         {/* Контейнер, разделяющий колонки */}
         <div
           className={cn(
@@ -159,14 +166,18 @@ export const CurrentLecturePage = () => {
             )}
           >
             <header className="mb-5">
-              <h1 className="text-3xl leading-tight font-normal tracking-tight text-text sm:text-4xl md:text-[42px]">
+              <h1 className="mt-12 text-3xl leading-tight font-normal tracking-tight text-text sm:text-4xl md:text-[42px]">
                 {lesson.title}
               </h1>
             </header>
 
             <main
               ref={contentRef}
-              className="prose max-w-none prose-invert prose-headings:font-normal prose-headings:tracking-tight prose-h2:mt-12 prose-h2:mb-6 prose-h2:text-xl sm:prose-h2:text-2xl prose-p:text-[17px] prose-p:leading-relaxed prose-p:text-text/85 prose-hr:my-10 prose-hr:border-text/10"
+              className={cn(
+                // Добавили класс prose-content-transition
+                'prose-content-transition prose max-w-none prose-invert prose-headings:font-normal prose-headings:tracking-tight prose-h2:mt-12 prose-h2:mb-6 prose-h2:text-xl sm:prose-h2:text-2xl prose-p:text-[17px] prose-p:leading-relaxed prose-p:text-text/85 prose-hr:my-10 prose-hr:border-text/10',
+                canUseNotes ? 'w-full max-w-[800px]' : 'w-full',
+              )}
             >
               {LazyMdxContent ? (
                 <Suspense fallback={<MdxSkeleton />}>
@@ -240,21 +251,16 @@ export const CurrentLecturePage = () => {
               ref={asideRef}
               className="relative hidden w-[280px] shrink-0 border-l-[3px] border-text/10 lg:block"
             >
-              {notes.length === 0 && (
-                <div className="absolute top-0 left-6 text-sm text-text/30">
-                  Выделите текст в лекции, чтобы оставить заметку.
-                </div>
-              )}
               {notes.map((note) => {
                 const layout = noteLayout[note.id];
                 const isPositioned = layout !== undefined;
-                const isDimmed = activeNoteId && activeNoteId !== note.id;
 
-                // Запоминаем, была ли карточка уже спозиционирована ранее
+                // ВОТ ТУТ ВЕРНУЛИ ЛОГИКУ ЗАТЕМНЕНИЯ ДЛЯ ASIDE:
+                const isDimmed =
+                  activeFocusMode === 'aside' && activeNoteId && activeNoteId !== note.id;
+
                 const wasPositioned = positionedNotes.current.has(note.id);
-                if (isPositioned && !wasPositioned) {
-                  positionedNotes.current.add(note.id);
-                }
+                if (isPositioned && !wasPositioned) positionedNotes.current.add(note.id);
 
                 return (
                   <motion.div
@@ -262,19 +268,18 @@ export const CurrentLecturePage = () => {
                     ref={(el) => {
                       if (el) notesRef.current[note.id] = el;
                     }}
-                    initial={{ scale: 0, opacity: 0, y: layout?.y || 0 }}
+                    initial={{ scale: 0.95, opacity: 0, y: layout?.y || 0 }}
                     animate={{
                       y: layout?.y || 0,
-                      opacity: isPositioned ? (isDimmed ? 0.3 : 1) : 0,
-                      scale: isPositioned ? 1 : 0,
+                      opacity: isPositioned ? (isDimmed ? 0.3 : 1) : 0, // <--- ВЕРНУЛИ isDimmed
+                      scale: isPositioned ? 1 : 0.95,
                     }}
                     transition={{
-                      // Если это её первое появление — мгновенно ставим на нужный Y (duration: 0)
                       y: wasPositioned
                         ? { type: 'spring', stiffness: 150, damping: 24 }
                         : { duration: 0 },
                       opacity: { duration: 0.15 },
-                      scale: { type: 'spring', stiffness: 350, damping: 25 },
+                      scale: { duration: 0.2, ease: 'easeOut' },
                     }}
                     className="absolute top-0 right-0 left-6 origin-center will-change-transform"
                   >
@@ -378,6 +383,61 @@ export const CurrentLecturePage = () => {
           </div>
         </>
       )}
+      {/* СТИЛИ ДЛЯ УМНОГО ЗАТЕМНЕНИЯ ТЕКСТА И ВЫДЕЛЕНИЙ */}
+      <style>{`
+        .prose-content-transition p,
+        .prose-content-transition h1,
+        .prose-content-transition h2,
+        .prose-content-transition h3,
+        .prose-content-transition h4,
+        .prose-content-transition li,
+        .prose-content-transition blockquote,
+        .prose-content-transition strong,
+        .prose-content-transition em,
+        .prose-content-transition img,
+        .prose-content-transition pre,
+        .prose-content-transition hr,
+        .prose-content-transition mark {
+          transition: color 0.4s ease, opacity 0.4s ease, filter 0.4s ease;
+        }
+
+        ${
+          activeFocusMode === 'text' && activeNoteId
+            ? `
+          @media (min-width: 1024px) {
+            .prose-content-transition p,
+            .prose-content-transition h1,
+            .prose-content-transition h2,
+            .prose-content-transition h3,
+            .prose-content-transition h4,
+            .prose-content-transition ul,
+            .prose-content-transition ol,
+            .prose-content-transition li,
+            .prose-content-transition blockquote,
+            .prose-content-transition a,
+            .prose-content-transition strong,
+            .prose-content-transition em {
+              color: rgba(128, 128, 128, 0.4) !important;
+              color: color-mix(in srgb, var(--text) 25%, transparent) !important;
+            }
+            .prose-content-transition img,
+            .prose-content-transition pre,
+            .prose-content-transition hr,
+            .prose-content-transition table {
+              opacity: 0.25 !important;
+            }
+            .prose-content-transition mark:not([data-note-id="${activeNoteId}"]) {
+              opacity: 0.3 !important;
+              filter: grayscale(80%) !important;
+            }
+            .prose-content-transition mark[data-note-id="${activeNoteId}"] {
+              filter: brightness(1.1) drop-shadow(0 2px 8px rgba(0,0,0,0.3)) !important;
+            }
+          }
+        `
+            : ''
+        }
+      `}</style>
     </div>
   );
 };

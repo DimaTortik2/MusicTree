@@ -16,7 +16,7 @@ export const NoteCard: React.FC<Props> = ({ note, hideHeader = false }) => {
   const user = useAuthStore((s) => s.user);
   const profile = useAuthStore((s) => s.profile);
   const activeSharedFriend = useAppModeStore((s) => s.activeSharedFriend);
-  
+
   const setActiveNoteId = useNotesStore((s) => s.setActiveNoteId);
   const deleteNote = useNotesStore((s) => s.deleteNote);
   if (!note) return null;
@@ -24,25 +24,25 @@ export const NoteCard: React.FC<Props> = ({ note, hideHeader = false }) => {
   const isMe = user?.id === note.author_id;
   const authorName = isMe ? profile?.full_name : activeSharedFriend?.full_name;
   const authorAvatar = isMe ? profile?.avatar_url : activeSharedFriend?.avatar_url;
-  
+
   const isLight = isColorLight(note.color);
   const textColor = isLight ? '#0f0510' : '#ffffff';
 
   return (
     <div
-    id={`note-card-${note.id}`}
-    onClick={(e) => {
-      e.stopPropagation();
-      setActiveNoteId(note.id);
-      const mark = document.getElementById(`note-mark-${note.id}`);
-        if (mark) mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      id={`note-card-${note.id}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        setActiveNoteId(note.id, 'text'); // <--- Добавили 'text'
+          const mark = document.getElementById(`note-mark-${note.id}`);
+          if (mark) mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }}
       className="group relative cursor-pointer rounded-2xl p-4 shadow-sm transition-colors duration-300"
       style={{
         backgroundColor: note.color,
         color: textColor,
       }}
-      >
+    >
       {isMe && (
         <button
           onClick={(e) => {

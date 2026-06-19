@@ -162,9 +162,10 @@ export const NotesHighlighterEngine: React.FC<Props> = ({
 
           mark.onclick = (e) => {
             e.stopPropagation();
-            setActiveNoteId(note.id);
+            setActiveNoteId(note.id, 'aside'); // <--- Добавили 'aside'
             const card = document.getElementById(`note-card-${note.id}`);
             if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
             if (window.innerWidth < 1024) onMobileNoteTap(note.id, mark.getBoundingClientRect());
           };
 

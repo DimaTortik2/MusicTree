@@ -166,7 +166,10 @@ export const CurrentLecturePage = () => {
 
     if (isSharedMode && !friendFinishedFirst && !iFinishedFirst) {
       // 1. Становимся первопроходцем: ставим отметку и остаемся на странице (кнопка переключится на "Я дочитал")
-      if (user) halfPassLesson(lesson.id, user.id);
+      if (user) {
+        halfPassLesson(lesson.id, user.id);
+        navigate('/app/tree');
+      }
     } else {
       // 2. Либо соло-режим, либо мы вторые завершаем урок — улетаем на дерево
       passLesson(lesson.id);

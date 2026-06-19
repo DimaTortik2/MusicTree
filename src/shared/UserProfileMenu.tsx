@@ -19,12 +19,10 @@ import { Avatar } from '@/shared/Avatar';
 import { toast } from '@/app/utils/toast';
 import { cn } from '@/app/utils/cn';
 import { Toggle } from '@/shared/Toggle';
-import { useBlobTransition } from '@/app/store/useBlobTransition';
 
 export const UserProfileMenu = () => {
   // ДОБАВИЛИ: profile и updateProfileState из стора
   const { user, profile, signOut, updateProfileState } = useAuthStore();
-  const { startTransition } = useBlobTransition();
   const [isSignOutModalOpen, setIsSignOutModalOpen] = useState(false);
   const [confirmEmail, setConfirmEmail] = useState('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);

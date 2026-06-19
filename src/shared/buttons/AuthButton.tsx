@@ -4,7 +4,7 @@ import { useAuthStore } from '@/app/store/authStore';
 import { useProgressStore } from '@/app/store/useProgressStore';
 import { Button } from '@/shared/buttons/Button';
 import { Modal } from '@/shared/Modal';
-import { UserCircle, WarningCircle } from '@phosphor-icons/react';
+import { User, WarningCircle } from '@phosphor-icons/react';
 import { useBlobTransition } from '@/app/store/useBlobTransition';
 
 export const AuthButton = () => {
@@ -33,10 +33,26 @@ export const AuthButton = () => {
 
   return (
     <>
-      <Button variant="solid" color="primary" size="sm" onClick={handleClick} className="gap-2">
-        <UserCircle size={20} weight="fill" />
-        Войти / Создать аккаунт
-      </Button>
+      <div className="mb-10">
+        <h2 className="mb-1 text-2xl font-normal text-text">Профиль</h2>
+        <p className="mb-4 max-w-sm text-[14px] leading-tight text-text/40">
+          Ваш прогресс сохранится на облаке, если войти/создать аккаунт
+        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          color="primary"
+          onClick={handleClick}
+          className="group gap-2 rounded-[14px] px-10"
+        >
+          <User
+            size={18}
+            weight='bold'
+            className="text-primary transition-colors duration-200 group-hover:text-white"
+          />
+          <span>Войти</span>
+        </Button>
+      </div>
 
       <Modal
         isOpen={showWarning}

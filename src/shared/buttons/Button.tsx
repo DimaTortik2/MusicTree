@@ -1,7 +1,6 @@
 import { cn } from '@/app/utils/cn';
 import React from 'react';
 
-// Добавили 'mini' в типы размеров
 export type ButtonVariant = 'solid' | 'outline';
 export type ButtonSize = 'mini' | 'sm' | 'md' | 'lg';
 export type ButtonColor = 'primary' | 'accent' | 'homework' | 'access' | 'text';
@@ -14,11 +13,10 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const baseStyles =
-  'inline-flex items-center justify-center font-normal transition-all duration-200 select-none active:scale-[0.98] outline-none focus-visible:ring-2 focus-visible:ring-text/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background hover:cursor-pointer hover:scale-102';
+  'inline-flex items-center justify-center font-normal transition-all duration-200 select-none outline-none focus-visible:ring-2 focus-visible:ring-text/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background';
 
-// Стили для размеров, включая новый mini
 const sizeStyles: Record<ButtonSize, string> = {
-  mini: 'px-4 py-1.5 text-xs rounded-[10px] border-2', // Твой новый размер для тостов/мелких действий
+  mini: 'px-4 py-1.5 text-xs rounded-[10px] border-2',
   sm: 'px-6 py-2.5 text-sm rounded-[14px] border-2',
   md: 'px-10 py-3.5 text-base rounded-[16px] border-[3px]',
   lg: 'px-20 py-5 text-xl rounded-[24px] border-[5px]',
@@ -57,8 +55,9 @@ export const Button: React.FC<ButtonProps> = ({
         baseStyles,
         sizeStyles[size],
         colorStyles[variant][color],
+        !disabled && 'hover:scale-102 hover:cursor-pointer active:scale-[0.98]',
+        disabled && 'pointer-events-none cursor-not-allowed opacity-40',
         className,
-        disabled && 'opacity-40',
       )}
       {...props}
     >

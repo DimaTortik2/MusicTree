@@ -11,6 +11,7 @@ import {
   MagnifyingGlassMinus,
   Trash,
   UploadSimple,
+  CircleNotch,
 } from '@phosphor-icons/react';
 import { Modal } from '@/shared/Modal';
 import { Button } from '@/shared/buttons/Button';
@@ -42,7 +43,7 @@ export const UserProfileMenu = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [baseScale, setBaseScale] = useState(1);
-
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -105,16 +106,17 @@ export const UserProfileMenu = () => {
   const isConfirmed = confirmEmail.trim().toLowerCase() === userEmail.toLowerCase();
 
   const handleSignOut = async () => {
-    if (isConfirmed) {
-      // 1. Сначала скрываем модалку для визуальной чистоты
-      setIsSignOutModalOpen(false);
+    // Защита от двойного клика
+    if (isConfirmed && !isSigningOut) {
+      setIsSigningOut(true); // Включаем лоадер
 
-      // 2. Запускаем волны. Как только они закроют экран,
-      // выполнится signOut(), который сбросит стейт, и React Router
-      // сам перекинет юзера на главную страницу прямо под волнами.
-      startTransition(() => {
-        signOut();
-      });
+      try {
+        // Просто ждём завершения выхода (внутри signOut прописан хард-редирект)
+        await signOut();
+      } catch (error) {
+        toast.error('Не удалось выйти из аккаунта');
+        setIsSigningOut(false); // Отключаем лоадер только при ошибке
+      }
     }
   };
 
@@ -675,7 +677,7 @@ export const UserProfileMenu = () => {
 
       <Modal
         isOpen={isSignOutModalOpen}
-        onClose={() => setIsSignOutModalOpen(false)}
+        onClose={() => !isSigningOut && setIsSignOutModalOpen(false)}
         layout="vertical"
         className="max-w-lg rounded-[32px] bg-surface !p-8 shadow-2xl md:max-w-[540px]"
       >
@@ -698,13 +700,14 @@ export const UserProfileMenu = () => {
             <input
               type="text"
               value={confirmEmail}
+              disabled={isSigningOut} // <-- Блокируем ввод при загрузке
               onChange={(e) => setConfirmEmail(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && isConfirmed) handleSignOut();
+                if (e.key === 'Enter' && isConfirmed && !isSigningOut) handleSignOut();
               }}
               placeholder={userEmail}
               autoFocus
-              className="w-full border-b-2 border-primary bg-transparent pb-2.5 text-lg font-medium text-text transition-colors outline-none focus:border-primary"
+              className="w-full border-b-2 border-primary bg-transparent pb-2.5 text-lg font-medium text-text transition-colors outline-none focus:border-primary disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
 
@@ -713,6 +716,7 @@ export const UserProfileMenu = () => {
               variant="outline"
               size="sm"
               color="primary"
+              disabled={isSigningOut} // <-- Блокируем кнопку "Отмена"
               onClick={() => setIsSignOutModalOpen(false)}
               className="w-full rounded-[16px] border-2 py-3 text-[15px] font-medium sm:w-auto sm:min-w-[140px] md:min-w-[160px]"
             >
@@ -722,11 +726,12 @@ export const UserProfileMenu = () => {
               variant="solid"
               size="sm"
               color="primary"
-              disabled={!isConfirmed}
+              disabled={!isConfirmed || isSigningOut} // <-- Блокируем кнопку при пустом инпуте или во время загрузки
               onClick={handleSignOut}
-              className="w-full rounded-[16px] border-2 py-3 text-[15px] font-medium disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto sm:min-w-[140px] md:min-w-[160px]"
+              className="flex w-full items-center justify-center gap-2 rounded-[16px] border-2 py-3 text-[15px] font-medium sm:w-auto sm:min-w-[140px] md:min-w-[160px]"
             >
-              Выйти
+              {isSigningOut && <CircleNotch weight="bold" size={20} className="animate-spin" />}
+              {isSigningOut ? 'Выход...' : 'Выйти'}
             </Button>
           </div>
         </div>

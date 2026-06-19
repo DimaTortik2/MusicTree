@@ -142,6 +142,7 @@ export const useProgressStore = create<AppState>()(
         "debug",
         "settings",
         "customize",
+        "chat"
       ],
       audioRecordIds: [],
 

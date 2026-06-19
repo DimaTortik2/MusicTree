@@ -23,6 +23,7 @@ import { useSharedTreeSync } from '@/shared/hooks/useSharedTreeSync';
 
 const TAB_ROUTES: Record<string, string> = {
   tree: '/app/tree',
+  chat: '/app/chat',
   lesson: '/app/current/lecture',
   homeworks: '/app/homeworks',
   chains: '/app/chains',
@@ -36,6 +37,7 @@ const TAB_ROUTES: Record<string, string> = {
 const DESKTOP_NAV_ITEMS = [
   'tree',
   'lesson',
+  'chat',
   'homeworks',
   'chains',
   'vocal',
@@ -120,8 +122,8 @@ export const AppLayout = () => {
 
   const desktopNavItems = useMemo(() => {
     if (activeSharedFriend) {
-      const others = DESKTOP_NAV_ITEMS.filter((i) => i !== 'friends' && i !== 'chats');
-      return ['friends', 'chats', ...others];
+      const others = DESKTOP_NAV_ITEMS.filter((i) => i !== 'friends' && i !== 'chat');
+      return ['friends', 'chat', ...others];
     }
     return DESKTOP_NAV_ITEMS;
   }, [activeSharedFriend]);
@@ -175,6 +177,7 @@ export const AppLayout = () => {
     const TAB_LABELS: Record<string, string> = {
       piano: 'Пианино',
       tree: 'Дерево',
+      chat: 'Чат',
       lesson: 'Текущая лекция',
       homeworks: 'Домашние задания',
       chains: 'Цепь распевки',
@@ -241,15 +244,15 @@ export const AppLayout = () => {
     }
 
     const route = TAB_ROUTES[id] || '/app';
-    const isChats = id === 'chats';
-    const isChatsDisabled = isChats && !activeSharedFriend;
+    const isChat = id === 'chat';
+    const isChatDisabled = isChat && !activeSharedFriend;
 
     return (
       <Tooltip key={id} content={label} shortcutAction={shortcutAction} position={tooltipPosition}>
         <NavLink
           to={route}
           onClick={(e) => {
-            if (isChatsDisabled)
+            if (isChatDisabled)
               e.preventDefault(); // Запрещаем переход
             else setIsOverflowOpen(false);
           }}
@@ -257,13 +260,13 @@ export const AppLayout = () => {
             cn(
               'flex items-center justify-center transition-colors duration-150 outline-none',
               isMobileView ? 'p-1.5' : 'rounded-lg p-2',
-              isActive && !isChatsDisabled ? 'text-text' : 'text-text/40',
-              !isChatsDisabled && isMobileView && 'hover:text-text',
-              !isChatsDisabled &&
+              isActive && !isChatDisabled ? 'text-text' : 'text-text/40',
+              !isChatDisabled && isMobileView && 'hover:text-text',
+              !isChatDisabled &&
                 !isMobileView &&
                 !isActive &&
                 'hover:bg-surface/40 hover:text-text',
-              isChatsDisabled && 'pointer-events-none cursor-not-allowed opacity-30', // Делаем серым и некликабельным
+              isChatDisabled && 'pointer-events-none cursor-not-allowed opacity-30', // Делаем серым и некликабельным
             )
           }
         >

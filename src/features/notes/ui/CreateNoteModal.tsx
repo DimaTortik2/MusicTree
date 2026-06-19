@@ -1,5 +1,4 @@
-// src/features/notes/ui/CreateNoteModal.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Modal } from '@/shared/Modal';
 import { Button } from '@/shared/buttons/Button';
 import { ColorPickerSlider } from './ColorPickerSlider';
@@ -29,7 +28,8 @@ export const CreateNoteModal: React.FC<Props> = ({ isOpen, onClose, onApply }) =
   const [text, setText] = useState('');
   const [color, setColor] = useState('#ec4899');
 
-  // ИСПРАВЛЕНИЕ: Случайный неиспользованный цвет при открытии
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
   useEffect(() => {
     if (isOpen) {
       setText('');
@@ -42,6 +42,14 @@ export const CreateNoteModal: React.FC<Props> = ({ isOpen, onClose, onApply }) =
       );
     }
   }, [isOpen, notes]);
+
+  // Логика авто-ресайза поля
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  }, [text, isOpen]);
 
   const isLight = isColorLight(color);
   const textColor = isLight ? '#0f0510' : '#ffffff';
@@ -57,23 +65,31 @@ export const CreateNoteModal: React.FC<Props> = ({ isOpen, onClose, onApply }) =
         <h3 className="mb-4 text-sm text-text/60">Создание заметки для друзей</h3>
 
         <div className="relative mb-6">
-          {/* ИСПРАВЛЕНИЕ: Автофокус и отступы, чтобы текст не налезал на иконку */}
           <textarea
+            ref={textareaRef}
             value={text}
             onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (text.trim()) {
+                  onApply(text.trim(), color);
+                  onClose();
+                }
+              }
+            }}
             placeholder="Очень важная заметка"
             autoFocus
-            className="w-full resize-none border-b-2 bg-transparent pr-10 pb-8 text-2xl outline-none"
-            style={{ color: '#fff', borderColor: color }}
-            rows={2}
+            rows={1}
+            className="w-full resize-none overflow-hidden border-b-2 bg-transparent pr-10 pb-2 text-2xl outline-none"
+            style={{ color: '#fff', borderColor: color, minHeight: '44px' }}
           />
-          <Drop size={24} weight="fill" className="absolute right-0 bottom-3" style={{ color }} />
+          <Drop size={24} weight="fill" className="absolute right-0 bottom-5" style={{ color }} />
         </div>
 
         <ColorPickerSlider color={color} onChange={setColor} />
 
         <div className="mt-8 flex gap-4">
-          {/* ИСПРАВЛЕНИЕ: Кнопка больше не розовеет при хавере */}
           <Button
             variant="outline"
             color="text"

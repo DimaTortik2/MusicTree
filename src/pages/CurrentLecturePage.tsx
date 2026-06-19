@@ -1,33 +1,23 @@
-import React, {
-  useMemo,
-  useState,
-  useEffect,
-  useLayoutEffect,
-  Suspense,
-  useRef,
-  useCallback,
-} from 'react';
+import React, { Suspense, useLayoutEffect, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { contentConfig } from '@/contentConfig';
 import { FireSimple, Check } from '@phosphor-icons/react';
 import { Button } from '@/shared/buttons/Button';
 import { MdxSkeleton } from '@/shared/MdxSkeleton';
-import confetti from 'canvas-confetti';
 import { motion, AnimatePresence } from 'framer-motion';
-
-import { useCurrentProgress } from '@/app/hooks/useCurrentProgress';
-import { useAppModeStore } from '@/app/store/useAppModeStore';
-import { useAuthStore } from '@/app/store/authStore';
+import { createPortal } from 'react-dom';
 import { cn } from '@/app/utils/cn';
 
-import { useNotesStore } from '@/features/notes/store/useNotesStore';
+// Компоненты заметок
 import { NotesHighlighterEngine } from '@/features/notes/ui/NotesHighlighterEngine';
 import { CreateNoteModal } from '@/features/notes/ui/CreateNoteModal';
 import { NoteCard } from '@/features/notes/ui/NoteCard';
-import { createPortal } from 'react-dom';
+import { useNotesStore } from '@/features/notes/store/useNotesStore';
+import { useCurrentProgress } from '@/app/hooks/useCurrentProgress';
+
+// Импортируем наш новый хук! Укажи правильный путь
+import { useLecturePageLogic } from '@/features/notes/hooks/useLecturePageLogic';
 
 const mdxLectures = import.meta.glob('/src/content/**/*.mdx');
-
 const mdxLecturesCache: Record<string, React.LazyExoticComponent<React.ComponentType<any>>> = {};
 for (const path in mdxLectures) {
   mdxLecturesCache[path] = React.lazy(
@@ -83,9 +73,9 @@ const MdxContentWrapper = ({
     };
 
     applyScroll(savedY);
-    const t1 = setTimeout(() => applyScroll(savedY), 50);
-    const t2 = setTimeout(() => applyScroll(savedY), 150);
-    const t3 = setTimeout(() => {
+    setTimeout(() => applyScroll(savedY), 50);
+    setTimeout(() => applyScroll(savedY), 150);
+    setTimeout(() => {
       applyScroll(savedY);
       isRestoring = false;
     }, 500);
@@ -96,28 +86,19 @@ const MdxContentWrapper = ({
       const currentY =
         scrollNode === window ? window.scrollY : (scrollNode as HTMLElement).scrollTop;
       latestValidY = currentY;
-
       clearTimeout(timeoutId);
       timeoutId = setTimeout(() => {
-        if (!isUnmounting) {
+        if (!isUnmounting)
           useCurrentProgress.getState().setLessonScrollPosition(lessonId, latestValidY);
-        }
       }, 300);
     };
 
     scrollNode.addEventListener('scroll', handleScroll, { passive: true });
-
     return () => {
       isUnmounting = true;
       scrollNode.removeEventListener('scroll', handleScroll);
-      clearTimeout(timeoutId);
-      clearTimeout(t1);
-      clearTimeout(t2);
-      clearTimeout(t3);
-
-      if (!isRestoring) {
+      if (!isRestoring)
         useCurrentProgress.getState().setLessonScrollPosition(lessonId, latestValidY);
-      }
     };
   }, [lessonId]);
 
@@ -130,37 +111,22 @@ const MdxContentWrapper = ({
 
 export const CurrentLecturePage = () => {
   const navigate = useNavigate();
-  const pageRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
 
-  const { currentLesson, passLesson, passedLessons, halfPassedLessons, halfPassLesson } =
-    useCurrentProgress();
-  const { activeSharedFriend, sharedTreeId } = useAppModeStore();
-  const { user, profile } = useAuthStore();
+  const {
+    refs: { pageRef, contentRef, asideRef, notesRef },
+    state: { showSuccessOverlay, mobilePopover, createModalData, noteLayout, activeNoteId },
+    computed: { lesson, isPassed, isSharedMode, canUseNotes, iFinishedFirst, friendFinishedFirst },
+    actions: {
+      handleCompleteClick,
+      handleFinish,
+      setMobilePopover,
+      setCreateModalData,
+      updateNotePositions,
+      handlePageClick,
+    },
+    notesData: { notes, addNote, user, sharedTreeId },
+  } = useLecturePageLogic();
 
-  const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const { notes, fetchNotes, subscribeToNotes, addNote } = useNotesStore();
-  const [createModalData, setCreateModalData] = useState<{
-    text: string;
-    prefix: string;
-    suffix: string;
-    offset: number;
-  } | null>(null);
-  const [mobilePopover, setMobilePopover] = useState<{ noteId: string; rect: DOMRect } | null>(
-    null,
-  );
-
-  // Стейты для умного позиционирования заметок
-  const [notePositions, setNotePositions] = useState<Record<string, number>>({});
-  const notesRef = useRef<Record<string, HTMLDivElement | null>>({});
-
-  const lesson = useMemo(
-    () => contentConfig.find((l) => l.id === currentLesson) || contentConfig[0],
-    [currentLesson],
-  );
-  const isPassed = useMemo(() => passedLessons.includes(lesson.id), [passedLessons, lesson.id]);
   const LazyMdxContent = lesson ? mdxLecturesCache[lesson.mdxPath] : null;
 
   useLayoutEffect(() => {
@@ -169,148 +135,38 @@ export const CurrentLecturePage = () => {
     const savedY = useCurrentProgress.getState().lessonScrollPositions[lesson.id] || 0;
     if (scrollNode === window) window.scrollTo({ top: savedY, left: 0, behavior: 'instant' });
     else (scrollNode as HTMLElement).scrollTop = savedY;
-  }, [lesson.id]);
-
-  const isSharedMode = !!activeSharedFriend;
-  const whoFinishedFirst = halfPassedLessons?.[lesson.id];
-  const iFinishedFirst = isSharedMode && whoFinishedFirst === user?.id;
-  const friendFinishedFirst = isSharedMode && whoFinishedFirst && whoFinishedFirst !== user?.id;
-  const canUseNotes = isSharedMode && !!profile?.can_use_notes;
-
-  useEffect(() => {
-    if (canUseNotes && sharedTreeId && lesson.id) {
-      fetchNotes(sharedTreeId, lesson.id);
-      const unsub = subscribeToNotes(sharedTreeId, lesson.id);
-      return () => unsub();
-    }
-  }, [canUseNotes, sharedTreeId, lesson.id, fetchNotes, subscribeToNotes]);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setMobilePopover(null);
-      useNotesStore.getState().setActiveNoteId(null);
-    };
-    window.addEventListener('scroll', handleScroll, { passive: true, capture: true });
-    return () => window.removeEventListener('scroll', handleScroll, { capture: true });
-  }, []);
-
-  // АЛГОРИТМ УМНОГО ПОЗИЦИОНИРОВАНИЯ ЗАМЕТОК (Google Docs style)
-  const updateNotePositions = useCallback(() => {
-    if (!contentRef.current || notes.length === 0) return;
-
-    const positions: Record<string, number> = {};
-    let nextMinY = 0;
-    const GAP = 16; // Отступ между заметками, чтобы не слипались
-
-    // Идем сверху вниз по тексту
-    const sortedNotes = [...notes].sort((a, b) => a.text_offset - b.text_offset);
-
-    sortedNotes.forEach((note) => {
-      const mark = document.getElementById(`note-mark-${note.id}`);
-      const noteEl = notesRef.current[note.id];
-      let targetY = nextMinY;
-
-      if (mark) {
-        const contentRect = contentRef.current!.getBoundingClientRect();
-        const markRect = mark.getBoundingClientRect();
-        // Расстояние от верхнего края контента до выделения
-        targetY = markRect.top - contentRect.top;
-      }
-
-      // Если заметки накладываются, толкаем нижнюю ниже
-      const finalY = Math.max(targetY, nextMinY);
-      positions[note.id] = finalY;
-
-      // Обновляем следующий минимально допустимый Y
-      if (noteEl) {
-        nextMinY = finalY + noteEl.offsetHeight + GAP;
-      } else {
-        nextMinY = finalY + 100 + GAP; // fallback, если DOM еще не отрендерил
-      }
-    });
-
-    setNotePositions((prev) => {
-      const isDifferent = sortedNotes.some((n) => prev[n.id] !== positions[n.id]);
-      return isDifferent ? positions : prev;
-    });
-  }, [notes]);
-
-  // Следим за изменениями размера (например картинка загрузилась и сдвинула текст)
-  useEffect(() => {
-    if (!canUseNotes || !contentRef.current) return;
-    const observer = new ResizeObserver(() => updateNotePositions());
-    observer.observe(contentRef.current);
-    return () => observer.disconnect();
-  }, [canUseNotes, updateNotePositions]);
-
-  const fireConfetti = () => {
-    const root = getComputedStyle(document.documentElement);
-    const colors = [root.getPropertyValue('--primary').trim() || '#ec4899'];
-    confetti({
-      particleCount: 500,
-      spread: 200,
-      startVelocity: 45,
-      origin: { y: 0.4 },
-      colors,
-      zIndex: 1000,
-    });
-  };
-
-  const handleFinish = () => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    setShowSuccessOverlay(false);
-    if (isSharedMode && !friendFinishedFirst && !iFinishedFirst && user) {
-      halfPassLesson(lesson.id, user.id);
-      navigate('/app/tree');
-    } else {
-      passLesson(lesson.id);
-      navigate('/app/tree');
-    }
-  };
-
-  const handleCompleteClick = () => {
-    fireConfetti();
-    setShowSuccessOverlay(true);
-  };
-
-  useEffect(() => {
-    if (showSuccessOverlay) {
-      timerRef.current = setTimeout(() => handleFinish(), 3000);
-    }
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, [showSuccessOverlay]);
-
+  }, [lesson.id, pageRef]);
+  const positionedNotes = useRef(new Set<string>());
   return (
     <div
       ref={pageRef}
+      onClick={handlePageClick}
       className="relative flex min-h-full w-full justify-center font-sans text-text selection:bg-primary/20"
     >
       <div className="flex w-full justify-center px-6 py-12 pb-[50vh] transition-all duration-300">
-        {/* Главный контейнер */}
+        {/* Контейнер, разделяющий колонки */}
         <div
           className={cn(
-            'flex w-full flex-col transition-all duration-300',
-            canUseNotes ? 'max-w-[1100px]' : 'max-w-[1000px]',
+            'flex w-full gap-8 transition-all duration-300 lg:gap-12',
+            canUseNotes ? 'max-w-[1100px]' : 'max-w-[1000px] justify-center',
           )}
         >
-          {/* Header ограничен шириной текста */}
-          <header className={cn('mb-5', canUseNotes && 'max-w-[800px]')}>
-            <h1 className="text-3xl leading-tight font-normal tracking-tight text-text sm:text-4xl md:text-[42px]">
-              {lesson.title}
-            </h1>
-          </header>
+          {/* ЛЕВАЯ КОЛОНКА (Заголовок + Текст) */}
+          <div
+            className={cn(
+              'flex w-full min-w-0 flex-col',
+              canUseNotes ? 'max-w-[800px]' : 'max-w-[1000px]',
+            )}
+          >
+            <header className="mb-5">
+              <h1 className="text-3xl leading-tight font-normal tracking-tight text-text sm:text-4xl md:text-[42px]">
+                {lesson.title}
+              </h1>
+            </header>
 
-          {/* Контейнер лекции и заметок */}
-          <div className="relative flex w-full gap-8 lg:gap-12">
-            {/* ЛЕВАЯ КОЛОНКА */}
             <main
               ref={contentRef}
-              className={cn(
-                'prose max-w-none prose-invert prose-headings:font-normal prose-headings:tracking-tight prose-h2:mt-12 prose-h2:mb-6 prose-h2:text-xl sm:prose-h2:text-2xl prose-p:text-[17px] prose-p:leading-relaxed prose-p:text-text/85 prose-hr:my-10 prose-hr:border-text/10',
-                canUseNotes ? 'w-full max-w-[800px]' : 'w-full',
-              )}
+              className="prose max-w-none prose-invert prose-headings:font-normal prose-headings:tracking-tight prose-h2:mt-12 prose-h2:mb-6 prose-h2:text-xl sm:prose-h2:text-2xl prose-p:text-[17px] prose-p:leading-relaxed prose-p:text-text/85 prose-hr:my-10 prose-hr:border-text/10"
             >
               {LazyMdxContent ? (
                 <Suspense fallback={<MdxSkeleton />}>
@@ -376,39 +232,58 @@ export const CurrentLecturePage = () => {
                 )}
               </div>
             </main>
-
-            {/* ПРАВАЯ КОЛОНКА (Абсолютное позиционирование заметок) */}
-            {canUseNotes && (
-              <aside className="relative hidden w-[280px] shrink-0 border-l-[3px] border-text/10 lg:block">
-                {notes.length === 0 && (
-                  <div className="absolute top-0 left-6 text-sm text-text/30">
-                    Выделите текст в лекции, чтобы оставить заметку.
-                  </div>
-                )}
-                {notes.map((note) => {
-                  const isPositioned = notePositions[note.id] !== undefined;
-                  return (
-                    <motion.div
-                      key={note.id}
-                      ref={(el) => {
-                        if (el) notesRef.current[note.id] = el;
-                      }}
-                      initial={false}
-                      animate={{
-                        y: notePositions[note.id] || 0,
-                        opacity: isPositioned ? 1 : 0,
-                        scale: isPositioned ? 1 : 0.95,
-                      }}
-                      transition={{ type: 'spring', stiffness: 350, damping: 30 }}
-                      className="absolute top-0 right-0 left-6 will-change-transform"
-                    >
-                      <NoteCard note={note} />
-                    </motion.div>
-                  );
-                })}
-              </aside>
-            )}
           </div>
+
+          {/* ПРАВАЯ КОЛОНКА (Заметки) */}
+          {canUseNotes && (
+            <aside
+              ref={asideRef}
+              className="relative hidden w-[280px] shrink-0 border-l-[3px] border-text/10 lg:block"
+            >
+              {notes.length === 0 && (
+                <div className="absolute top-0 left-6 text-sm text-text/30">
+                  Выделите текст в лекции, чтобы оставить заметку.
+                </div>
+              )}
+              {notes.map((note) => {
+                const layout = noteLayout[note.id];
+                const isPositioned = layout !== undefined;
+                const isDimmed = activeNoteId && activeNoteId !== note.id;
+
+                // Запоминаем, была ли карточка уже спозиционирована ранее
+                const wasPositioned = positionedNotes.current.has(note.id);
+                if (isPositioned && !wasPositioned) {
+                  positionedNotes.current.add(note.id);
+                }
+
+                return (
+                  <motion.div
+                    key={note.id}
+                    ref={(el) => {
+                      if (el) notesRef.current[note.id] = el;
+                    }}
+                    initial={{ scale: 0, opacity: 0, y: layout?.y || 0 }}
+                    animate={{
+                      y: layout?.y || 0,
+                      opacity: isPositioned ? (isDimmed ? 0.3 : 1) : 0,
+                      scale: isPositioned ? 1 : 0,
+                    }}
+                    transition={{
+                      // Если это её первое появление — мгновенно ставим на нужный Y (duration: 0)
+                      y: wasPositioned
+                        ? { type: 'spring', stiffness: 150, damping: 24 }
+                        : { duration: 0 },
+                      opacity: { duration: 0.15 },
+                      scale: { type: 'spring', stiffness: 350, damping: 25 },
+                    }}
+                    className="absolute top-0 right-0 left-6 origin-center will-change-transform"
+                  >
+                    <NoteCard note={note} hideHeader={layout?.isGrouped} />
+                  </motion.div>
+                );
+              })}
+            </aside>
+          )}
         </div>
       </div>
 
@@ -420,7 +295,6 @@ export const CurrentLecturePage = () => {
             onMobileNoteTap={(id, rect) => setMobilePopover({ noteId: id, rect })}
             onMarksRendered={updateNotePositions}
           />
-
           <CreateNoteModal
             isOpen={!!createModalData}
             onClose={() => setCreateModalData(null)}
@@ -461,16 +335,48 @@ export const CurrentLecturePage = () => {
             >
               <div
                 className="fixed inset-0 z-[-1]"
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   setMobilePopover(null);
                   useNotesStore.getState().setActiveNoteId(null);
                 }}
               />
-              <NoteCard note={notes.find((n) => n.id === mobilePopover.noteId)!} />
+              <NoteCard
+                note={notes.find((n) => n.id === mobilePopover.noteId)!}
+                hideHeader={false}
+              />
             </motion.div>
           )}
         </AnimatePresence>,
         document.body,
+      )}
+
+      {/* ЭКРАН ПООЩРЕНИЯ (ОГОНЁК) */}
+      {showSuccessOverlay && (
+        <>
+          <style>{`
+            @keyframes overlayFadeIn { from { opacity: 0; } to { opacity: 1; } }
+            @keyframes contentScaleIn { from { transform: scale(0.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+            .animate-overlay-fade { animation: overlayFadeIn 0.25s ease-out forwards; }
+            .animate-content-scale { animation: contentScaleIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+          `}</style>
+
+          <div
+            onClick={handleFinish}
+            className="animate-overlay-fade fixed inset-0 z-[5000] flex cursor-pointer flex-col items-center justify-center bg-(--background)/90 backdrop-blur-[2px]"
+          >
+            <div className="animate-content-scale flex flex-col items-center gap-8 px-4 text-center">
+              <FireSimple
+                size="100%"
+                weight="light"
+                className="size-45 text-primary transition-all duration-300 sm:size-60 md:size-80 lg:size-100"
+              />
+              <h2 className="text-3xl font-medium tracking-wide text-text selection:bg-transparent sm:text-5xl md:text-6xl">
+                Замечательно!
+              </h2>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

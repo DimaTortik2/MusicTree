@@ -5,10 +5,12 @@ import { useProgressStore } from '@/app/store/useProgressStore';
 import { Button } from '@/shared/buttons/Button';
 import { Modal } from '@/shared/Modal';
 import { UserCircle, WarningCircle } from '@phosphor-icons/react';
+import { useBlobTransition } from '@/app/store/useBlobTransition';
 
 export const AuthButton = () => {
   const { user, initialized } = useAuthStore();
   const navigate = useNavigate();
+  const { startTransition } = useBlobTransition();
   const [showWarning, setShowWarning] = useState(false);
 
   // Проверяем, есть ли прогресс (пройденные уроки или записанное аудио)
@@ -23,7 +25,9 @@ export const AuthButton = () => {
     if (hasLocalProgress) {
       setShowWarning(true);
     } else {
-      navigate('/auth');
+      startTransition(() => {
+        navigate('/auth');
+      });
     }
   };
 

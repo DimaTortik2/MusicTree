@@ -6,6 +6,8 @@ import { TreeWallpaper } from '@/wallpapers/TreeWallpaper';
 import { supabase } from '@/shared/lib/supabase';
 import { GradientQrCode } from '@/shared/GradientQrCode';
 import { QrScannerModal } from '@/shared/QrScannerModal';
+import { useBlobTransition } from '@/app/store/useBlobTransition';
+import { useNavigate } from 'react-router';
 
 const DITHER_NOISE =
   "data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='4' numOctaves='1' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E";
@@ -30,7 +32,8 @@ const SCRIM_MASK = `radial-gradient(
 export const AuthPage = () => {
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
-
+  const navigate = useNavigate();
+  const { startTransition } = useBlobTransition();
   const translateX = useTransform(mouseX, [-1, 1], [20, -20]);
   const translateY = useTransform(mouseY, [-1, 1], [20, -20]);
 
@@ -57,6 +60,18 @@ export const AuthPage = () => {
   }, [mouseX, mouseY]);
 
   useEffect(() => {
+    const handleQrRedirect = (link: string) => {
+      try {
+        const url = new URL(link);
+        // Запускаем нашу анимацию волн и переходим через Router
+        startTransition(() => {
+          navigate(url.pathname + url.search);
+        });
+      } catch (e) {
+        // Фолбек, если URL какой-то нестандартный
+        window.location.href = link;
+      }
+    };
     // 🔥 БОНУС: Если отсканировали штатной камерой телефона, он сам откроет этот URL
     // Мы ловим его и автоматически перенаправляем на авторизацию
     const params = new URLSearchParams(window.location.search);
@@ -70,7 +85,7 @@ export const AuthPage = () => {
         .single()
         .then(({ data }) => {
           if (data?.status === 'approved' && data.action_link) {
-            window.location.href = data.action_link;
+            handleQrRedirect(data.action_link);
           }
         });
     }
@@ -87,7 +102,7 @@ export const AuthPage = () => {
         { event: 'UPDATE', schema: 'public', table: 'qr_auth_sessions', filter: `id=eq.${token}` },
         (payload) => {
           if (payload.new.status === 'approved' && payload.new.action_link) {
-            window.location.href = payload.new.action_link;
+            handleQrRedirect(payload.new.action_link);
           }
         },
       )
@@ -101,7 +116,7 @@ export const AuthPage = () => {
         .single();
 
       if (data && data.status === 'approved' && data.action_link) {
-        window.location.href = data.action_link;
+        handleQrRedirect(data.action_link);
       }
     }, 3000);
 
@@ -109,7 +124,7 @@ export const AuthPage = () => {
       channel.unsubscribe();
       clearInterval(fallbackInterval);
     };
-  }, []);
+  }, [navigate, startTransition]);
 
   return (
     <div className="relative flex min-h-dvh w-full overflow-hidden bg-background font-sans text-text">
@@ -151,7 +166,7 @@ export const AuthPage = () => {
         }}
       />
 
-      <div className="relative z-20 flex w-full flex-col bg-surface/40 backdrop-blur-lg p-6 sm:p-12 md:w-[480px] xl:w-[540px]">
+      <div className="relative z-20 flex w-full flex-col bg-surface/40 p-6 backdrop-blur-lg sm:p-12 md:w-[480px] xl:w-[540px]">
         <RegisterForm onOpenQrScanner={() => setIsPhoneScannerOpen(true)} />
       </div>
 

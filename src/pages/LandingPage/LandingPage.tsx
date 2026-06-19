@@ -7,6 +7,7 @@ import { Button } from '@/shared/buttons/Button';
 import { useNavigate } from 'react-router-dom';
 import { unlockAudioContext } from '@/shared/lib/audioEngine';
 import { TreeWallpaper } from '@/wallpapers/TreeWallpaper';
+import { useBlobTransition } from '@/app/store/useBlobTransition';
 
 // Маска сглаживания для мягкого затухания краев свечения
 const SCRIM_MASK = `radial-gradient(
@@ -32,6 +33,7 @@ const DITHER_NOISE =
 
 export function LandingPage() {
   const navigate = useNavigate();
+  const { startTransition } = useBlobTransition();
 
   // Параллакс логика
   const mouseX = useMotionValue(0);
@@ -65,7 +67,9 @@ export function LandingPage() {
     await unlockAudioContext();
 
     // 2. Затем делаем редирект в приложение (на дерево)
-    navigate('/app');
+    startTransition(() => {
+      navigate('/app');
+    });
   };
 
   return (
@@ -164,7 +168,7 @@ export function LandingPage() {
             Начать
           </Button>
         </div>
-        <footer className="absolute bottom-0 left-0 z-20 flex w-full justify-center gap-6 pb-6 text-xs text-text/40 text-[0.65rem] sm:pb-8 sm:text-sm">
+        <footer className="absolute bottom-0 left-0 z-20 flex w-full justify-center gap-6 pb-6 text-xs text-[0.65rem] text-text/40 sm:pb-8 sm:text-sm">
           <button
             onClick={() => navigate('/terms')}
             className="cursor-pointer transition-colors hover:text-primary"

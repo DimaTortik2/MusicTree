@@ -18,11 +18,12 @@ import { Avatar } from '@/shared/Avatar';
 import { toast } from '@/app/utils/toast';
 import { cn } from '@/app/utils/cn';
 import { Toggle } from '@/shared/Toggle';
+import { useBlobTransition } from '@/app/store/useBlobTransition';
 
 export const UserProfileMenu = () => {
   // ДОБАВИЛИ: profile и updateProfileState из стора
   const { user, profile, signOut, updateProfileState } = useAuthStore();
-
+  const { startTransition } = useBlobTransition();
   const [isSignOutModalOpen, setIsSignOutModalOpen] = useState(false);
   const [confirmEmail, setConfirmEmail] = useState('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -104,7 +105,17 @@ export const UserProfileMenu = () => {
   const isConfirmed = confirmEmail.trim().toLowerCase() === userEmail.toLowerCase();
 
   const handleSignOut = async () => {
-    if (isConfirmed) await signOut();
+    if (isConfirmed) {
+      // 1. Сначала скрываем модалку для визуальной чистоты
+      setIsSignOutModalOpen(false);
+
+      // 2. Запускаем волны. Как только они закроют экран,
+      // выполнится signOut(), который сбросит стейт, и React Router
+      // сам перекинет юзера на главную страницу прямо под волнами.
+      startTransition(() => {
+        signOut();
+      });
+    }
   };
 
   const handleUpdateProfile = async () => {

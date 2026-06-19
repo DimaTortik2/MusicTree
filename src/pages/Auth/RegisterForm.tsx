@@ -8,6 +8,7 @@ import { Input } from '@/shared/Input';
 import { toast } from '@/app/utils/toast';
 import { cn } from '@/app/utils/cn';
 import { useNavigate } from 'react-router-dom';
+import { useBlobTransition } from '@/app/store/useBlobTransition';
 
 const getFriendlyErrorMessage = (message: string): string => {
   const msg = message.toLowerCase();
@@ -30,7 +31,6 @@ const getFriendlyErrorMessage = (message: string): string => {
   return 'Что-то пошло не так. Пожалуйста, попробуйте позже.';
 };
 
-// 🔥 ДОБАВЛЯЕМ ПРОПСЫ ДЛЯ СВЯЗИ СО СКАНЕРОМ ИЗ AuthPage
 interface RegisterFormProps {
   onOpenQrScanner?: () => void;
 }
@@ -44,10 +44,23 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onOpenQrScanner }) =
   const [fullName, setFullName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const [showPassword, setShowPassword] = useState(false);
+  // 1. Достаем isActive из стора
+  const { startTransition, isActive } = useBlobTransition();
 
+  const [showPassword, setShowPassword] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const turnstileRef = useRef<TurnstileInstance>(null);
+
+  // 🔥 2. Стейт для отложенного маунта капчи. Если мы зашли по прямой ссылке
+  // (без транзишена), isActive будет false и капча появится сразу.
+  const [showCaptcha, setShowCaptcha] = useState(!isActive);
+
+  // 🔥 3. Ждем, пока транзишен полностью очистится
+  useEffect(() => {
+    if (!isActive) {
+      setShowCaptcha(true);
+    }
+  }, [isActive]);
 
   const [isEmailSent, setIsEmailSent] = useState(false);
   const [isResetEmailSent, setIsResetEmailSent] = useState(false);
@@ -82,23 +95,26 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onOpenQrScanner }) =
   const isSubmitDisabled = !isFormValid || isLoading || !captchaToken;
   const isForgotSubmitDisabled = !isEmailValid || isLoading || !captchaToken;
 
+  // 🔥 4. Рендерим Turnstile только когда showCaptcha === true
   const renderCaptcha = () => (
     <div className="mt-6 flex min-h-[65px] w-full flex-col items-center justify-center gap-2">
-      <Turnstile
-        ref={turnstileRef}
-        siteKey="0x4AAAAAADhan7iwbBXBvP5v"
-        options={{ language: 'ru', theme: 'auto' }}
-        onSuccess={(token) => setCaptchaToken(token)}
-        onExpire={() => {
-          setCaptchaToken(null);
-          toast.error('Время капчи истекло', { position: 'bottom-right' });
-          turnstileRef.current?.reset();
-        }}
-        onError={() => {
-          setCaptchaToken(null);
-          toast.error('Ошибка капчи. Отключите VPN/AdBlock.', { position: 'bottom-right' });
-        }}
-      />
+      {showCaptcha && (
+        <Turnstile
+          ref={turnstileRef}
+          siteKey="0x4AAAAAADhan7iwbBXBvP5v"
+          options={{ language: 'ru', theme: 'auto' }}
+          onSuccess={(token) => setCaptchaToken(token)}
+          onExpire={() => {
+            setCaptchaToken(null);
+            toast.error('Время капчи истекло', { position: 'bottom-right' });
+            turnstileRef.current?.reset();
+          }}
+          onError={() => {
+            setCaptchaToken(null);
+            toast.error('Ошибка капчи. Отключите VPN/AdBlock.', { position: 'bottom-right' });
+          }}
+        />
+      )}
     </div>
   );
 
@@ -316,7 +332,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onOpenQrScanner }) =
     <div className="relative flex h-full w-full flex-col pt-8 sm:pt-0">
       <button
         type="button"
-        onClick={() => navigate(-1)}
+        onClick={() => startTransition(() => navigate(-1))}
         className="absolute top-0 left-0 flex cursor-pointer items-center gap-2 text-sm font-medium text-text/50 transition-colors outline-none hover:text-text active:scale-95 sm:-top-8 sm:-left-8"
       >
         <ArrowLeft className="h-5 w-5" />
@@ -450,7 +466,6 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onOpenQrScanner }) =
           <div className="h-px flex-1 bg-line"></div>
         </div>
 
-        {/* 🔥 НОВАЯ СЕКЦИЯ КНОПОК */}
         <div className="space-y-4">
           {onOpenQrScanner && (
             <Button

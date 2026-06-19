@@ -259,7 +259,7 @@ export function FriendsPage() {
               : 'Ваш аккаунт пока не имеет доступа к функции совместных деревьев.'
           }
           icon={<UserPlus className="size-8 text-text sm:size-10" weight="regular" />}
-          onIconClick={!user ? () => navigate('/auth') : undefined}
+          onIconClick={!user ? () => startTransition(() => navigate('/auth')) : undefined}
           iconContainerClassName="bg-primary text-surface"
         />
       </div>

@@ -1,4 +1,4 @@
-import React, { Suspense, useLayoutEffect, useRef, useEffect } from 'react';
+import React, { Suspense, useLayoutEffect, useRef, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FireSimple, Check } from '@phosphor-icons/react';
 import { Button } from '@/shared/buttons/Button';
@@ -154,7 +154,19 @@ export const CurrentLecturePage = () => {
     if (scrollNode === window) window.scrollTo({ top: savedY, left: 0, behavior: 'instant' });
     else (scrollNode as HTMLElement).scrollTop = savedY;
   }, [lesson.id, pageRef]);
-  const positionedNotes = useRef(new Set<string>());
+
+  const previousNoteLayout = useRef(noteLayout);
+  useEffect(() => {
+    previousNoteLayout.current = noteLayout;
+  }, [noteLayout]);
+
+  const [isReadyToAnimate, setIsReadyToAnimate] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsReadyToAnimate(true);
+    }, 1000); // 1 секунды достаточно, чтобы весь макет лекции полностью загрузился и встал на свои места
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
     <div
@@ -259,20 +271,26 @@ export const CurrentLecturePage = () => {
 
           {/* ПРАВАЯ КОЛОНКА (Заметки) */}
           {canUseNotes && (
-            <aside
+            <motion.aside
               ref={asideRef}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.4, delay: 0.1, ease: 'easeOut' }}
               className="relative hidden w-[280px] shrink-0 border-l-[3px] border-text/10 lg:block"
             >
               {notes.map((note) => {
                 const layout = noteLayout[note.id];
                 const isPositioned = layout !== undefined;
 
+                const isFirstPositioning = isPositioned && !previousNoteLayout.current[note.id];
+
+                // Анимируем сдвиги по Y только если страница уже загрузилась (прошла 1 сек)
+                // и это НЕ первое появление этой конкретной заметки
+                const shouldAnimateY = isReadyToAnimate && isPositioned && !isFirstPositioning;
+
                 // ЗАТЕМНЕНИЕ ДЛЯ ASIDE:
                 const isDimmed =
                   activeFocusMode === 'aside' && activeNoteId && activeNoteId !== note.id;
-
-                const wasPositioned = positionedNotes.current.has(note.id);
-                if (isPositioned && !wasPositioned) positionedNotes.current.add(note.id);
 
                 return (
                   <motion.div
@@ -280,27 +298,31 @@ export const CurrentLecturePage = () => {
                     ref={(el) => {
                       if (el) notesRef.current[note.id] = el;
                     }}
-                    initial={{ scale: 0.95, opacity: 0, y: layout?.y || 0 }}
+                    initial={{ scale: 0.95, opacity: 0 }}
                     animate={{
                       y: layout?.y || 0,
                       opacity: isPositioned ? (isDimmed ? 0.3 : 1) : 0,
                       scale: isPositioned ? 1 : 0.95,
                     }}
                     transition={{
-                      // ИСПРАВЛЕНИЕ: Анимация без лагов при первой загрузке
-                      y: wasPositioned
-                        ? { type: 'spring', stiffness: 150, damping: 24 }
+                      // Если макет страницы еще грузится (первая секунда) ИЛИ это новое появление карточки -> прыгаем мгновенно.
+                      // Если страница готова и мы удалили/добавили другую заметку -> остальные плавно сдвигаются.
+                      y: shouldAnimateY
+                        ? { type: 'spring', stiffness: 200, damping: 25 }
                         : { duration: 0 },
-                      opacity: { duration: wasPositioned ? 0.15 : 0 },
-                      scale: { duration: wasPositioned ? 0.2 : 0, ease: 'easeOut' },
+                      opacity: { duration: 0.2 },
+                      scale: { duration: 0.2, ease: 'easeOut' },
                     }}
                     className="absolute top-0 right-0 left-6 origin-center will-change-transform"
+                    style={{
+                      pointerEvents: isPositioned ? 'auto' : 'none',
+                    }}
                   >
                     <NoteCard note={note} hideHeader={layout?.isGrouped} />
                   </motion.div>
                 );
               })}
-            </aside>
+            </motion.aside>
           )}
         </div>
       </div>
@@ -389,54 +411,55 @@ export const CurrentLecturePage = () => {
           </div>
         </>
       )}
-      {/* СТИЛИ ДЛЯ УМНОГО ЗАТЕМНЕНИЯ ТЕКСТА И ВЫДЕЛЕНИЙ */}
       <style>{`
-        .prose-content-transition p,
-        .prose-content-transition h1,
-        .prose-content-transition h2,
-        .prose-content-transition h3,
-        .prose-content-transition h4,
-        .prose-content-transition li,
-        .prose-content-transition blockquote,
-        .prose-content-transition strong,
-        .prose-content-transition em,
+        .prose-content-transition {
+          position: relative;
+        }
+        .prose-content-transition::after {
+          content: "";
+          position: absolute;
+          inset: -20px;
+          background-color: var(--background, #0f0510);
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 0.3s ease-out;
+          z-index: 10;
+        }
         .prose-content-transition img,
         .prose-content-transition pre,
         .prose-content-transition hr,
+        .prose-content-transition table,
         .prose-content-transition mark {
-          transition: color 0.4s ease, opacity 0.4s ease, filter 0.4s ease;
+          transition: opacity 0.3s ease-out, filter 0.3s ease-out;
         }
 
         ${
           activeFocusMode === 'text' && activeNoteId
             ? `
           @media (min-width: 1024px) {
-            .prose-content-transition p,
-            .prose-content-transition h1,
-            .prose-content-transition h2,
-            .prose-content-transition h3,
-            .prose-content-transition h4,
-            .prose-content-transition ul,
-            .prose-content-transition ol,
-            .prose-content-transition li,
-            .prose-content-transition blockquote,
-            .prose-content-transition a,
-            .prose-content-transition strong,
-            .prose-content-transition em {
-              color: rgba(128, 128, 128, 0.4) !important;
-              color: color-mix(in srgb, var(--text) 25%, transparent) !important;
+            /* Мгновенно и одновременно затемняем весь текст оверлеем */
+            .prose-content-transition::after {
+              opacity: 0.75; /* Сила затемнения (регулируйте по вкусу) */
             }
+            
+            /* Дополнительно приглушаем картинки и блоки кода */
             .prose-content-transition img,
             .prose-content-transition pre,
             .prose-content-transition hr,
             .prose-content-transition table {
               opacity: 0.25 !important;
             }
+
+            /* Неактивные маркеры тускнеют под оверлеем */
             .prose-content-transition mark:not([data-note-id="${activeNoteId}"]) {
               opacity: 0.3 !important;
               filter: grayscale(80%) !important;
             }
+
+            /* ВЫТАСКИВАЕМ активную заметку ПОВЕРХ оверлея затемнения (z-index 20 > 10) */
             .prose-content-transition mark[data-note-id="${activeNoteId}"] {
+              position: relative !important;
+              z-index: 20 !important;
               filter: brightness(1.1) drop-shadow(0 2px 8px rgba(0,0,0,0.3)) !important;
             }
           }

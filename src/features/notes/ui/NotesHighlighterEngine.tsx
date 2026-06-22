@@ -89,11 +89,38 @@ export const NotesHighlighterEngine: React.FC<Props> = ({
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const existingMarks = Array.from(containerRef.current.querySelectorAll('mark.mt-shared-note'));
+    const currentNoteIds = new Set(notes.map((n) => String(n.id)));
+    const existingMarks = Array.from(
+      containerRef.current.querySelectorAll<HTMLElement>('mark.mt-shared-note'),
+    );
+
     existingMarks.forEach((mark) => {
-      const parent = mark.parentNode;
-      while (mark.firstChild) parent?.insertBefore(mark.firstChild, mark);
-      parent?.removeChild(mark);
+      const noteId = mark.dataset.noteId;
+
+      if (noteId && !currentNoteIds.has(noteId)) {
+        // ЗАМЕТКА УДАЛЕНА: Убираем класс, чтобы не мешать новым поискам
+        mark.classList.remove('mt-shared-note');
+
+        // Запускаем плавное исчезновение (анимация сработает за счет transition-colors)
+        mark.style.backgroundColor = 'transparent';
+        mark.style.borderColor = 'transparent';
+        mark.style.color = 'inherit';
+
+        // Ждем 300мс окончания CSS-транзиции (duration-300), после чего аккуратно убираем тег
+        setTimeout(() => {
+          const parent = mark.parentNode;
+          if (parent) {
+            while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+            parent.removeChild(mark);
+            parent.normalize(); // Склеиваем обратно разбитые текстовые ноды
+          }
+        }, 300);
+      } else {
+        // ЗАМЕТКА ВСЁ ЕЩЁ СУЩЕСТВУЕТ: Мгновенно снимаем старую обертку перед пересчетом её позиции
+        const parent = mark.parentNode;
+        while (mark.firstChild) parent?.insertBefore(mark.firstChild, mark);
+        parent?.removeChild(mark);
+      }
     });
 
     containerRef.current.normalize();
@@ -151,11 +178,10 @@ export const NotesHighlighterEngine: React.FC<Props> = ({
           mark.dataset.noteId = note.id;
           mark.className = 'mt-shared-note transition-colors duration-300 relative';
 
-          if (op.isFirst) mark.classList.add('border-l-[3px]', 'rounded-l-[3px]');
-          if (op.isLast) mark.classList.add('border-r-[3px]', 'rounded-r-[3px]');
+          if (op.isFirst) mark.classList.add('rounded-l-[3px]');
+          if (op.isLast) mark.classList.add('rounded-r-[3px]');
 
           mark.style.backgroundColor = note.color;
-          mark.style.borderColor = isColorLight(note.color) ? '#0f051060' : '#f3f4f660';
           mark.style.color = isColorLight(note.color) ? '#0f0510' : '#f3f4f6';
 
           if (op.isFirst) mark.id = `note-mark-${note.id}`;

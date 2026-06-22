@@ -201,6 +201,7 @@ export const CurrentLecturePage = () => {
                 // Добавили класс prose-content-transition
                 'prose-content-transition prose max-w-none prose-invert prose-headings:font-normal prose-headings:tracking-tight prose-h2:mt-12 prose-h2:mb-6 prose-h2:text-xl sm:prose-h2:text-2xl prose-p:text-[17px] prose-p:leading-relaxed prose-p:text-text/85 prose-hr:my-10 prose-hr:border-text/10',
                 canUseNotes ? 'w-full max-w-[800px]' : 'w-full',
+                activeFocusMode === 'text' && activeNoteId ? 'focus-mode-active' : '',
               )}
             >
               {LazyMdxContent ? (
@@ -429,38 +430,34 @@ export const CurrentLecturePage = () => {
           transition: opacity 0.3s ease-out, filter 0.3s ease-out;
         }
 
-        ${
-          activeFocusMode === 'text' && activeNoteId
-            ? `
-          @media (min-width: 1024px) {
-            /* Мгновенно и одновременно затемняем весь текст оверлеем */
-            .prose-content-transition::after {
-              opacity: 0.75; /* Сила затемнения (регулируйте по вкусу) */
-            }
-            
-            /* Дополнительно приглушаем картинки и блоки кода */
-            .prose-content-transition img,
-            .prose-content-transition pre,
-            .prose-content-transition hr,
-            .prose-content-transition table {
-              opacity: 0.25 !important;
-            }
-
-            /* Неактивные маркеры тускнеют под оверлеем */
-            .prose-content-transition mark:not([data-note-id="${activeNoteId}"]) {
-              opacity: 0.3 !important;
-              filter: grayscale(80%) !important;
-            }
-
-            /* ВЫТАСКИВАЕМ активную заметку ПОВЕРХ оверлея затемнения (z-index 20 > 10) */
-            .prose-content-transition mark[data-note-id="${activeNoteId}"] {
-              position: relative !important;
-              z-index: 20 !important;
-              filter: brightness(1.1) drop-shadow(0 2px 8px rgba(0,0,0,0.3)) !important;
-            }
+        @media (min-width: 1024px) {
+          /* Когда активирован режим фокуса на заметке */
+          .prose-content-transition.focus-mode-active::after {
+            opacity: 0.75;
           }
-        `
-            : ''
+          
+          /* Приглушаем картинки, таблицы и блоки кода */
+          .prose-content-transition.focus-mode-active img,
+          .prose-content-transition.focus-mode-active pre,
+          .prose-content-transition.focus-mode-active hr,
+          .prose-content-transition.focus-mode-active table {
+            opacity: 0.25 !important;
+          }
+
+          /* Неактивные маркеры тускнеют под оверлеем. 
+             НО если внутри маркера лежит активный ребенок (:has), мы не даем родителю прозрачность, 
+             иначе ребенок застрянет в родительском Stacking Context и не сможет выпрыгнуть! */
+          .prose-content-transition.focus-mode-active mark:not(.active-note-mark):not(:has(.active-note-mark)) {
+            opacity: 0.3 !important;
+            filter: grayscale(80%) !important;
+          }
+
+          /* Активная заметка выпрыгивает поверх оверлея затемнения */
+          .prose-content-transition.focus-mode-active mark.active-note-mark {
+            position: relative !important;
+            z-index: 20 !important;
+            filter: brightness(1.1) drop-shadow(0 2px 8px rgba(0,0,0,0.3)) !important;
+          }
         }
       `}</style>
     </div>

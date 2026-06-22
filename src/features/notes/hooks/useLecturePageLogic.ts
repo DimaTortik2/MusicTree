@@ -77,7 +77,10 @@ export const useLecturePageLogic = () => {
 
   // Закрытие поповеров при скролле и клике вне области
   useEffect(() => {
-    const handleScroll = () => setMobilePopover(null);
+    const handleScroll = () => {
+      // Спасает от ненужных проверок и вызовов, если поповер и так закрыт
+      setMobilePopover((prev) => (prev !== null ? null : prev));
+    };
 
     // ИСПРАВЛЕНИЕ: Закрываем поповер при тапе вне карточки
     const handlePointerDown = (e: PointerEvent) => {
@@ -231,9 +234,19 @@ export const useLecturePageLogic = () => {
 
     let timeoutId: ReturnType<typeof setTimeout>;
 
-    const observer = new ResizeObserver(() => {
+    let previousWidth = contentRef.current?.offsetWidth || 0;
+
+    const observer = new ResizeObserver((entries) => {
+      // Ищем изменение именно основного контейнера
+      const contentEntry = entries.find((e) => e.target === contentRef.current);
+      if (contentEntry) {
+        const currentWidth = contentEntry.contentRect.width;
+        // Если ширина не изменилась (изменилась только высота), ничего не делаем!
+        if (currentWidth === previousWidth) return;
+        previousWidth = currentWidth;
+      }
+
       clearTimeout(timeoutId);
-      // Небольшая задержка, чтобы браузер успел применить размеры
       timeoutId = setTimeout(() => {
         updateNotePositions();
       }, 30);

@@ -91,6 +91,27 @@ export const NotesHighlighterEngine: React.FC<Props> = ({
     };
   }, [containerRef]);
 
+  // ОПТИМИЗАЦИЯ: Прямая работа с DOM без ререндера компонента!
+  useEffect(() => {
+    // Подписываемся на изменения Zustand в обход React-цикла
+    const unsub = useNotesStore.subscribe((state, prevState) => {
+      if (state.activeNoteId !== prevState.activeNoteId) {
+        if (!containerRef.current) return;
+
+        const marks = containerRef.current.querySelectorAll<HTMLElement>('mark.mt-shared-note');
+        marks.forEach((mark) => {
+          if (mark.dataset.noteId === state.activeNoteId) {
+            mark.classList.add('active-note-mark');
+          } else {
+            mark.classList.remove('active-note-mark');
+          }
+        });
+      }
+    });
+
+    return unsub;
+  }, [containerRef]);
+
   // 2. Многоабзацный хайлайтер (Оптимизированный)
   useEffect(() => {
     if (!containerRef.current) return;
@@ -177,7 +198,7 @@ export const NotesHighlighterEngine: React.FC<Props> = ({
 
           // Добавили легкую тень и z-index, чтобы вложенные заметки визуально "отрывались" от родительских
           mark.className =
-            'mt-shared-note transition-colors duration-200 relative z-10 hover:z-20 shadow-[0_1px_2px_rgba(0,0,0,0.15)]';
+            'mt-shared-note transition-colors duration-200 relative shadow-[0_1px_2px_rgba(0,0,0,0.15)] hover:shadow-md';
 
           if (op.isFirst) mark.classList.add('rounded-l-[4px]');
           if (op.isLast) mark.classList.add('rounded-r-[4px]');

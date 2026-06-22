@@ -33,9 +33,9 @@ export const NoteCard: React.FC<Props> = ({ note, hideHeader = false }) => {
       id={`note-card-${note.id}`}
       onClick={(e) => {
         e.stopPropagation();
-        setActiveNoteId(note.id, 'text'); // <--- Добавили 'text'
-          const mark = document.getElementById(`note-mark-${note.id}`);
-          if (mark) mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setActiveNoteId(note.id, 'text');
+        const mark = document.getElementById(`note-mark-${note.id}`);
+        if (mark) mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }}
       className="group relative cursor-pointer rounded-2xl p-4 shadow-sm transition-colors duration-300"
       style={{
@@ -49,7 +49,8 @@ export const NoteCard: React.FC<Props> = ({ note, hideHeader = false }) => {
             e.stopPropagation();
             deleteNote(note.id);
           }}
-          className="absolute top-2 right-2 z-10 rounded-md p-1.5 opacity-0 transition-all group-hover:opacity-100 hover:bg-black/10 [.light_&]:hover:bg-white/20"
+          // ИСПРАВЛЕНИЕ: на мобилке всегда 100%, на десктопе (lg) только при ховере
+          className="absolute top-2 right-2 z-10 rounded-md p-1.5 opacity-100 transition-all hover:bg-black/10 lg:opacity-0 lg:group-hover:opacity-100 [.light_&]:hover:bg-white/20"
         >
           <Trash size={18} weight="bold" />
         </button>

@@ -64,17 +64,26 @@ export const useLecturePageLogic = () => {
     }
   }, [canUseNotes, sharedTreeId, lesson.id, fetchNotes, subscribeToNotes]);
 
-  // Закрытие поповеров при скролле и снятие фокуса при скролле
+// Закрытие поповеров при скролле и клике вне области
   useEffect(() => {
-    const handleScroll = () => {
-      setMobilePopover(null);
+    const handleScroll = () => setMobilePopover(null);
+    
+    // ИСПРАВЛЕНИЕ: Закрываем поповер при тапе вне карточки
+    const handlePointerDown = (e: PointerEvent) => {
+      const target = e.target as HTMLElement;
+      // Если клик был не по карточке заметки и не по маркеру текста - закрываем
+      if (!target.closest('[id^="note-card-"]') && !target.closest('[id^="note-mark-"]')) {
+        setMobilePopover(null);
+      }
     };
-    window.addEventListener("scroll", handleScroll, {
-      passive: true,
-      capture: true,
-    });
-    return () =>
+
+    window.addEventListener("scroll", handleScroll, { passive: true, capture: true });
+    document.addEventListener("pointerdown", handlePointerDown);
+
+    return () => {
       window.removeEventListener("scroll", handleScroll, { capture: true });
+      document.removeEventListener("pointerdown", handlePointerDown);
+    };
   }, []);
 
   // Алгоритм умного позиционирования (теперь ориентируется на asideRef)

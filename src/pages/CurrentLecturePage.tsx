@@ -11,7 +11,6 @@ import { cn } from '@/app/utils/cn';
 import { NotesHighlighterEngine } from '@/features/notes/ui/NotesHighlighterEngine';
 import { CreateNoteModal } from '@/features/notes/ui/CreateNoteModal';
 import { NoteCard } from '@/features/notes/ui/NoteCard';
-import { useNotesStore } from '@/features/notes/store/useNotesStore';
 import { useCurrentProgress } from '@/app/hooks/useCurrentProgress';
 
 // Импортируем наш новый хук! Укажи правильный путь
@@ -19,10 +18,22 @@ import { useLecturePageLogic } from '@/features/notes/hooks/useLecturePageLogic'
 
 const mdxLectures = import.meta.glob('/src/content/**/*.mdx');
 const mdxLecturesCache: Record<string, React.LazyExoticComponent<React.ComponentType<any>>> = {};
+
+// ИСПРАВЛЕНИЕ: Защита от старых JS-чанков на Vercel (Фикс Failed to fetch)
 for (const path in mdxLectures) {
-  mdxLecturesCache[path] = React.lazy(
-    mdxLectures[path] as () => Promise<{ default: React.ComponentType<any> }>,
-  );
+  mdxLecturesCache[path] = React.lazy(async () => {
+    try {
+      return await (mdxLectures[path] as () => Promise<{ default: React.ComponentType<any> }>)();
+    } catch (error: any) {
+      if (
+        error.message.includes('Failed to fetch dynamically imported module') ||
+        error.message.includes('Importing a module script failed')
+      ) {
+        window.location.reload();
+      }
+      throw error;
+    }
+  });
 }
 
 const getScrollNode = (element: HTMLElement | null): HTMLElement | Window => {
@@ -144,6 +155,7 @@ export const CurrentLecturePage = () => {
     else (scrollNode as HTMLElement).scrollTop = savedY;
   }, [lesson.id, pageRef]);
   const positionedNotes = useRef(new Set<string>());
+
   return (
     <div
       ref={pageRef}
@@ -255,7 +267,7 @@ export const CurrentLecturePage = () => {
                 const layout = noteLayout[note.id];
                 const isPositioned = layout !== undefined;
 
-                // ВОТ ТУТ ВЕРНУЛИ ЛОГИКУ ЗАТЕМНЕНИЯ ДЛЯ ASIDE:
+                // ЗАТЕМНЕНИЕ ДЛЯ ASIDE:
                 const isDimmed =
                   activeFocusMode === 'aside' && activeNoteId && activeNoteId !== note.id;
 
@@ -271,15 +283,16 @@ export const CurrentLecturePage = () => {
                     initial={{ scale: 0.95, opacity: 0, y: layout?.y || 0 }}
                     animate={{
                       y: layout?.y || 0,
-                      opacity: isPositioned ? (isDimmed ? 0.3 : 1) : 0, // <--- ВЕРНУЛИ isDimmed
+                      opacity: isPositioned ? (isDimmed ? 0.3 : 1) : 0,
                       scale: isPositioned ? 1 : 0.95,
                     }}
                     transition={{
+                      // ИСПРАВЛЕНИЕ: Анимация без лагов при первой загрузке
                       y: wasPositioned
                         ? { type: 'spring', stiffness: 150, damping: 24 }
                         : { duration: 0 },
-                      opacity: { duration: 0.15 },
-                      scale: { duration: 0.2, ease: 'easeOut' },
+                      opacity: { duration: wasPositioned ? 0.15 : 0 },
+                      scale: { duration: wasPositioned ? 0.2 : 0, ease: 'easeOut' },
                     }}
                     className="absolute top-0 right-0 left-6 origin-center will-change-transform"
                   >
@@ -338,14 +351,7 @@ export const CurrentLecturePage = () => {
                 left: '50%',
               }}
             >
-              <div
-                className="fixed inset-0 z-[-1]"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setMobilePopover(null);
-                  useNotesStore.getState().setActiveNoteId(null);
-                }}
-              />
+              {/* ИСПРАВЛЕНИЕ: Невидимый слой-перехватчик удален, скролл работает свободно */}
               <NoteCard
                 note={notes.find((n) => n.id === mobilePopover.noteId)!}
                 hideHeader={false}
@@ -368,7 +374,7 @@ export const CurrentLecturePage = () => {
 
           <div
             onClick={handleFinish}
-            className="animate-overlay-fade fixed inset-0 z-[5000] flex cursor-pointer flex-col items-center justify-center bg-(--background)/90 backdrop-blur-[2px]"
+            className="animate-overlay-fade fixed inset-0 z-[5000] flex cursor-pointer flex-col items-center justify-center bg-[var(--background)]/90 backdrop-blur-[2px]"
           >
             <div className="animate-content-scale flex flex-col items-center gap-8 px-4 text-center">
               <FireSimple

@@ -24,7 +24,7 @@ export const NotesHighlighterEngine: React.FC<Props> = ({
 }) => {
   const notes = useNotesStore((s) => s.notes);
   const setActiveNoteId = useNotesStore((s) => s.setActiveNoteId);
-  const activeNoteId = useNotesStore((s) => s.activeNoteId);
+  // const activeNoteId = useNotesStore((s) => s.activeNoteId);
 
   const [selectionRect, setSelectionRect] = useState<DOMRect | null>(null);
   const [selectionData, setSelectionData] = useState<{

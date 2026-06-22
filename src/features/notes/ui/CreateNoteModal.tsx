@@ -69,7 +69,13 @@ export const CreateNoteModal: React.FC<Props> = ({ isOpen, onClose, onApply }) =
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
-              /* ... ваш код ... */
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (text.trim()) {
+                  onApply(text.trim(), color);
+                  onClose();
+                }
+              }
             }}
             placeholder="Очень важная заметка"
             autoFocus
@@ -89,7 +95,7 @@ export const CreateNoteModal: React.FC<Props> = ({ isOpen, onClose, onApply }) =
           <Button
             variant="outline"
             color="text"
-            className="flex-1 border-2 !bg-transparent text-text hover:text-text opacity-80 hover:bg-text/10 hover:opacity-100"
+            className="flex-1 border-2 !bg-transparent text-text opacity-80 hover:bg-text/10 hover:text-text hover:opacity-100"
             style={{ borderColor: color }}
             onClick={onClose}
           >

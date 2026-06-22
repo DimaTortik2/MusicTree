@@ -22,6 +22,8 @@ interface NotesState {
   activeNoteId: string | null;
   isLoading: boolean;
   activeFocusMode: 'aside' | 'text' | null;
+  // НОВОЕ: Список заметок, ожидающих удаления (таймер тикает)
+  pendingDeletionIds: string[];
 
   fetchNotes: (treeId: string, lessonId: string) => Promise<void>;
   subscribeToNotes: (treeId: string, lessonId: string) => () => void;
@@ -35,6 +37,7 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   activeNoteId: null,
   isLoading: false,
   activeFocusMode: null,
+  pendingDeletionIds: [], // Инициализация
 
   setActiveNoteId: (id, mode = null) => set({ activeNoteId: id, activeFocusMode: mode }),
 
@@ -48,7 +51,6 @@ export const useNotesStore = create<NotesState>((set, get) => ({
       .order('text_offset', { ascending: true });
 
     if (data) {
-      // Расшифровываем все заметки
       const decryptedNotes = await Promise.all(
         data.map(async (note) => ({
           ...note,
@@ -72,26 +74,18 @@ export const useNotesStore = create<NotesState>((set, get) => ({
           filter: `shared_tree_id=eq.${treeId}`,
         },
         async (payload) => {
-          // Если это удаление - сразу удаляем из стейта по ID
-          // (Теперь БД будет присылать нам событие, потому что фильтр сработает!)
           if (payload.eventType === 'DELETE') {
-            set((state) => ({
-              notes: state.notes.filter((n) => n.id !== payload.old.id),
-            }));
+            set((state) => ({ notes: state.notes.filter((n) => n.id !== payload.old.id) }));
             return;
           }
 
-          // Для INSERT и UPDATE проверяем, относится ли это к текущему уроку
           const newNote = payload.new as SharedNote;
           if (newNote.lesson_id !== lessonId) return;
 
-          // Если добавилась новая заметка
           if (payload.eventType === 'INSERT') {
             const decryptedText = await decryptNoteText(newNote.note_text, treeId);
-
             set((state) => {
               const newNotes = [...state.notes];
-              // Проверка от дублирования оптимистичного UI
               if (!newNotes.some((n) => n.id === newNote.id)) {
                 newNotes.push({ ...newNote, note_text: decryptedText });
               }
@@ -101,7 +95,6 @@ export const useNotesStore = create<NotesState>((set, get) => ({
         },
       )
       .subscribe();
-
     return () => {
       supabase.removeChannel(channel);
     };
@@ -115,12 +108,10 @@ export const useNotesStore = create<NotesState>((set, get) => ({
       created_at: new Date().toISOString(),
     };
 
-    // Оптимистичный UI: добавляем расшифрованную версию в стейт
     set((state) => ({
       notes: [...state.notes, finalNote].sort((a, b) => a.text_offset - b.text_offset),
     }));
 
-    // Шифруем текст перед отправкой в БД
     const encryptedText = await encryptNoteText(finalNote.note_text, finalNote.shared_tree_id);
     const dbPayload = { ...finalNote, note_text: encryptedText };
 
@@ -135,14 +126,19 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   },
 
   deleteNote: (noteId) => {
-    const noteToDelete = get().notes.find((n) => n.id === noteId);
-    if (!noteToDelete) return;
+    // Получаем текущее состояние ДО удаления
+    const state = get();
+    const wasActive = state.activeNoteId === noteId;
+    const previousMode = state.activeFocusMode;
 
-    // 1. Убираем из локального стейта моментально (для самого юзера)
-    set((state) => ({ notes: state.notes.filter((n) => n.id !== noteId) }));
+    // 1. Мягкое удаление: добавляем ID в список и СКИДЫВАЕМ ФОКУС, если он был на ней
+    set((state) => ({
+      pendingDeletionIds: [...state.pendingDeletionIds, noteId],
+      ...(wasActive ? { activeNoteId: null, activeFocusMode: null } : {}),
+    }));
+
     let isUndone = false;
 
-    // 2. Запускаем тост с таймером
     const toastId = toast.undo(
       <div className="flex w-full items-center justify-between gap-3">
         <span>Заметка удалена</span>
@@ -150,12 +146,13 @@ export const useNotesStore = create<NotesState>((set, get) => ({
           className="rounded-md bg-primary/10 px-2 py-1 font-medium text-primary transition-colors hover:bg-primary/20"
           onClick={(e) => {
             e.stopPropagation();
-            isUndone = true; // Ставим флаг отмены
+            isUndone = true;
             toast.dismiss(toastId);
 
-            // Возвращаем в локальный стейт (БД мы не трогали, так что шифровать заново не надо)
+            // 2. ОТМЕНА: Убираем из списка удаления и ВОЗВРАЩАЕМ ФОКУС, если он был!
             set((state) => ({
-              notes: [...state.notes, noteToDelete].sort((a, b) => a.text_offset - b.text_offset),
+              pendingDeletionIds: state.pendingDeletionIds.filter((id) => id !== noteId),
+              ...(wasActive ? { activeNoteId: noteId, activeFocusMode: previousMode } : {}),
             }));
           }}
         >
@@ -163,12 +160,15 @@ export const useNotesStore = create<NotesState>((set, get) => ({
         </button>
       </div>,
       {
-        autoClose: 4000, // Ждем 4 секунды
+        autoClose: 4000,
         onClose: async () => {
-          // 3. Если время вышло и юзер НЕ нажал "Отменить" — удаляем из БД окончательно
           if (!isUndone) {
+            // 3. ФИНАЛЬНОЕ УДАЛЕНИЕ
+            set((state) => ({
+              notes: state.notes.filter((n) => n.id !== noteId),
+              pendingDeletionIds: state.pendingDeletionIds.filter((id) => id !== noteId),
+            }));
             await supabase.from('shared_notes').delete().eq('id', noteId);
-            // Именно здесь БД отправит Realtime DELETE-событие другу, и заметка у него исчезнет!
           }
         },
       },

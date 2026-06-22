@@ -34,6 +34,7 @@ export const useLecturePageLogic = () => {
     activeNoteId,
     activeFocusMode,
     setActiveNoteId,
+    pendingDeletionIds,
   } = useNotesStore();
 
   const [createModalData, setCreateModalData] = useState<
@@ -114,7 +115,13 @@ export const useLecturePageLogic = () => {
       ? asideRef.current.getBoundingClientRect().top
       : contentRef.current.getBoundingClientRect().top;
 
-    const sortedNotes = [...notes].sort((a, b) =>
+    // ИСПРАВЛЕНИЕ: Игнорируем заметки, которые ожидают удаления!
+    // Благодаря этому нижние карточки плавно съедутся вверх и закроют "пустое место".
+    const visibleNotes = notes.filter((n) =>
+      !pendingDeletionIds.includes(n.id)
+    );
+
+    const sortedNotes = [...visibleNotes].sort((a, b) =>
       a.text_offset - b.text_offset
     );
 
@@ -213,11 +220,11 @@ export const useLecturePageLogic = () => {
       const isDifferent = JSON.stringify(prev) !== JSON.stringify(newLayout);
       return isDifferent ? newLayout : prev;
     });
-  }, [notes, activeNoteId]); // <-- Важно! Добавили activeNoteId в зависимости
+  }, [notes, activeNoteId, pendingDeletionIds]); // <-- Важно! Добавили activeNoteId в зависимости
 
   useEffect(() => {
     updateNotePositions();
-  }, [updateNotePositions, activeNoteId, notes]);
+  }, [updateNotePositions, activeNoteId, notes, pendingDeletionIds]);
 
   useEffect(() => {
     if (!canUseNotes || !contentRef.current) return;
@@ -225,21 +232,28 @@ export const useLecturePageLogic = () => {
     let timeoutId: ReturnType<typeof setTimeout>;
 
     const observer = new ResizeObserver(() => {
-      // Ждем 50мс, чтобы не дергать React при каждом микро-сдвиге высоты
       clearTimeout(timeoutId);
+      // Небольшая задержка, чтобы браузер успел применить размеры
       timeoutId = setTimeout(() => {
         updateNotePositions();
-      }, 50);
+      }, 30);
     });
 
+    // 1. Наблюдаем за основным текстом (на случай загрузки картинок)
     if (contentRef.current) observer.observe(contentRef.current);
-    if (asideRef.current) observer.observe(asideRef.current);
+
+    // 2. ИСПРАВЛЕНИЕ: Наблюдаем за КАЖДОЙ отдельной карточкой!
+    // Так как они absolute, asideRef не "видит" их роста.
+    const currentNotesRef = notesRef.current;
+    Object.values(currentNotesRef).forEach((cardEl) => {
+      if (cardEl) observer.observe(cardEl);
+    });
 
     return () => {
       observer.disconnect();
       clearTimeout(timeoutId);
     };
-  }, [canUseNotes, updateNotePositions]);
+  }, [canUseNotes, updateNotePositions, notes]); // ВАЖНО: добавили notes в зависимости, чтобы отслеживать новые заметки
 
   const fireConfetti = () => {
     const root = getComputedStyle(document.documentElement);

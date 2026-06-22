@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useLayoutEffect } from 'react';
 import { useNotesStore } from '../store/useNotesStore';
 import { Quotes, NoteBlank } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -24,7 +24,6 @@ export const NotesHighlighterEngine: React.FC<Props> = ({
 }) => {
   const notes = useNotesStore((s) => s.notes);
   const setActiveNoteId = useNotesStore((s) => s.setActiveNoteId);
-  // const activeNoteId = useNotesStore((s) => s.activeNoteId);
 
   const [selectionRect, setSelectionRect] = useState<DOMRect | null>(null);
   const [selectionData, setSelectionData] = useState<{
@@ -33,6 +32,13 @@ export const NotesHighlighterEngine: React.FC<Props> = ({
     suffix: string;
     offset: number;
   } | null>(null);
+
+  // ОПТИМИЗАЦИЯ 1: Прячем коллбеки в ref, чтобы их изменение не вызывало
+  // полную перерисовку (ререндер) всего DOM-дерева хайлайтов!
+  const handlers = useRef({ onOpenCreateModal, onMobileNoteTap, onMarksRendered, setActiveNoteId });
+  useLayoutEffect(() => {
+    handlers.current = { onOpenCreateModal, onMobileNoteTap, onMarksRendered, setActiveNoteId };
+  });
 
   // 1. Сохранение текущего выделения юзером
   useEffect(() => {
@@ -85,52 +91,44 @@ export const NotesHighlighterEngine: React.FC<Props> = ({
     };
   }, [containerRef]);
 
-  // 2. Многоабзацный хайлайтер
+  // 2. Многоабзацный хайлайтер (Оптимизированный)
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const currentNoteIds = new Set(notes.map((n) => String(n.id)));
+    // ОПТИМИЗАЦИЯ 2: Пакетная очистка DOM.
+    // Снимаем все старые обертки мгновенно за 1 цикл, не дожидаясь анимаций.
+    // Анимации текста ломали Reflow браузера и вызывали жесткие лаги при удалении.
     const existingMarks = Array.from(
       containerRef.current.querySelectorAll<HTMLElement>('mark.mt-shared-note'),
     );
-
     existingMarks.forEach((mark) => {
-      const noteId = mark.dataset.noteId;
-
-      if (noteId && !currentNoteIds.has(noteId)) {
-        // ЗАМЕТКА УДАЛЕНА: Убираем класс, чтобы не мешать новым поискам
-        mark.classList.remove('mt-shared-note');
-
-        // Запускаем плавное исчезновение (анимация сработает за счет transition-colors)
-        mark.style.backgroundColor = 'transparent';
-        mark.style.borderColor = 'transparent';
-        mark.style.color = 'inherit';
-
-        // Ждем 300мс окончания CSS-транзиции (duration-300), после чего аккуратно убираем тег
-        setTimeout(() => {
-          const parent = mark.parentNode;
-          if (parent) {
-            while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
-            parent.removeChild(mark);
-            parent.normalize(); // Склеиваем обратно разбитые текстовые ноды
-          }
-        }, 300);
-      } else {
-        // ЗАМЕТКА ВСЁ ЕЩЁ СУЩЕСТВУЕТ: Мгновенно снимаем старую обертку перед пересчетом её позиции
-        const parent = mark.parentNode;
-        while (mark.firstChild) parent?.insertBefore(mark.firstChild, mark);
-        parent?.removeChild(mark);
-      }
+      const parent = mark.parentNode;
+      if (!parent) return;
+      while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+      parent.removeChild(mark);
     });
 
+    // Склеиваем разбитые текстовые ноды (вызывает Reflow 1 раз, а не 100 раз)
     containerRef.current.normalize();
 
     if (notes.length === 0) {
-      if (onMarksRendered) setTimeout(onMarksRendered, 50);
+      if (handlers.current.onMarksRendered) setTimeout(handlers.current.onMarksRendered, 50);
       return;
     }
 
-    const sortedNotes = [...notes].sort((a, b) => b.text_offset - a.text_offset);
+    // ИСПРАВЛЕНИЕ БАГА С НАЛОЖЕНИЕМ:
+    // Сортируем СНАЧАЛА самые длинные (абзацы), ЗАТЕМ короткие (предложения).
+    // Таким образом короткая заметка оборачивает текст ВНУТРИ длинной заметки
+    // и оказывается визуально поверх неё!
+    const sortedNotes = [...notes].sort((a, b) => {
+      const lenA = a.selected_text.length;
+      const lenB = b.selected_text.length;
+      if (lenA !== lenB) {
+        return lenB - lenA; // По убыванию длины
+      }
+      // Если длина одинаковая, то сортируем по расположению в тексте
+      return a.text_offset - b.text_offset;
+    });
 
     sortedNotes.forEach((note) => {
       try {
@@ -176,23 +174,29 @@ export const NotesHighlighterEngine: React.FC<Props> = ({
 
           const mark = document.createElement('mark');
           mark.dataset.noteId = note.id;
-          mark.className = 'mt-shared-note transition-colors duration-300 relative';
 
-          if (op.isFirst) mark.classList.add('rounded-l-[3px]');
-          if (op.isLast) mark.classList.add('rounded-r-[3px]');
+          // Добавили легкую тень и z-index, чтобы вложенные заметки визуально "отрывались" от родительских
+          mark.className =
+            'mt-shared-note transition-colors duration-200 relative z-10 hover:z-20 shadow-[0_1px_2px_rgba(0,0,0,0.15)]';
+
+          if (op.isFirst) mark.classList.add('rounded-l-[4px]');
+          if (op.isLast) mark.classList.add('rounded-r-[4px]');
 
           mark.style.backgroundColor = note.color;
-          mark.style.color = isColorLight(note.color) ? '#0f0510' : '#f3f4f6';
+          mark.style.color = isColorLight(note.color) ? '#0f0510' : '#ffffff';
 
           if (op.isFirst) mark.id = `note-mark-${note.id}`;
 
           mark.onclick = (e) => {
-            e.stopPropagation();
-            setActiveNoteId(note.id, 'aside'); // <--- Добавили 'aside'
+            e.stopPropagation(); // ВАЖНО: Останавливает клик, чтобы не нажималась родительская заметка!
+
+            handlers.current.setActiveNoteId(note.id, 'aside');
             const card = document.getElementById(`note-card-${note.id}`);
             if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-            if (window.innerWidth < 1024) onMobileNoteTap(note.id, mark.getBoundingClientRect());
+            if (window.innerWidth < 1024) {
+              handlers.current.onMobileNoteTap(note.id, mark.getBoundingClientRect());
+            }
           };
 
           mark.appendChild(split1.cloneNode(true));
@@ -203,11 +207,35 @@ export const NotesHighlighterEngine: React.FC<Props> = ({
       }
     });
 
-    // Уведомляем систему о том, что новые элементы вставлены и можно считать координаты
-    if (onMarksRendered) {
-      setTimeout(onMarksRendered, 50);
+    if (handlers.current.onMarksRendered) {
+      setTimeout(handlers.current.onMarksRendered, 50);
     }
-  }, [notes, containerRef, onMobileNoteTap, setActiveNoteId, onMarksRendered]);
+  }, [notes, containerRef]); // В зависимостях оставили только notes. Никаких лишних ререндеров!
+
+  // ОПТИМИЗАЦИЯ УРОВНЯ БОГ: Мягкое скрытие маркеров без перерисовки DOM
+  const pendingDeletionIds = useNotesStore((s) => s.pendingDeletionIds);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    // Находим все маркеры
+    const allMarks = containerRef.current.querySelectorAll<HTMLElement>('mark.mt-shared-note');
+
+    allMarks.forEach((mark) => {
+      const noteId = mark.dataset.noteId;
+      if (!noteId) return;
+
+      // Если заметка в процессе удаления - делаем маркер прозрачным
+      if (pendingDeletionIds.includes(noteId)) {
+        mark.style.opacity = '0';
+        mark.style.pointerEvents = 'none'; // Чтобы нельзя было случайно кликнуть
+      } else {
+        // Если нажали "Отмена" - возвращаем видимость
+        mark.style.opacity = '1';
+        mark.style.pointerEvents = 'auto';
+      }
+    });
+  }, [pendingDeletionIds, containerRef]);
 
   return (
     <AnimatePresence>
@@ -216,7 +244,7 @@ export const NotesHighlighterEngine: React.FC<Props> = ({
           initial={{ opacity: 0, y: 10, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
-          className="fixed z-[2000] flex items-center gap-2 rounded-xl bg-primary px-3 py-2"
+          className="fixed z-[2000] flex items-center gap-2 rounded-xl bg-primary px-3 py-2 shadow-lg"
           style={{
             top: Math.max(10, selectionRect.top - 60),
             left: Math.max(
@@ -233,6 +261,7 @@ export const NotesHighlighterEngine: React.FC<Props> = ({
               window.getSelection()?.removeAllRanges();
             }}
             className="cursor-pointer rounded-lg p-1.5 text-white transition-colors hover:bg-white/20"
+            title="Цитата"
           >
             <Quotes size={22} weight="fill" />
           </button>
@@ -240,11 +269,12 @@ export const NotesHighlighterEngine: React.FC<Props> = ({
           <button
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => {
-              onOpenCreateModal(selectionData);
+              handlers.current.onOpenCreateModal(selectionData);
               setSelectionRect(null);
               window.getSelection()?.removeAllRanges();
             }}
             className="cursor-pointer rounded-lg p-1.5 text-white transition-colors hover:bg-white/20"
+            title="Создать заметку"
           >
             <NoteBlank size={22} weight="fill" />
           </button>

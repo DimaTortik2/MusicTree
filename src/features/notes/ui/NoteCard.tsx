@@ -78,6 +78,9 @@ export const NoteCard: React.FC<Props> = ({ note, hideHeader = false }) => {
     [deleteNote, note.id],
   );
 
+  const pendingDeletionIds = useNotesStore((s) => s.pendingDeletionIds);
+  const isPending = pendingDeletionIds.includes(note.id);
+
   return (
     <div
       id={`note-card-${note.id}`}
@@ -89,6 +92,7 @@ export const NoteCard: React.FC<Props> = ({ note, hideHeader = false }) => {
         isActive
           ? 'cursor-default shadow-lg ring-2 ring-black/10 dark:ring-white/10'
           : 'cursor-pointer shadow-sm hover:-translate-y-0.5 hover:shadow-md',
+        isPending && 'pointer-events-none scale-95 opacity-0',
       )}
       style={{
         backgroundColor: note.color,
@@ -156,22 +160,19 @@ export const NoteCard: React.FC<Props> = ({ note, hideHeader = false }) => {
       </div>
 
       {/* ПОДСКАЗКА (Скрыта на мобилках: hidden lg:block) */}
-      <div
-        className={cn(
-          'relative z-10 hidden overflow-hidden transition-[max-height,opacity,margin] duration-300 ease-in-out lg:block',
-          isActive ? 'mt-3 max-h-12 opacity-100' : 'mt-0 max-h-0 opacity-0',
-        )}
-      >
-        <div
-          className={cn(
-            'inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold backdrop-blur-sm transition-colors active:scale-95',
-            isLight ? 'bg-black/5 hover:bg-black/10' : 'bg-white/10 hover:bg-white/20',
-          )}
-        >
-          <ArrowBendDownRight weight="bold" size={14} className="opacity-80" />
-          <span>К лекции</span>
+      {isActive && (
+        <div className="animate-in fade-in relative z-10 mt-3 hidden duration-200 lg:block">
+          <div
+            className={cn(
+              'inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold backdrop-blur-sm transition-colors active:scale-95',
+              isLight ? 'bg-black/5 hover:bg-black/10' : 'bg-white/10 hover:bg-white/20',
+            )}
+          >
+            <ArrowBendDownRight weight="bold" size={14} className="opacity-80" />
+            <span>К лекции</span>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

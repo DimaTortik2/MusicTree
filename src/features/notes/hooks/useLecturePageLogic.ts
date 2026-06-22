@@ -26,8 +26,15 @@ export const useLecturePageLogic = () => {
   const { user, profile } = useAuthStore();
 
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
-   const { notes, fetchNotes, subscribeToNotes, addNote, activeNoteId, activeFocusMode, setActiveNoteId } = useNotesStore();
-
+  const {
+    notes,
+    fetchNotes,
+    subscribeToNotes,
+    addNote,
+    activeNoteId,
+    activeFocusMode,
+    setActiveNoteId,
+  } = useNotesStore();
 
   const [createModalData, setCreateModalData] = useState<
     { text: string; prefix: string; suffix: string; offset: number } | null
@@ -36,7 +43,10 @@ export const useLecturePageLogic = () => {
     { noteId: string; rect: DOMRect } | null
   >(null);
   const [noteLayout, setNoteLayout] = useState<
-    Record<string, { y: number; isGrouped: boolean }>
+    Record<
+      string,
+      { y: number; isGrouped: boolean; zIndex: number; scale: number }
+    >
   >({});
 
   const lesson = useMemo(
@@ -64,20 +74,26 @@ export const useLecturePageLogic = () => {
     }
   }, [canUseNotes, sharedTreeId, lesson.id, fetchNotes, subscribeToNotes]);
 
-// Закрытие поповеров при скролле и клике вне области
+  // Закрытие поповеров при скролле и клике вне области
   useEffect(() => {
     const handleScroll = () => setMobilePopover(null);
-    
+
     // ИСПРАВЛЕНИЕ: Закрываем поповер при тапе вне карточки
     const handlePointerDown = (e: PointerEvent) => {
       const target = e.target as HTMLElement;
       // Если клик был не по карточке заметки и не по маркеру текста - закрываем
-      if (!target.closest('[id^="note-card-"]') && !target.closest('[id^="note-mark-"]')) {
+      if (
+        !target.closest('[id^="note-card-"]') &&
+        !target.closest('[id^="note-mark-"]')
+      ) {
         setMobilePopover(null);
       }
     };
 
-    window.addEventListener("scroll", handleScroll, { passive: true, capture: true });
+    window.addEventListener("scroll", handleScroll, {
+      passive: true,
+      capture: true,
+    });
     document.addEventListener("pointerdown", handlePointerDown);
 
     return () => {
@@ -90,61 +106,132 @@ export const useLecturePageLogic = () => {
   const updateNotePositions = useCallback(() => {
     if (!contentRef.current || notes.length === 0) return;
 
-    const newLayout: Record<string, { y: number; isGrouped: boolean }> = {};
-    let nextMinY = 0;
-    const STANDARD_GAP = 16;
-    const GROUP_GAP = 6;
-    const GROUP_THRESHOLD = 60;
-
-    // Базовая верхняя точка (начало правой колонки)
+    const newLayout: Record<
+      string,
+      { y: number; isGrouped: boolean; zIndex: number; scale: number }
+    > = {};
     const baseTop = asideRef.current
       ? asideRef.current.getBoundingClientRect().top
       : contentRef.current.getBoundingClientRect().top;
+
     const sortedNotes = [...notes].sort((a, b) =>
       a.text_offset - b.text_offset
     );
 
-    sortedNotes.forEach((note, index) => {
+    // Шаг А: Узнаем "идеальные" позиции маркеров
+    const notesWithTargets = sortedNotes.map((note) => {
       const mark = document.getElementById(`note-mark-${note.id}`);
-      const noteEl = notesRef.current[note.id];
+      const targetY = mark ? mark.getBoundingClientRect().top - baseTop : 0;
+      const height = notesRef.current[note.id]?.offsetHeight || 80;
+      return { note, targetY, height };
+    });
 
-      let targetY = nextMinY;
-      if (mark) {
-        targetY = mark.getBoundingClientRect().top - baseTop;
-      }
+    // Шаг Б: Разбиваем заметки на кластеры по близости
+    const CLUSTER_DISTANCE = 120; // Пикселей между маркерами для объединения в стопку
+    const clusters: (typeof notesWithTargets)[] = [];
+    let currentCluster: typeof notesWithTargets = [];
 
-      const prevNote = index > 0 ? sortedNotes[index - 1] : null;
-      const isSameAuthor = prevNote && prevNote.author_id === note.author_id;
-      const prevBottom = index > 0 ? nextMinY - STANDARD_GAP : 0;
-
-      let isGrouped = false;
-      let finalY = targetY;
-
-      if (isSameAuthor && targetY <= prevBottom + GROUP_THRESHOLD) {
-        isGrouped = true;
-        finalY = Math.max(targetY, prevBottom + GROUP_GAP);
+    notesWithTargets.forEach((item) => {
+      if (currentCluster.length === 0) {
+        currentCluster.push(item);
       } else {
-        finalY = Math.max(targetY, nextMinY);
+        const firstItem = currentCluster[0];
+        // Если маркер рядом с началом кластера — кидаем в эту же стопку
+        if (item.targetY - firstItem.targetY < CLUSTER_DISTANCE) {
+          currentCluster.push(item);
+        } else {
+          clusters.push(currentCluster);
+          currentCluster = [item];
+        }
       }
+    });
+    if (currentCluster.length > 0) clusters.push(currentCluster);
 
-      newLayout[note.id] = { y: finalY, isGrouped };
-      const height = noteEl?.offsetHeight || 80;
-      nextMinY = finalY + height + STANDARD_GAP;
+    // Шаг В: Рассчитываем физические координаты (разворачиваем или сжимаем)
+    let nextMinY = 0;
+    const STANDARD_GAP = 16;
+    const GROUP_GAP = 6;
+    const STACK_OFFSET = 12; // На сколько пикселей торчит следующая карточка в стопке
+    const SCALE_STEP = 0.03; // Насколько уменьшаем масштаб задних карточек
+
+    clusters.forEach((cluster) => {
+      // Кластер считается активным, если хоть одна заметка внутри него == activeNoteId
+      const isActiveCluster = cluster.some((item) =>
+        item.note.id === activeNoteId
+      );
+
+      let clusterStartY = Math.max(cluster[0].targetY, nextMinY);
+
+      cluster.forEach((item, index) => {
+        let finalY = clusterStartY;
+        let scale = 1;
+        let zIndex = 10 - index; // Чем глубже в стопке, тем ниже z-index
+        let isGrouped = false;
+
+        const prevItem = index > 0 ? cluster[index - 1] : null;
+        const isSameAuthor = prevItem &&
+          prevItem.note.author_id === item.note.author_id;
+
+        if (isActiveCluster) {
+          // --- РАЗВЕРНУТОЕ СОСТОЯНИЕ ---
+          if (item.note.id === activeNoteId) zIndex = 50; // Активную вытаскиваем поверх всех
+
+          if (
+            isSameAuthor &&
+            clusterStartY <=
+              (newLayout[prevItem!.note.id]?.y || 0) + prevItem!.height + 40
+          ) {
+            isGrouped = true;
+            finalY = clusterStartY;
+          } else {
+            finalY = clusterStartY;
+          }
+          // Обновляем Y для следующей карточки на ПОЛНУЮ ВЫСОТУ
+          clusterStartY = finalY + item.height +
+            (isGrouped ? GROUP_GAP : STANDARD_GAP);
+        } else {
+          // --- СВЕРНУТОЕ СОСТОЯНИЕ (СТОПКА) ---
+          finalY = clusterStartY + (index * STACK_OFFSET); // Карточки наслаиваются
+          scale = 1 - (index * SCALE_STEP);
+          isGrouped = false; // В стопках шапки оставляем видимыми для создания эффекта "колоды карт"
+        }
+
+        newLayout[item.note.id] = { y: finalY, isGrouped, zIndex, scale };
+      });
+
+      // Обновляем общую минимальную высоту для следующего кластера
+      if (isActiveCluster) {
+        nextMinY = clusterStartY;
+      } else {
+        // Если стопка свернута, она занимает мало места (высота 1-ой карты + хвост)
+        nextMinY = clusterStartY + cluster[0].height +
+          (cluster.length - 1) * STACK_OFFSET + STANDARD_GAP;
+      }
     });
 
     setNoteLayout((prev) => {
-      const isDifferent = sortedNotes.some((n) =>
-        prev[n.id]?.y !== newLayout[n.id]?.y ||
-        prev[n.id]?.isGrouped !== newLayout[n.id]?.isGrouped
-      );
+      const isDifferent = JSON.stringify(prev) !== JSON.stringify(newLayout);
       return isDifferent ? newLayout : prev;
     });
-  }, [notes]);
+  }, [notes, activeNoteId]); // <-- Важно! Добавили activeNoteId в зависимости
 
   useEffect(() => {
-    if (!canUseNotes || !contentRef.current) return;
+    updateNotePositions();
+  }, [updateNotePositions, activeNoteId, notes]);
+
+  // В useLecturePageLogic.tsx найдите этот useEffect и обновите его:
+  useEffect(() => {
+    if (!canUseNotes) return;
+
     const observer = new ResizeObserver(() => updateNotePositions());
-    observer.observe(contentRef.current);
+
+    // Наблюдаем за изменением высоты самого текста лекции
+    if (contentRef.current) observer.observe(contentRef.current);
+
+    // ВАЖНО: Наблюдаем за колонкой заметок. Если карточка развернет текст,
+    // aside изменит высоту -> сработает пересчет позиций остальных карточек!
+    if (asideRef.current) observer.observe(asideRef.current);
+
     return () => observer.disconnect();
   }, [canUseNotes, updateNotePositions]);
 
@@ -191,16 +278,6 @@ export const useLecturePageLogic = () => {
   const handlePageClick = () => {
     setActiveNoteId(null);
   };
-  // Плавное автоматическое снятие фокуса (затемнения других карточек) через 2 секунды
-  useEffect(() => {
-    if (!activeNoteId) return;
-
-    const timer = setTimeout(() => {
-      setActiveNoteId(null);
-    }, 1000); // 1000 мс обычно идеально для эффекта "вспышки внимания"
-
-    return () => clearTimeout(timer);
-  }, [activeNoteId, setActiveNoteId]);
 
   return {
     refs: { pageRef, contentRef, asideRef, notesRef },
@@ -210,7 +287,7 @@ export const useLecturePageLogic = () => {
       createModalData,
       noteLayout,
       activeNoteId,
-      activeFocusMode
+      activeFocusMode,
     },
     computed: {
       lesson,

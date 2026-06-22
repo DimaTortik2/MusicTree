@@ -283,14 +283,7 @@ export const CurrentLecturePage = () => {
                 const isPositioned = layout !== undefined;
 
                 const isFirstPositioning = isPositioned && !previousNoteLayout.current[note.id];
-
-                // Анимируем сдвиги по Y только если страница уже загрузилась (прошла 1 сек)
-                // и это НЕ первое появление этой конкретной заметки
                 const shouldAnimateY = isReadyToAnimate && isPositioned && !isFirstPositioning;
-
-                // ЗАТЕМНЕНИЕ ДЛЯ ASIDE:
-                const isDimmed =
-                  activeFocusMode === 'aside' && activeNoteId && activeNoteId !== note.id;
 
                 return (
                   <motion.div
@@ -301,21 +294,24 @@ export const CurrentLecturePage = () => {
                     initial={{ scale: 0.95, opacity: 0 }}
                     animate={{
                       y: layout?.y || 0,
-                      opacity: isPositioned ? (isDimmed ? 0.3 : 1) : 0,
-                      scale: isPositioned ? 1 : 0.95,
+                      opacity: isPositioned ? 1 : 0,
+                      // 1. Добавляем масштабирование из стейта
+                      scale: isPositioned ? (layout?.scale ?? 1) : 0.95,
                     }}
                     transition={{
-                      // Если макет страницы еще грузится (первая секунда) ИЛИ это новое появление карточки -> прыгаем мгновенно.
-                      // Если страница готова и мы удалили/добавили другую заметку -> остальные плавно сдвигаются.
                       y: shouldAnimateY
                         ? { type: 'spring', stiffness: 200, damping: 25 }
                         : { duration: 0 },
                       opacity: { duration: 0.2 },
                       scale: { duration: 0.2, ease: 'easeOut' },
                     }}
-                    className="absolute top-0 right-0 left-6 origin-center will-change-transform"
+                    // 2. ВАЖНО: Заменили origin-center на origin-top!
+                    // Чтобы при уменьшении масштаба (scale) они не отрывались сверху, а формировали ровную стопку.
+                    className="absolute top-0 right-0 left-6 origin-top will-change-transform"
                     style={{
                       pointerEvents: isPositioned ? 'auto' : 'none',
+                      // 3. Добавляем мгновенное применение zIndex, чтобы активная карточка выпрыгивала вперед
+                      zIndex: layout?.zIndex || 1,
                     }}
                   >
                     <NoteCard note={note} hideHeader={layout?.isGrouped} />

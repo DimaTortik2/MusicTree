@@ -219,20 +219,26 @@ export const useLecturePageLogic = () => {
     updateNotePositions();
   }, [updateNotePositions, activeNoteId, notes]);
 
-  // В useLecturePageLogic.tsx найдите этот useEffect и обновите его:
   useEffect(() => {
-    if (!canUseNotes) return;
+    if (!canUseNotes || !contentRef.current) return;
 
-    const observer = new ResizeObserver(() => updateNotePositions());
+    let timeoutId: ReturnType<typeof setTimeout>;
 
-    // Наблюдаем за изменением высоты самого текста лекции
+    const observer = new ResizeObserver(() => {
+      // Ждем 50мс, чтобы не дергать React при каждом микро-сдвиге высоты
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        updateNotePositions();
+      }, 50);
+    });
+
     if (contentRef.current) observer.observe(contentRef.current);
-
-    // ВАЖНО: Наблюдаем за колонкой заметок. Если карточка развернет текст,
-    // aside изменит высоту -> сработает пересчет позиций остальных карточек!
     if (asideRef.current) observer.observe(asideRef.current);
 
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      clearTimeout(timeoutId);
+    };
   }, [canUseNotes, updateNotePositions]);
 
   const fireConfetti = () => {

@@ -27,6 +27,9 @@ import { toast } from '@/app/utils/toast';
 import { Tooltip } from '@/shared/Tooltip';
 import { MobileSidebarPortal } from '@/shared/MobileSidebarPortal';
 import { SidebarIcon } from '@/shared/icons/sidebarIcon';
+import { ViewToggle } from '@/shared/buttons/ViewToggle';
+import { useAppModeStore } from '@/app/store/useAppModeStore';
+import { useFriendAudio } from '@/features/vocalTuner/hooks/useFriendAudio';
 
 const RecordingSkeleton = () => (
   <div className="flex items-center justify-between rounded-2xl border-3 border-text/5 bg-transparent p-3 [.light_&]:border-line/60 [.light_&]:bg-surface/40">
@@ -53,7 +56,7 @@ const RecordingSkeleton = () => (
 export function VocalTunerPage() {
   const {
     phase,
-    recordings,
+    recordings: myRecordings,
     playingId,
     isPlaying,
     micError,
@@ -78,7 +81,16 @@ export function VocalTunerPage() {
   } = useVocalTuner();
 
   const isCloudMode = useVocalGlobalStore((s) => s.isCloudMode);
-  const hasLoaded = useVocalGlobalStore((s) => s.hasLoaded);
+  const myHasLoaded = useVocalGlobalStore((s) => s.hasLoaded);
+
+  const activeSharedFriend = useAppModeStore((s) => s.activeSharedFriend);
+  const [viewTarget, setViewTarget] = useState<'me' | 'friend'>('me');
+  const { recordings: friendRecordings, isLoading: isFriendLoading } = useFriendAudio(
+    activeSharedFriend?.id
+  );
+
+  const recordings = viewTarget === 'friend' ? friendRecordings : myRecordings;
+  const hasLoaded = viewTarget === 'me' ? myHasLoaded : !isFriendLoading;
 
   const [recToDelete, setRecToDelete] = useState<Recording | null>(null);
   const [recToRename, setRecToRename] = useState<Recording | null>(null);
@@ -135,7 +147,16 @@ export function VocalTunerPage() {
   const sidebarContent = (
     // ВАЖНО: Добавлен min-h-0 для фикса бага с флексбоксами!
     <div className="flex min-h-0 w-full flex-1 flex-col p-4 pb-0 md:h-full md:w-80 md:flex-none md:border-r md:border-line">
-      <div className="mb-5 flex h-7 shrink-0 items-center justify-end pl-1">
+      <div className="mb-5 flex h-auto shrink-0 items-center justify-between pl-1">
+        {activeSharedFriend ? (
+          <ViewToggle
+            viewTarget={viewTarget}
+            onChange={setViewTarget}
+            color="primary"
+          />
+        ) : (
+          <div />
+        )}
         {hasLoaded && (
           <button
             onClick={() => setIsModeInfoOpen(true)}
@@ -266,21 +287,23 @@ export function VocalTunerPage() {
 
                               <MiniWaveform active={isActive} />
 
-                              <button
-                                className={cn(
-                                  'shrink-0 cursor-pointer p-1 transition-colors outline-none',
-                                  isActive
-                                    ? 'text-white hover:opacity-70'
-                                    : 'text-text group-hover:text-primary',
-                                )}
-                                onClick={(e) => handleThreeDotsClick(e, rec)}
-                              >
-                                <DotsThreeVertical weight="bold" size={24} />
-                              </button>
+                              {viewTarget === 'me' && (
+                                <button
+                                  className={cn(
+                                    'shrink-0 cursor-pointer p-1 transition-colors outline-none',
+                                    isActive
+                                      ? 'text-white hover:opacity-70'
+                                      : 'text-text group-hover:text-primary',
+                                  )}
+                                  onClick={(e) => handleThreeDotsClick(e, rec)}
+                                >
+                                  <DotsThreeVertical weight="bold" size={24} />
+                                </button>
+                              )}
                             </div>
 
                             <AnimatePresence initial={false}>
-                              {isActive && (
+                              {isActive && viewTarget === 'me' && (
                                 <motion.div
                                   initial={{ height: 0, opacity: 0 }}
                                   animate={{ height: 'auto', opacity: 1 }}
@@ -415,7 +438,9 @@ export function VocalTunerPage() {
             pitchDataRef={pitchDataRef}
             actions={
               <button
+                disabled={viewTarget === 'friend'}
                 onClick={() => {
+                  if (viewTarget === 'friend') return;
                   if (isRecording) {
                     stopRec();
                   } else {
@@ -430,6 +455,7 @@ export function VocalTunerPage() {
                   'flex cursor-pointer items-center justify-center bg-primary text-white transition-all duration-300 hover:scale-105 active:scale-95',
                   'h-[64px] w-[64px] rounded-[24px] md:h-[72px] md:w-[72px] md:rounded-[28px]',
                   isRecording && 'animate-pulse bg-text text-primary',
+                  viewTarget === 'friend' && 'opacity-30 cursor-not-allowed pointer-events-none bg-text/10 text-text/30'
                 )}
               >
                 {isRecording ? (

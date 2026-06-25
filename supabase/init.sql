@@ -989,3 +989,36 @@ CREATE POLICY "Участники дерева могут писать" ON publi
 
 -- 8. Включаем вебсокеты (Realtime) для моментальной доставки сообщений
 ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
+
+
+-- ==========================================
+-- 9. ПОЛИТИКИ ДЛЯ СОВМЕСТНОГО ДОСТУПА ДРУЗЕЙ К АУДИО
+-- ==========================================
+
+-- Разрешаем пользователям видеть аудиозаписи своих друзей в таблице audio_tracks
+drop policy if exists "Юзеры видят только свои аудио" on public.audio_tracks;
+create policy "Юзеры видят свои аудио и аудио друзей"
+on public.audio_tracks for select
+using (
+  auth.uid() = user_id
+  or exists (
+    select 1 from public.friends
+    where user_id = auth.uid() and friend_id = audio_tracks.user_id
+  )
+);
+
+-- Разрешаем генерировать подписанные ссылки (Signed URLs) для файлов друзей в Storage
+drop policy if exists "Пользователь может слушать свое аудио" on storage.objects;
+create policy "Пользователь может слушать свое аудио и аудио друзей"
+on storage.objects for select
+using (
+  bucket_id = 'audio_records'
+  and (
+    auth.uid()::text = (storage.foldername(name))[1]
+    or exists (
+      select 1 from public.friends
+      where user_id = auth.uid() and friend_id::text = (storage.foldername(name))[1]
+    )
+  )
+);
+

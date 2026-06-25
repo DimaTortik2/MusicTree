@@ -18,9 +18,15 @@ export interface TestGroup {
   items: MappedTest[];
 }
 
-export const useTestsData = () => {
-  const passedLessons = useProgressStore((s) => s.passedLessons);
-  const passedTests = useProgressStore((s) => s.passedTests);
+export const useTestsData = (
+  customPassedLessons?: string[],
+  customPassedTests?: Record<string, any>
+) => {
+  const storePassedLessons = useProgressStore((s) => s.passedLessons);
+  const storePassedTests = useProgressStore((s) => s.passedTests);
+
+  const passedLessons = customPassedLessons ?? storePassedLessons;
+  const passedTests = customPassedTests ?? storePassedTests;
 
   return useMemo(() => {
     const activeMap = new Map<string, TestGroup>();

@@ -8,6 +8,9 @@ import { DetailLayout } from '@/shared/layouts/DetailLayout';
 import { useTestsData } from './useTestsData';
 import { TestRunner } from './TestRunner';
 import { useRememberSelection } from '@/shared/hooks/useRememberSelection';
+import { ViewToggle } from '@/shared/buttons/ViewToggle';
+import { useAppModeStore } from '@/app/store/useAppModeStore';
+import { useFriendProgress } from '@/shared/hooks/useFriendProgress';
 // ✨ Добавляем framer-motion
 import { AnimatePresence, motion, type Variants } from 'framer-motion';
 
@@ -38,7 +41,18 @@ const contentTransitionVariants: Variants = {
 export const TestsPage = () => {
   const navigate = useNavigate();
   const { testId } = useParams();
-  const data = useTestsData();
+
+  const activeSharedFriend = useAppModeStore((s) => s.activeSharedFriend);
+  const [viewTarget, setViewTarget] = useState<'me' | 'friend'>('me');
+  const { progress: friendProgress } = useFriendProgress(activeSharedFriend?.id);
+
+  const friendPassedLessons = friendProgress?.passedLessons;
+  const friendPassedTests = friendProgress?.passedTests;
+
+  const data = useTestsData(
+    viewTarget === 'friend' ? friendPassedLessons : undefined,
+    viewTarget === 'friend' ? friendPassedTests : undefined
+  );
 
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
@@ -72,6 +86,15 @@ export const TestsPage = () => {
   }, [isTestDirty]);
 
   const selectedTest = data.allItems.find((t) => t.id === testId);
+
+  useEffect(() => {
+    if (testId && data.allItems.length > 0 && !data.allItems.some((t) => t.id === testId)) {
+      const firstId = data.allItems[0]?.id;
+      if (firstId) {
+        navigate(`/app/tests/${firstId}`, { replace: true });
+      }
+    }
+  }, [viewTarget, data.allItems, testId, navigate]);
 
   useEffect(() => {
     if (detailRef.current) {
@@ -126,7 +149,16 @@ export const TestsPage = () => {
     setPendingAction(null);
   };
 
-  const EmptyState = (
+  const EmptyState = viewTarget === 'friend' ? (
+    <Modal
+      inline
+      layout="horizontal"
+      title="У друга пока нет пройденных тестов"
+      description="Как только друг пройдет хотя бы один тест, его результат появится здесь"
+      icon={<GitFork className="size-8 sm:size-10" weight="regular" />}
+      iconContainerClassName="bg-primary"
+    />
+  ) : (
     <Modal
       inline
       layout="horizontal"
@@ -140,7 +172,17 @@ export const TestsPage = () => {
 
   const ListContent = (
     <>
-      {data.activeGroups.map((group, i) => (
+      {activeSharedFriend && (
+        <div className="mb-6 flex justify-start pl-3">
+          <ViewToggle
+            viewTarget={viewTarget}
+            onChange={setViewTarget}
+            color="accent"
+          />
+        </div>
+      )}
+
+      {viewTarget === 'me' && data.activeGroups.map((group, i) => (
         <div key={`active-${group.lessonId}`} className="mb-2">
           <div className="space-y-2">
             {group.items.map((test) => (
@@ -193,8 +235,15 @@ export const TestsPage = () => {
                   variant={isSelected ? 'solid' : 'outline'}
                   color="accent"
                   className={cn(
-                    '!h-auto w-full scale-90 flex-col !items-start !justify-start gap-1 p-5 shadow-lg transition-all hover:scale-92',
-                    'opacity-40 hover:opacity-70',
+                    '!h-auto w-full scale-90 flex-col !items-start !justify-start gap-1 p-5 shadow-lg',
+                    viewTarget === 'friend'
+                      ? isSelected
+                        ? 'bg-surface/50 border-accent/60 text-text/60 shadow-md'
+                        : 'bg-surface/20 border-line/40 text-text/40 hover:bg-surface/30'
+                      : cn(
+                          'transition-all hover:scale-92',
+                          'opacity-40 hover:opacity-70',
+                        )
                   )}
                   onClick={() => {
                     navigate(`/app/tests/${test.id}`);
@@ -206,7 +255,9 @@ export const TestsPage = () => {
                       <span
                         className={cn(
                           'text-[22px] leading-tight font-normal tracking-wide',
-                          isSelected ? 'text-white' : 'text-text/40',
+                          viewTarget === 'friend'
+                            ? 'text-text/50'
+                            : isSelected ? 'text-white' : 'text-text/40',
                         )}
                       >
                         {test.title}
@@ -214,14 +265,19 @@ export const TestsPage = () => {
                       <span
                         className={cn(
                           'text-[15px] font-light',
-                          isSelected ? 'text-white/70' : 'text-text/40',
+                          viewTarget === 'friend'
+                            ? 'text-text/30'
+                            : isSelected ? 'text-white/70' : 'text-text/40',
                         )}
                       >
                         {test.lessonTitle}
                       </span>
                     </div>
                     {test.score !== undefined && (
-                      <span className="rounded-md px-2 py-1 text-sm font-medium text-text">
+                      <span className={cn(
+                        'rounded-md px-2 py-1 text-sm font-medium',
+                        viewTarget === 'friend' ? 'text-text/50' : 'text-text'
+                      )}>
                         {test.score}/{test.maxScore}
                       </span>
                     )}
@@ -251,7 +307,12 @@ export const TestsPage = () => {
             variants={contentTransitionVariants}
             className="flex flex-1 flex-col"
           >
-            <TestRunner test={selectedTest} onDirtyStateChange={setIsTestDirty} />
+            <TestRunner
+              test={selectedTest}
+              onDirtyStateChange={setIsTestDirty}
+              isReadOnly={viewTarget === 'friend'}
+              friendPassedTests={friendPassedTests}
+            />
           </motion.div>
         )}
       </AnimatePresence>

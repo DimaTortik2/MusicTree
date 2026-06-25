@@ -106,6 +106,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     localStorage.removeItem("app-shortcuts-storage");
     localStorage.removeItem("music-tree-device-id");
     localStorage.removeItem("music-tree-app-mode");
+    localStorage.removeItem("music-tree-friend-cache");
     // 3. Делаем хард-редирект на главную (или в /app/tree).
     // Это гарантированно выгрузит старые данные из оперативной памяти Zustand.
     window.location.href = "/";

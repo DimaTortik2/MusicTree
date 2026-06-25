@@ -12,9 +12,16 @@ import type { MappedTest } from './useTestsData';
 interface TestRunnerProps {
   test: MappedTest;
   onDirtyStateChange: (isDirty: boolean) => void;
+  isReadOnly?: boolean;
+  friendPassedTests?: Record<string, any>;
 }
 
-export const TestRunner: React.FC<TestRunnerProps> = ({ test, onDirtyStateChange }) => {
+export const TestRunner: React.FC<TestRunnerProps> = ({
+  test,
+  onDirtyStateChange,
+  isReadOnly = false,
+  friendPassedTests,
+}) => {
   const { passTest, clearTestResult } = useProgressStore();
 
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -109,6 +116,20 @@ export const TestRunner: React.FC<TestRunnerProps> = ({ test, onDirtyStateChange
     }, 100);
   };
 
+  // Блокируем прохождение теста, если режим read-only и друг его еще не прошел
+  if (isReadOnly && !test.isPassed) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center p-8 text-center font-sans">
+        <p className="text-lg font-medium text-text/60">
+          Друг еще не проходил этот тест.
+        </p>
+        <p className="mt-1 text-sm text-text/40">
+          Результаты появятся здесь, как только он завершит его.
+        </p>
+      </div>
+    );
+  }
+
   // --- ЭКРАН РЕЗУЛЬТАТОВ (АРХИВ) ---
   if (isFinished || test.isPassed) {
     const displayResult = isFinished
@@ -124,7 +145,7 @@ export const TestRunner: React.FC<TestRunnerProps> = ({ test, onDirtyStateChange
       : {
           score: test.score!,
           max: test.maxScore!,
-          answers: useProgressStore.getState().passedTests[test.id].userAnswers,
+          answers: (friendPassedTests || useProgressStore.getState().passedTests)[test.id]?.userAnswers || [],
         };
 
     const percentage = (displayResult.score / displayResult.max) * 100;
@@ -201,15 +222,17 @@ export const TestRunner: React.FC<TestRunnerProps> = ({ test, onDirtyStateChange
           </div>
         )}
 
-        <Button
-          variant="outline"
-          color="primary"
-          size="md"
-          className="mt-auto w-full sm:w-auto"
-          onClick={() => setShowClearModal(true)}
-        >
-          Очистить и перепройти
-        </Button>
+        {!isReadOnly && (
+          <Button
+            variant="outline"
+            color="primary"
+            size="md"
+            className="mt-auto w-full sm:w-auto"
+            onClick={() => setShowClearModal(true)}
+          >
+            Очистить и перепройти
+          </Button>
+        )}
 
         <Modal
           isOpen={showClearModal}

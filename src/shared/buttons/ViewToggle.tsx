@@ -29,21 +29,25 @@ export const ViewToggle: React.FC<ViewToggleProps> = ({
 
   const activeColorClass = color === 'primary' ? 'border-primary' : 'border-accent';
 
+  const handleToggle = () => {
+    onChange(viewTarget === 'me' ? 'friend' : 'me');
+  };
+
   return (
-    <div
+    <button
+      type="button"
+      onClick={handleToggle}
       className={cn(
-        'relative flex items-center w-44 sm:w-48 rounded-full p-0 bg-surface/30 border-2 backdrop-blur-md select-none transition-colors duration-300',
+        'relative flex items-center w-full h-[58px] md:h-[62px] rounded-full p-0 bg-surface/30 border-2 backdrop-blur-md select-none transition-colors duration-300 outline-none cursor-pointer',
         activeColorClass,
         className
       )}
     >
       {/* Me Option */}
-      <button
-        type="button"
-        onClick={() => onChange('me')}
+      <div
         className={cn(
-          'relative w-1/2 h-9 sm:h-11 flex items-center justify-center rounded-l-full py-1.5 text-xs sm:text-sm font-medium transition-colors duration-200 outline-none cursor-pointer',
-          viewTarget === 'me' ? 'text-white font-semibold' : 'text-text/60 hover:text-text'
+          'relative w-1/2 h-full flex items-center justify-center rounded-l-full py-1.5 text-xs sm:text-sm font-medium transition-colors duration-200',
+          viewTarget === 'me' ? 'text-white font-semibold' : 'text-text/60'
         )}
       >
         {viewTarget === 'me' && (
@@ -62,26 +66,26 @@ export const ViewToggle: React.FC<ViewToggleProps> = ({
             transition={{ type: 'spring', stiffness: 380, damping: 30 }}
           />
         )}
-        <span className="absolute left-1 sm:left-1.5 top-1/2 -translate-y-1/2 z-10">
+        <span className="absolute left-[7px] top-1/2 -translate-y-1/2 z-10">
           <UserAvatar
             userId={user?.id}
             name={userAvatarName}
             src={profile?.avatar_url}
             lqip={profile?.avatar_lqip}
             forceGradient={profile?.use_gradient}
-            className="size-7 sm:size-8 shrink-0"
+            className="size-10 md:size-[44px] shrink-0"
           />
         </span>
-        <span className="relative z-10 pl-7 sm:pl-8">Вы</span>
-      </button>
+        <span className="absolute left-[47px] md:left-[51px] right-0 top-0 bottom-0 flex items-center justify-center z-10">
+          <span>Вы</span>
+        </span>
+      </div>
 
       {/* Friend Option */}
-      <button
-        type="button"
-        onClick={() => onChange('friend')}
+      <div
         className={cn(
-          'relative w-1/2 h-9 sm:h-11 flex items-center justify-center rounded-r-full py-1.5 transition-colors duration-200 outline-none cursor-pointer',
-          viewTarget === 'friend' ? 'text-white font-semibold' : 'text-text/60 hover:text-text'
+          'relative w-1/2 h-full flex items-center justify-center rounded-r-full py-1.5 transition-colors duration-200',
+          viewTarget === 'friend' ? 'text-white font-semibold' : 'text-text/60'
         )}
       >
         {viewTarget === 'friend' && (
@@ -100,17 +104,17 @@ export const ViewToggle: React.FC<ViewToggleProps> = ({
             transition={{ type: 'spring', stiffness: 380, damping: 30 }}
           />
         )}
-        <span className="absolute right-1 sm:right-1.5 top-1/2 -translate-y-1/2 z-10">
+        <span className="absolute right-[7px] top-1/2 -translate-y-1/2 z-10">
           <UserAvatar
             userId={activeSharedFriend.id}
             name={friendAvatarName}
             src={activeSharedFriend.avatar_url}
             lqip={activeSharedFriend.avatar_lqip}
             forceGradient={activeSharedFriend.use_gradient}
-            className="size-7 sm:size-8 shrink-0"
+            className="size-10 md:size-[44px] shrink-0"
           />
         </span>
-      </button>
-    </div>
+      </div>
+    </button>
   );
 };

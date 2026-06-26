@@ -173,12 +173,14 @@ export const TestsPage = () => {
   const ListContent = (
     <>
       {activeSharedFriend && (
-        <div className="mb-6 flex justify-start pl-3">
-          <ViewToggle
-            viewTarget={viewTarget}
-            onChange={setViewTarget}
-            color="accent"
-          />
+        <div className="mb-6 flex w-full justify-center">
+          <div className="w-full scale-90">
+            <ViewToggle
+              viewTarget={viewTarget}
+              onChange={setViewTarget}
+              color="accent"
+            />
+          </div>
         </div>
       )}
 

@@ -153,6 +153,7 @@ export function VocalTunerPage() {
             viewTarget={viewTarget}
             onChange={setViewTarget}
             color="primary"
+            className="flex-1 mr-3"
           />
         ) : (
           <div />

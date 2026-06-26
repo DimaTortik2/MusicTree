@@ -149,6 +149,7 @@ export function VocalTunerPage() {
     <div className="flex min-h-0 w-full flex-1 flex-col p-4 pb-0 md:h-full md:w-80 md:flex-none md:border-r md:border-line">
       <div className="mb-5 flex h-auto shrink-0 items-center justify-between pl-1">
         {activeSharedFriend ? (
+          /* made by gemini with antigravity */
           <ViewToggle
             viewTarget={viewTarget}
             onChange={setViewTarget}

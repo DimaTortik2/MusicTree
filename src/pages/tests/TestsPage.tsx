@@ -173,6 +173,7 @@ export const TestsPage = () => {
   const ListContent = (
     <>
       {activeSharedFriend && (
+        /* made by technocat */
         <div className="mb-6 flex w-full justify-center">
           <div className="w-full scale-90">
             <ViewToggle

@@ -192,7 +192,7 @@ export const TestRunner: React.FC<TestRunnerProps> = ({
                   const ans = displayResult.answers[i] || [];
                   const isExactlyCorrect =
                     ans.length === q.correctAnswers.length &&
-                    ans.every((v) => q.correctAnswers.includes(v));
+                    ans.every((v: number) => q.correctAnswers.includes(v));
                   if (isExactlyCorrect) return null;
 
                   return (
@@ -205,7 +205,7 @@ export const TestRunner: React.FC<TestRunnerProps> = ({
                             Нет ответа
                           </div>
                         ) : (
-                          ans.map((a) => (
+                          ans.map((a: number) => (
                             <div key={a} className="rounded-xl bg-primary/10 p-3 text-primary">
                               {q.options[a]}
                             </div>

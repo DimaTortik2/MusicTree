@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { unlockAudioContext } from '@/shared/lib/audioEngine';
 import { TreeWallpaper } from '@/wallpapers/TreeWallpaper';
 import { useBlobTransition } from '@/app/store/useBlobTransition';
+import { useAppModeStore } from '@/app/store/useAppModeStore';
 
 // Маска сглаживания для мягкого затухания краев свечения
 const SCRIM_MASK = `radial-gradient(
@@ -45,6 +46,11 @@ export function LandingPage() {
   const springConfig = { damping: 30, stiffness: 50, mass: 0.5 };
   const springX = useSpring(translateX, springConfig);
   const springY = useSpring(translateY, springConfig);
+
+  useEffect(() => {
+    // Сбрасываем режим просмотра друга при посещении лендинга
+    useAppModeStore.getState().exitSharedMode();
+  }, []);
 
   useEffect(() => {
     const hasMouse = window.matchMedia('(pointer: fine)').matches;

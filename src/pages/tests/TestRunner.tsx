@@ -12,10 +12,19 @@ import type { MappedTest } from './useTestsData';
 interface TestRunnerProps {
   test: MappedTest;
   onDirtyStateChange: (isDirty: boolean) => void;
+  isReadOnly?: boolean;
+  friendPassedTests?: Record<string, any>;
 }
 
-export const TestRunner: React.FC<TestRunnerProps> = ({ test, onDirtyStateChange }) => {
+export const TestRunner: React.FC<TestRunnerProps> = ({
+  test,
+  onDirtyStateChange,
+  isReadOnly = false,
+  friendPassedTests,
+}) => {
   const { passTest, clearTestResult } = useProgressStore();
+  const myPassedTests = useProgressStore((s) => s.passedTests);
+  const hasPassedSelf = !!myPassedTests[test.id];
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedOptions, setSelectedOptions] = useState<number[]>([]);
@@ -109,6 +118,20 @@ export const TestRunner: React.FC<TestRunnerProps> = ({ test, onDirtyStateChange
     }, 100);
   };
 
+  // Блокируем прохождение теста, если режим read-only и друг его еще не прошел
+  if (isReadOnly && !test.isPassed) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center p-8 text-center font-sans">
+        <p className="text-lg font-medium text-text/60">
+          Друг еще не проходил этот тест.
+        </p>
+        <p className="mt-1 text-sm text-text/40">
+          Результаты появятся здесь, как только он завершит его.
+        </p>
+      </div>
+    );
+  }
+
   // --- ЭКРАН РЕЗУЛЬТАТОВ (АРХИВ) ---
   if (isFinished || test.isPassed) {
     const displayResult = isFinished
@@ -124,7 +147,7 @@ export const TestRunner: React.FC<TestRunnerProps> = ({ test, onDirtyStateChange
       : {
           score: test.score!,
           max: test.maxScore!,
-          answers: useProgressStore.getState().passedTests[test.id].userAnswers,
+          answers: (friendPassedTests || useProgressStore.getState().passedTests)[test.id]?.userAnswers || [],
         };
 
     const percentage = (displayResult.score / displayResult.max) * 100;
@@ -163,53 +186,66 @@ export const TestRunner: React.FC<TestRunnerProps> = ({ test, onDirtyStateChange
             <h3 className="mb-6 flex items-center gap-2 text-xl text-text">
               <X size={24} className="text-primary" /> Аналитика ошибок
             </h3>
-            <div className="flex flex-col gap-6">
-              {test.questions.map((q, i) => {
-                const ans = displayResult.answers[i] || [];
-                const isExactlyCorrect =
-                  ans.length === q.correctAnswers.length &&
-                  ans.every((v) => q.correctAnswers.includes(v));
-                if (isExactlyCorrect) return null;
+            {!isReadOnly || hasPassedSelf ? (
+              <div className="flex flex-col gap-6">
+                {test.questions.map((q, i) => {
+                  const ans = displayResult.answers[i] || [];
+                  const isExactlyCorrect =
+                    ans.length === q.correctAnswers.length &&
+                    ans.every((v) => q.correctAnswers.includes(v));
+                  if (isExactlyCorrect) return null;
 
-                return (
-                  <div key={q.id} className="w-full rounded-2xl bg-surface p-6">
-                    <p className="mb-4 font-medium text-text">{q.text}</p>
-                    <div className="space-y-2 text-sm">
-                      <div className="text-text/60">Ваш ответ:</div>
-                      {ans.length === 0 ? (
-                        <div className="rounded-xl border border-surface bg-surface p-3 text-text/50">
-                          Нет ответа
-                        </div>
-                      ) : (
-                        ans.map((a) => (
-                          <div key={a} className="rounded-xl bg-primary/10 p-3 text-primary">
-                            {q.options[a]}
+                  return (
+                    <div key={q.id} className="w-full rounded-2xl bg-surface p-6">
+                      <p className="mb-4 font-medium text-text">{q.text}</p>
+                      <div className="space-y-2 text-sm">
+                        <div className="text-text/60">Ваш ответ:</div>
+                        {ans.length === 0 ? (
+                          <div className="rounded-xl border border-surface bg-surface p-3 text-text/50">
+                            Нет ответа
                           </div>
-                        ))
-                      )}
-                      <div className="mt-4 text-text/60">Правильный ответ:</div>
-                      {q.correctAnswers.map((ca) => (
-                        <div key={ca} className="rounded-xl bg-access/10 p-3 text-access">
-                          {q.options[ca]}
-                        </div>
-                      ))}
+                        ) : (
+                          ans.map((a) => (
+                            <div key={a} className="rounded-xl bg-primary/10 p-3 text-primary">
+                              {q.options[a]}
+                            </div>
+                          ))
+                        )}
+                        <div className="mt-4 text-text/60">Правильный ответ:</div>
+                        {q.correctAnswers.map((ca) => (
+                          <div key={ca} className="rounded-xl bg-access/10 p-3 text-access">
+                            {q.options[ca]}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="rounded-2xl bg-surface/50 border border-line/20 p-6 text-center font-sans">
+                <p className="text-base font-medium text-text/60">
+                  Детальный анализ скрыт
+                </p>
+                <p className="mt-1 text-sm text-text/40">
+                  Пройдите этот тест самостоятельно, чтобы увидеть ошибки и подробные ответы друга.
+                </p>
+              </div>
+            )}
           </div>
         )}
 
-        <Button
-          variant="outline"
-          color="primary"
-          size="md"
-          className="mt-auto w-full sm:w-auto"
-          onClick={() => setShowClearModal(true)}
-        >
-          Очистить и перепройти
-        </Button>
+        {!isReadOnly && (
+          <Button
+            variant="outline"
+            color="primary"
+            size="md"
+            className="mt-auto w-full sm:w-auto"
+            onClick={() => setShowClearModal(true)}
+          >
+            Очистить и перепройти
+          </Button>
+        )}
 
         <Modal
           isOpen={showClearModal}

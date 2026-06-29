@@ -79,9 +79,16 @@ export function FriendsPage() {
       .single();
 
     if (data) {
-      // 🔥 ОБЕРНУЛИ В ТРАНЗИШЕН
       startTransition(() => {
-        useSharedProgressStore.setState(data.progress_state || {});
+        // 🔥 ИСПРАВЛЕНИЕ: Явно зануляем массивы перед слиянием с БД
+        useSharedProgressStore.setState({
+          passedLessons: [],
+          passedHomeworks: [],
+          passedTests: {},
+          halfPassedLessons: {},
+          unlockedChains: [],
+          ...(data.progress_state || {}),
+        });
         setSharedMode(friend, data.id);
         navigate('/app/tree');
       });
@@ -94,7 +101,14 @@ export function FriendsPage() {
   const handleCreateTree = async (type: 'empty' | 'min') => {
     if (!isCreatingShared || !user) return;
 
-    let initialState = {};
+    // 🔥 ИСПРАВЛЕНИЕ: Явно прописываем пустые массивы, а не {}
+    let initialState: any = {
+      passedLessons: [],
+      passedHomeworks: [],
+      passedTests: {},
+      halfPassedLessons: {},
+      unlockedChains: [],
+    };
 
     if (type === 'min') {
       const { data: friendProfile } = await supabase
@@ -108,6 +122,7 @@ export function FriendsPage() {
         arr1.filter((x) => arr2.includes(x));
 
       initialState = {
+        ...initialState, // Сохраняем пустые словари для остальных полей
         passedLessons: intersect(personalProgress.passedLessons, friendState.passedLessons),
         passedHomeworks: intersect(personalProgress.passedHomeworks, friendState.passedHomeworks),
       };
@@ -120,7 +135,6 @@ export function FriendsPage() {
       .single();
 
     if (data) {
-      // 🔥 ОБЕРНУЛИ В ТРАНЗИШЕН
       startTransition(() => {
         useSharedProgressStore.setState(initialState);
         setSharedMode(isCreatingShared, data.id);
@@ -259,7 +273,7 @@ export function FriendsPage() {
               : 'Ваш аккаунт пока не имеет доступа к функции совместных деревьев.'
           }
           icon={<UserPlus className="size-8 text-text sm:size-10" weight="regular" />}
-          onIconClick={!user ? () => navigate('/auth') : undefined}
+          onIconClick={!user ? () => startTransition(() => navigate('/auth')) : undefined}
           iconContainerClassName="bg-primary text-surface"
         />
       </div>

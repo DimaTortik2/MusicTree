@@ -18,6 +18,7 @@ import { UpdatePasswordPage } from '@/pages/Auth/UpdatePasswordPage';
 import { FriendsPage } from '@/pages/FriendsPage/FriendsPage';
 import { TermsPage } from '@/pages/Legal/TermsPage';
 import { PrivacyPage } from '@/pages/Legal/PrivacyPage';
+import { ChatsPage } from '@/pages/ChatsPage';
 
 export const router = createBrowserRouter([
   {
@@ -95,6 +96,10 @@ export const router = createBrowserRouter([
       {
         path: 'friends',
         element: <FriendsPage />,
+      },
+      {
+        path: 'chat',
+        element: <ChatsPage />,
       },
       {
         path: 'debug',

@@ -57,13 +57,13 @@ export const TABS_INFO: Record<
     title: "Друзья",
     desc: "Ваши друзья и заявки",
   },
-  chats: { icon: ChatCircle, title: "Чат", desc: "Общение с другом" },
+  chat: { icon: ChatCircle, title: "Чат", desc: "Общение с другом" },
   debug: {
     icon: Wrench,
     title: "Для разработчиков",
     desc: "Симуляция любой ситуации",
   },
-  settings: {
+settings: {
     icon: Gear,
     title: "Настройки",
     desc: "Громкость, хоткеи, данные и т.д.",

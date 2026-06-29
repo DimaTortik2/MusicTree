@@ -1,7 +1,7 @@
-import { supabase } from "@/shared/lib/supabase";
-import type { Session, User } from "@supabase/supabase-js";
-import { create } from "zustand";
-import localforage from "localforage";
+import { supabase } from '@/shared/lib/supabase';
+import type { Session, User } from '@supabase/supabase-js';
+import { create } from 'zustand';
+import localforage from 'localforage';
 
 export interface UserProfile {
   full_name: string | null;
@@ -14,6 +14,7 @@ export interface UserProfile {
   can_use_presence: boolean;
   can_use_qr_login: boolean;
   can_use_friends: boolean;
+  can_use_chats: boolean;
   can_use_notes: boolean;
 }
 
@@ -45,11 +46,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // Вспомогательная функция для загрузки кастомных данных профиля из БД
     const fetchProfile = async (userId: string) => {
       const { data } = await supabase
-        .from("profiles")
+        .from('profiles')
         .select(
-          "full_name, avatar_url, avatar_lqip, can_upload_avatar, can_use_gradient, use_gradient, username, can_use_presence, can_use_qr_login, can_use_friends, can_use_notes",
+          'full_name, avatar_url, avatar_lqip, can_upload_avatar, can_use_gradient, use_gradient, username, can_use_presence, can_use_qr_login, can_use_friends, can_use_chats, can_use_notes',
         )
-        .eq("id", userId)
+        .eq('id', userId)
         .single();
 
       if (data) {
@@ -88,15 +89,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   signOut: async () => {
-    const deviceId = localStorage.getItem("music-tree-device-id");
+    const deviceId = localStorage.getItem('music-tree-device-id');
     if (deviceId) {
-      await supabase.rpc("terminate_device", {
+      await supabase.rpc('terminate_device', {
         target_device_id: deviceId,
         current_device_id: deviceId,
       });
     }
 
-    await supabase.auth.signOut({ scope: "local" });
+    await supabase.auth.signOut({ scope: 'local' });
 
     // 1. Очищаем IndexedDB (все локальные аудиозаписи)
     await localforage.clear();
@@ -109,6 +110,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     localStorage.removeItem("music-tree-friend-cache");
     // 3. Делаем хард-редирект на главную (или в /app/tree).
     // Это гарантированно выгрузит старые данные из оперативной памяти Zustand.
-    window.location.href = "/";
+    window.location.href = '/';
   },
 }));

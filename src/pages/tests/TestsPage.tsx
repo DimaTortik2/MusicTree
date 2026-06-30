@@ -10,11 +10,8 @@ import { TestRunner } from './TestRunner';
 import { useRememberSelection } from '@/shared/hooks/useRememberSelection';
 import { ViewToggle } from '@/shared/buttons/ViewToggle';
 import { useAppModeStore } from '@/app/store/useAppModeStore';
-import { useFriendProgress } from '@/shared/hooks/useFriendProgress';
-// ✨ Добавляем framer-motion
 import { AnimatePresence, motion, type Variants } from 'framer-motion';
 
-// ✨ Те же варианты затухания
 const contentTransitionVariants: Variants = {
   initial: {
     opacity: 0,
@@ -44,15 +41,10 @@ export const TestsPage = () => {
 
   const activeSharedFriend = useAppModeStore((s) => s.activeSharedFriend);
   const [viewTarget, setViewTarget] = useState<'me' | 'friend'>('me');
-  const { progress: friendProgress } = useFriendProgress(activeSharedFriend?.id);
 
-  const friendPassedLessons = friendProgress?.passedLessons;
-  const friendPassedTests = friendProgress?.passedTests;
-
-  const data = useTestsData(
-    viewTarget === 'friend' ? friendPassedLessons : undefined,
-    viewTarget === 'friend' ? friendPassedTests : undefined
-  );
+  // МАГИЯ ЗДЕСЬ: Просто передаем ID друга, если смотрим его результаты!
+  // Вся остальная информация уже лежит в нашем умном сторе (useSharedProgressStore)
+  const data = useTestsData(viewTarget === 'friend' ? activeSharedFriend?.id : undefined);
 
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
@@ -149,82 +141,78 @@ export const TestsPage = () => {
     setPendingAction(null);
   };
 
-  const EmptyState = viewTarget === 'friend' ? (
-    <Modal
-      inline
-      layout="horizontal"
-      title="У друга пока нет пройденных тестов"
-      description="Как только друг пройдет хотя бы один тест, его результат появится здесь"
-      icon={<GitFork className="size-8 sm:size-10" weight="regular" />}
-      iconContainerClassName="bg-primary"
-    />
-  ) : (
-    <Modal
-      inline
-      layout="horizontal"
-      title="После прохождения первого урока эта страница пополнится первым тестом"
-      description="Тесты будут накапливаться, Вы всегда сможете найти их здесь"
-      icon={<GitFork className="size-8 sm:size-10" weight="regular" />}
-      onIconClick={() => navigate('/app/tree', { replace: true })}
-      iconContainerClassName="bg-primary"
-    />
-  );
+  const EmptyState =
+    viewTarget === 'friend' ? (
+      <Modal
+        inline
+        layout="horizontal"
+        title="У друга пока нет пройденных тестов"
+        description="Как только друг пройдет хотя бы один тест, его результат появится здесь"
+        icon={<GitFork className="size-8 sm:size-10" weight="regular" />}
+        iconContainerClassName="bg-primary"
+      />
+    ) : (
+      <Modal
+        inline
+        layout="horizontal"
+        title="После прохождения первого урока эта страница пополнится первым тестом"
+        description="Тесты будут накапливаться, Вы всегда сможете найти их здесь"
+        icon={<GitFork className="size-8 sm:size-10" weight="regular" />}
+        onIconClick={() => navigate('/app/tree', { replace: true })}
+        iconContainerClassName="bg-primary"
+      />
+    );
+
+  const ListHeader = activeSharedFriend ? (
+    <div className="flex w-full justify-center">
+      <ViewToggle viewTarget={viewTarget} onChange={setViewTarget} color="accent" />
+    </div>
+  ) : undefined;
 
   const ListContent = (
     <>
-      {activeSharedFriend && (
-        /* made by technocat */
-        <div className="mb-6 flex w-full justify-center">
-          <div className="w-full scale-90">
-            <ViewToggle
-              viewTarget={viewTarget}
-              onChange={setViewTarget}
-              color="accent"
-            />
-          </div>
-        </div>
-      )}
 
-      {viewTarget === 'me' && data.activeGroups.map((group, i) => (
-        <div key={`active-${group.lessonId}`} className="mb-2">
-          <div className="space-y-2">
-            {group.items.map((test) => (
-              <Button
-                id={`test-item-${test.id}`}
-                key={test.id}
-                variant={testId === test.id ? 'solid' : 'outline'}
-                color="accent"
-                className="h-auto w-full scale-90 flex-col items-start justify-start gap-1 p-5 shadow-lg transition-all hover:scale-92"
-                onClick={() => {
-                  navigate(`/app/tests/${test.id}`);
-                  if (window.innerWidth < 768) setIsMobileOpen(true);
-                }}
-                size="md"
-              >
-                <span
-                  className={cn(
-                    'text-[22px] leading-tight font-normal tracking-wide',
-                    testId === test.id ? 'text-white' : 'text-text',
-                  )}
+      {viewTarget === 'me' &&
+        data.activeGroups.map((group, i) => (
+          <div key={`active-${group.lessonId}`} className="mb-2">
+            <div className="space-y-2">
+              {group.items.map((test) => (
+                <Button
+                  id={`test-item-${test.id}`}
+                  key={test.id}
+                  variant={testId === test.id ? 'solid' : 'outline'}
+                  color="accent"
+                  className="h-auto w-full scale-90 flex-col items-start justify-start gap-1 p-5 shadow-lg transition-all hover:scale-92"
+                  onClick={() => {
+                    navigate(`/app/tests/${test.id}`);
+                    if (window.innerWidth < 768) setIsMobileOpen(true);
+                  }}
+                  size="md"
                 >
-                  {test.title}
-                </span>
-                <span
-                  className={cn(
-                    'text-[15px] font-light',
-                    testId === test.id ? 'text-white/70' : 'text-text/40',
-                  )}
-                >
-                  {test.lessonTitle}
-                </span>
-              </Button>
-            ))}
+                  <span
+                    className={cn(
+                      'text-[22px] leading-tight font-normal tracking-wide',
+                      testId === test.id ? 'text-white' : 'text-text',
+                    )}
+                  >
+                    {test.title}
+                  </span>
+                  <span
+                    className={cn(
+                      'text-[15px] font-light',
+                      testId === test.id ? 'text-white/70' : 'text-text/40',
+                    )}
+                  >
+                    {test.lessonTitle}
+                  </span>
+                </Button>
+              ))}
+            </div>
+            {(i < data.activeGroups.length - 1 || data.archivedGroups.length > 0) && (
+              <div className="mx-auto my-8 h-[3px] w-24 rounded-full bg-text/10" />
+            )}
           </div>
-          {(i < data.activeGroups.length - 1 || data.archivedGroups.length > 0) && (
-            <div className="mx-auto my-8 h-[3px] w-24 rounded-full bg-text/10" />
-          )}
-        </div>
-      ))}
+        ))}
 
       {data.archivedGroups.map((group, i) => (
         <div key={`archive-${group.lessonId}`} className="mb-2">
@@ -238,15 +226,12 @@ export const TestsPage = () => {
                   variant={isSelected ? 'solid' : 'outline'}
                   color="accent"
                   className={cn(
-                    '!h-auto w-full scale-90 flex-col !items-start !justify-start gap-1 p-5 shadow-lg',
+                    '!h-auto w-full scale-90 flex-col !items-start !justify-start gap-1 p-5 shadow-lg hover:scale-92',
                     viewTarget === 'friend'
                       ? isSelected
-                        ? 'bg-surface/50 border-accent/60 text-text/60 shadow-md'
-                        : 'bg-surface/20 border-line/40 text-text/40 hover:bg-surface/30'
-                      : cn(
-                          'transition-all hover:scale-92',
-                          'opacity-40 hover:opacity-70',
-                        )
+                        ? 'border-accent/60 bg-surface/50 text-text/60 shadow-md'
+                        : 'border-line/40 bg-surface/20 text-text/40 hover:bg-surface/30'
+                      : cn('transition-all hover:scale-92', 'opacity-40 hover:opacity-70'),
                   )}
                   onClick={() => {
                     navigate(`/app/tests/${test.id}`);
@@ -260,7 +245,9 @@ export const TestsPage = () => {
                           'text-[22px] leading-tight font-normal tracking-wide',
                           viewTarget === 'friend'
                             ? 'text-text/50'
-                            : isSelected ? 'text-white' : 'text-text/40',
+                            : isSelected
+                              ? 'text-white'
+                              : 'text-text/40',
                         )}
                       >
                         {test.title}
@@ -270,17 +257,21 @@ export const TestsPage = () => {
                           'text-[15px] font-light',
                           viewTarget === 'friend'
                             ? 'text-text/30'
-                            : isSelected ? 'text-white/70' : 'text-text/40',
+                            : isSelected
+                              ? 'text-white/70'
+                              : 'text-text/40',
                         )}
                       >
                         {test.lessonTitle}
                       </span>
                     </div>
                     {test.score !== undefined && (
-                      <span className={cn(
-                        'rounded-md px-2 py-1 text-sm font-medium',
-                        viewTarget === 'friend' ? 'text-text/50' : 'text-text'
-                      )}>
+                      <span
+                        className={cn(
+                          'rounded-md px-2 py-1 text-sm font-medium',
+                          viewTarget === 'friend' ? 'text-text/50' : 'text-text',
+                        )}
+                      >
                         {test.score}/{test.maxScore}
                       </span>
                     )}
@@ -297,7 +288,6 @@ export const TestsPage = () => {
     </>
   );
 
-  // ✨ Оборачиваем TestRunner в AnimatePresence и motion.div
   const DetailContent = (
     <>
       <AnimatePresence mode="wait">
@@ -314,7 +304,6 @@ export const TestsPage = () => {
               test={selectedTest}
               onDirtyStateChange={setIsTestDirty}
               isReadOnly={viewTarget === 'friend'}
-              friendPassedTests={friendPassedTests}
             />
           </motion.div>
         )}
@@ -360,6 +349,7 @@ export const TestsPage = () => {
   return (
     <DetailLayout
       isEmpty={data.isEmpty}
+      listHeader={ListHeader}
       emptyState={EmptyState}
       isMobileDetailOpen={isMobileOpen}
       onBackClick={() => {

@@ -1,8 +1,10 @@
-// src/app/pages/tests/useTestsData.ts
 import { useMemo } from 'react';
-import { useProgressStore } from '@/app/store/useProgressStore';
+ // Используем умный хук
+import { useAppModeStore } from '@/app/store/useAppModeStore';
+import { useAuthStore } from '@/app/store/authStore';
 import { contentConfig } from '@/contentConfig';
 import { testsData, type TestConfig } from '@/content/tests/testsData';
+import { useCurrentProgress } from '@/app/hooks/useCurrentProgress';
 
 export interface MappedTest extends TestConfig {
   lessonId: string;
@@ -18,15 +20,16 @@ export interface TestGroup {
   items: MappedTest[];
 }
 
-export const useTestsData = (
-  customPassedLessons?: string[],
-  customPassedTests?: Record<string, any>
-) => {
-  const storePassedLessons = useProgressStore((s) => s.passedLessons);
-  const storePassedTests = useProgressStore((s) => s.passedTests);
+// Теперь хук принимает ID пользователя, чьи результаты мы хотим посмотреть
+export const useTestsData = (viewUserId?: string) => {
+  const currentProgress = useCurrentProgress();
+  const isSharedMode = !!useAppModeStore((s) => s.sharedTreeId);
+  const myId = useAuthStore((s) => s.user?.id);
 
-  const passedLessons = customPassedLessons ?? storePassedLessons;
-  const passedTests = customPassedTests ?? storePassedTests;
+  const passedLessons = currentProgress.passedLessons;
+  const passedTests = currentProgress.passedTests;
+
+  const targetId = viewUserId || myId;
 
   return useMemo(() => {
     const activeMap = new Map<string, TestGroup>();
@@ -35,15 +38,23 @@ export const useTestsData = (
     const activeItems: MappedTest[] = [];
     const archivedItems: MappedTest[] = [];
 
-    // Идем по урокам в порядке их конфига
     contentConfig.forEach((lesson) => {
-      // Показываем тесты только из пройденных уроков
+      // База тестов общая, строится на пройденных уроках в ТЕКУЩЕМ дереве
       if (passedLessons.includes(lesson.id) && lesson.linkedTests.length > 0) {
         lesson.linkedTests.forEach((testId) => {
           const testContent = testsData[testId];
           if (!testContent) return;
 
-          const testResult = passedTests[testId];
+          let testResult = null;
+          
+          if (isSharedMode && targetId) {
+            // В совместном дереве достаем результат конкретного юзера
+            testResult = (passedTests[testId] as any)?.[targetId];
+          } else {
+            // В личном дереве всё лежит линейно
+            testResult = passedTests[testId];
+          }
+
           const isPassed = !!testResult;
 
           const mapped: MappedTest = {
@@ -78,5 +89,5 @@ export const useTestsData = (
       archivedItems,
       isEmpty: passedLessons.length === 0 || allItems.length === 0,
     };
-  }, [passedLessons, passedTests]);
+  }, [passedLessons, passedTests, isSharedMode, targetId]);
 };

@@ -29,7 +29,7 @@ import { MobileSidebarPortal } from '@/shared/MobileSidebarPortal';
 import { SidebarIcon } from '@/shared/icons/sidebarIcon';
 import { ViewToggle } from '@/shared/buttons/ViewToggle';
 import { useAppModeStore } from '@/app/store/useAppModeStore';
-import { useFriendAudio } from '@/features/vocalTuner/hooks/useFriendAudio';
+import { useAuthStore } from '@/app/store/authStore';
 
 const RecordingSkeleton = () => (
   <div className="flex items-center justify-between rounded-2xl border-3 border-text/5 bg-transparent p-3 [.light_&]:border-line/60 [.light_&]:bg-surface/40">
@@ -56,7 +56,7 @@ const RecordingSkeleton = () => (
 export function VocalTunerPage() {
   const {
     phase,
-    recordings: myRecordings,
+    recordings: allWorkspaceRecordings,
     playingId,
     isPlaying,
     micError,
@@ -81,16 +81,17 @@ export function VocalTunerPage() {
   } = useVocalTuner();
 
   const isCloudMode = useVocalGlobalStore((s) => s.isCloudMode);
-  const myHasLoaded = useVocalGlobalStore((s) => s.hasLoaded);
+  const hasLoaded = useVocalGlobalStore((s) => s.hasLoaded);
 
   const activeSharedFriend = useAppModeStore((s) => s.activeSharedFriend);
+  const myId = useAuthStore((s) => s.user?.id);
   const [viewTarget, setViewTarget] = useState<'me' | 'friend'>('me');
-  const { recordings: friendRecordings, isLoading: isFriendLoading } = useFriendAudio(
-    activeSharedFriend?.id
-  );
-
-  const recordings = viewTarget === 'friend' ? friendRecordings : myRecordings;
-  const hasLoaded = viewTarget === 'me' ? myHasLoaded : !isFriendLoading;
+  const [isSidebarScrolled, setIsSidebarScrolled] = useState(false);
+  // МАГИЯ: Записи уже загружены все для текущего дерева, мы просто фильтруем их локально!
+  const recordings =
+    viewTarget === 'friend'
+      ? allWorkspaceRecordings.filter((r) => r.userId === activeSharedFriend?.id)
+      : allWorkspaceRecordings.filter((r) => r.userId === myId);
 
   const [recToDelete, setRecToDelete] = useState<Recording | null>(null);
   const [recToRename, setRecToRename] = useState<Recording | null>(null);
@@ -143,225 +144,221 @@ export function VocalTunerPage() {
       </div>
     );
   }
+ const sidebarContent = (
+   <div
+     className="custom-scroll relative flex min-h-0 w-full flex-1 flex-col overflow-y-auto border-text/10 md:h-full md:w-[320px] md:flex-none md:border-r-[3px] lg:w-[380px]"
+     onScroll={(e) => setIsSidebarScrolled(e.currentTarget.scrollTop > 5)}
+   >
+     {activeSharedFriend && (
+       <div
+         className={cn(
+           'sticky top-0 z-10 border-b-[3px] px-4 py-4 transition-colors duration-300 md:px-8 md:backdrop-blur-lg',
+           isSidebarScrolled
+             ? 'border-text/10 bg-background md:bg-background/30'
+             : 'border-transparent bg-transparent',
+         )}
+       >
+         <ViewToggle viewTarget={viewTarget} onChange={setViewTarget} color="primary" />
+       </div>
+     )}
 
-  const sidebarContent = (
-    // ВАЖНО: Добавлен min-h-0 для фикса бага с флексбоксами!
-    <div className="flex min-h-0 w-full flex-1 flex-col p-4 pb-0 md:h-full md:w-80 md:flex-none md:border-r md:border-line">
-      <div className="mb-5 flex h-auto shrink-0 items-center justify-between pl-1">
-        {activeSharedFriend ? (
-          /* made by gemini with antigravity */
-          <ViewToggle
-            viewTarget={viewTarget}
-            onChange={setViewTarget}
-            color="primary"
-            className="flex-1 mr-3"
-          />
-        ) : (
-          <div />
-        )}
-        {hasLoaded && (
-          <button
-            onClick={() => setIsModeInfoOpen(true)}
-            className="flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-medium text-text transition-colors"
-          >
-            {isCloudMode ? (
-              <Cloud
-                size={16}
-                weight="fill"
-                className="text-text/40 transition-colors hover:text-primary"
-              />
-            ) : (
-              <HardDrives
-                size={16}
-                weight="fill"
-                className="text-text/40 transition-colors hover:text-primary"
-              />
-            )}
-          </button>
-        )}
-      </div>
+     <div className={cn('flex-1 px-4 pb-24 md:px-8', !activeSharedFriend && 'pt-6')}>
+       <AnimatePresence mode="wait">
+         {!hasLoaded ? (
+           <motion.div
+             key="loading-skeletons"
+             initial={{ opacity: 0 }}
+             animate={{ opacity: 1 }}
+             exit={{ opacity: 0, scale: 0.98, filter: 'blur(4px)' }}
+             transition={{ duration: 0.3, ease: 'easeOut' }}
+             className="flex flex-col gap-3"
+           >
+             {[1, 2, 3, 4].map((i) => (
+               <RecordingSkeleton key={`load-${i}`} />
+             ))}
+           </motion.div>
+         ) : (
+           <motion.div
+             key="recordings-list"
+             initial={{ opacity: 0 }}
+             animate={{ opacity: 1 }}
+             transition={{ duration: 0.3 }}
+             className="flex flex-col gap-3"
+           >
+             {recordings.length === 0 && !(isSaving && isCloudMode && viewTarget === 'me') && (
+               <motion.div
+                 initial={{ opacity: 0, y: 10 }}
+                 animate={{ opacity: 1, y: 0 }}
+                 className="mt-10 flex flex-col items-center justify-center px-4 text-center"
+               >
+                 {viewTarget === 'friend' &&
+                 activeSharedFriend &&
+                 !activeSharedFriend.can_cloud_audio ? (
+                   <div className="flex flex-col items-center gap-2 rounded-2xl border border-line bg-surface/50 p-4">
+                     <HardDrives size={28} weight="fill" className="text-text/30" />
+                     <span className="text-sm font-medium text-text/80">
+                       У пользователя {activeSharedFriend.full_name || activeSharedFriend.username}{' '}
+                       нет доступа к облаку
+                     </span>
+                     <span className="text-xs text-text/50">
+                       Его записи сохраняются только локально на его устройстве, поэтому вы не
+                       можете их послушать.
+                     </span>
+                   </div>
+                 ) : (
+                   <span className="text-sm text-text/40">Записей пока нет</span>
+                 )}
+               </motion.div>
+             )}
 
-      <div className="custom-scroll flex-1 overflow-y-auto pr-2 pb-24">
-        <AnimatePresence mode="wait">
-          {!hasLoaded ? (
-            <motion.div
-              key="loading-skeletons"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0, scale: 0.98, filter: 'blur(4px)' }}
-              transition={{ duration: 0.3, ease: 'easeOut' }}
-              className="flex flex-col gap-3"
-            >
-              {[1, 2, 3, 4].map((i) => (
-                <RecordingSkeleton key={`load-${i}`} />
-              ))}
-            </motion.div>
-          ) : (
-            <motion.div
-              key="recordings-list"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.3 }}
-              className="flex flex-col gap-3"
-            >
-              {recordings.length === 0 && !(isSaving && isCloudMode) && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mt-10 text-center text-sm text-text/40"
-                >
-                  Записей пока нет
-                </motion.div>
-              )}
+             <AnimatePresence mode="popLayout" initial={false}>
+               {isSaving && isCloudMode && viewTarget === 'me' && (
+                 <motion.div
+                   key="saving-skeleton"
+                   layout="position"
+                   initial={{ opacity: 0, y: -15, scale: 0.96 }}
+                   animate={{ opacity: 1, y: 0, scale: 1 }}
+                   exit={{ opacity: 0, scale: 0.96, y: -15 }}
+                   transition={{ type: 'spring', stiffness: 450, damping: 35 }}
+                 >
+                   <RecordingSkeleton />
+                 </motion.div>
+               )}
 
-              <AnimatePresence mode="popLayout" initial={false}>
-                {isSaving && isCloudMode && (
-                  <motion.div
-                    key="saving-skeleton"
-                    layout="position"
-                    initial={{ opacity: 0, y: -15, scale: 0.96 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.96, y: -15 }}
-                    transition={{ type: 'spring', stiffness: 450, damping: 35 }}
-                  >
-                    <RecordingSkeleton />
-                  </motion.div>
-                )}
+               {recordings.map((rec) => {
+                 const isActive = playingId === rec.id;
+                 const isCurrentlyPlaying = isActive && isPlaying;
+                 const showDeletingSkeleton = deletingIds.includes(rec.id) && isCloudMode;
 
-                {recordings.map((rec) => {
-                  const isActive = playingId === rec.id;
-                  const isCurrentlyPlaying = isActive && isPlaying;
-                  const showDeletingSkeleton = deletingIds.includes(rec.id) && isCloudMode;
+                 return (
+                   <motion.div
+                     key={rec.id}
+                     layout="position"
+                     initial={{ opacity: 0, y: 15, scale: 0.96 }}
+                     animate={{ opacity: 1, y: 0, scale: 1 }}
+                     exit={{ opacity: 0, scale: 0.96, y: -15, transition: { duration: 0.15 } }}
+                     transition={{ type: 'spring', stiffness: 450, damping: 35 }}
+                   >
+                     <AnimatePresence mode="popLayout" initial={false}>
+                       {showDeletingSkeleton ? (
+                         <motion.div
+                           key="skeleton"
+                           initial={{ opacity: 0, filter: 'blur(4px)' }}
+                           animate={{ opacity: 0.5, filter: 'blur(0px)' }}
+                           exit={{ opacity: 0, filter: 'blur(4px)' }}
+                           transition={{ duration: 0.2 }}
+                           className="pointer-events-none grayscale"
+                         >
+                           <RecordingSkeleton />
+                         </motion.div>
+                       ) : (
+                         <motion.div
+                           key="content"
+                           initial={{ opacity: 0, filter: 'blur(4px)' }}
+                           animate={{ opacity: 1, filter: 'blur(0px)' }}
+                           exit={{ opacity: 0, filter: 'blur(4px)' }}
+                           transition={{ duration: 0.2 }}
+                           className="flex flex-col gap-1"
+                         >
+                           <div
+                             className={cn(
+                               'group flex cursor-pointer items-center justify-between rounded-2xl border-3 p-3 transition-all duration-300',
+                               isActive
+                                 ? 'border-primary bg-primary text-white shadow-md'
+                                 : 'border-primary bg-transparent text-text hover:bg-primary/10 [.light_&]:border-line [.light_&]:bg-surface [.light_&]:hover:border-primary/40 [.light_&]:hover:bg-primary/5',
+                             )}
+                             onClick={() => togglePlay(rec)}
+                           >
+                             <div
+                               className={cn(
+                                 'flex shrink-0 items-center justify-center p-1 transition-colors',
+                                 isActive
+                                   ? 'text-white hover:text-white/70'
+                                   : 'text-text group-hover:text-primary',
+                               )}
+                             >
+                               {isCurrentlyPlaying ? (
+                                 <Pause weight="fill" size={20} />
+                               ) : (
+                                 <Play weight="fill" size={20} />
+                               )}
+                             </div>
 
-                  return (
-                    <motion.div
-                      key={rec.id}
-                      layout="position"
-                      initial={{ opacity: 0, y: 15, scale: 0.96 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.96, y: -15, transition: { duration: 0.15 } }}
-                      transition={{ type: 'spring', stiffness: 450, damping: 35 }}
-                    >
-                      <AnimatePresence mode="popLayout" initial={false}>
-                        {showDeletingSkeleton ? (
-                          <motion.div
-                            key="skeleton"
-                            initial={{ opacity: 0, filter: 'blur(4px)' }}
-                            animate={{ opacity: 0.5, filter: 'blur(0px)' }}
-                            exit={{ opacity: 0, filter: 'blur(4px)' }}
-                            transition={{ duration: 0.2 }}
-                            className="pointer-events-none grayscale"
-                          >
-                            <RecordingSkeleton />
-                          </motion.div>
-                        ) : (
-                          <motion.div
-                            key="content"
-                            initial={{ opacity: 0, filter: 'blur(4px)' }}
-                            animate={{ opacity: 1, filter: 'blur(0px)' }}
-                            exit={{ opacity: 0, filter: 'blur(4px)' }}
-                            transition={{ duration: 0.2 }}
-                            className="flex flex-col gap-1"
-                          >
-                            <div
-                              className={cn(
-                                'group flex cursor-pointer items-center justify-between rounded-2xl border-3 p-3 transition-all duration-300',
-                                isActive
-                                  ? 'border-primary bg-primary text-white shadow-md'
-                                  : 'border-primary bg-transparent text-text hover:bg-primary/10 [.light_&]:border-line [.light_&]:bg-surface [.light_&]:hover:border-primary/40 [.light_&]:hover:bg-primary/5',
-                              )}
-                              onClick={() => togglePlay(rec)}
-                            >
-                              <div
-                                className={cn(
-                                  'flex shrink-0 items-center justify-center p-1 transition-colors',
-                                  isActive
-                                    ? 'text-white hover:text-white/70'
-                                    : 'text-text group-hover:text-primary',
-                                )}
-                              >
-                                {isCurrentlyPlaying ? (
-                                  <Pause weight="fill" size={20} />
-                                ) : (
-                                  <Play weight="fill" size={20} />
-                                )}
-                              </div>
+                             <MiniWaveform active={isActive} />
 
-                              <MiniWaveform active={isActive} />
+                             {viewTarget === 'me' && (
+                               <button
+                                 className={cn(
+                                   'shrink-0 cursor-pointer p-1 transition-colors outline-none',
+                                   isActive
+                                     ? 'text-white hover:opacity-70'
+                                     : 'text-text group-hover:text-primary',
+                                 )}
+                                 onClick={(e) => handleThreeDotsClick(e, rec)}
+                               >
+                                 <DotsThreeVertical weight="bold" size={24} />
+                               </button>
+                             )}
+                           </div>
 
-                              {viewTarget === 'me' && (
-                                <button
-                                  className={cn(
-                                    'shrink-0 cursor-pointer p-1 transition-colors outline-none',
-                                    isActive
-                                      ? 'text-white hover:opacity-70'
-                                      : 'text-text group-hover:text-primary',
-                                  )}
-                                  onClick={(e) => handleThreeDotsClick(e, rec)}
-                                >
-                                  <DotsThreeVertical weight="bold" size={24} />
-                                </button>
-                              )}
-                            </div>
-
-                            <AnimatePresence initial={false}>
-                              {isActive && viewTarget === 'me' && (
-                                <motion.div
-                                  initial={{ height: 0, opacity: 0 }}
-                                  animate={{ height: 'auto', opacity: 1 }}
-                                  exit={{ height: 0, opacity: 0 }}
-                                  transition={{ duration: 0.2 }}
-                                  className="overflow-hidden"
-                                >
-                                  <div className="mx-1 mt-1 flex items-center justify-between rounded-xl bg-primary px-4 py-2 text-white">
-                                    <button
-                                      className="cursor-pointer p-1 transition-opacity hover:opacity-70"
-                                      title="Удалить"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setRecToDelete(rec);
-                                      }}
-                                    >
-                                      <Trash size={18} weight="bold" />
-                                    </button>
-                                    <div className="flex gap-4">
-                                      <button
-                                        className="cursor-pointer p-1 transition-opacity hover:opacity-70"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setRecToRename(rec);
-                                          setNewName(rec.name);
-                                        }}
-                                      >
-                                        <PencilSimple size={18} weight="bold" />
-                                      </button>
-                                      <button
-                                        className="cursor-pointer p-1 transition-opacity hover:opacity-70"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          downloadRec(rec);
-                                        }}
-                                      >
-                                        <DownloadSimple size={18} weight="bold" />
-                                      </button>
-                                    </div>
-                                  </div>
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </motion.div>
-                  );
-                })}
-              </AnimatePresence>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    </div>
-  );
+                           <AnimatePresence initial={false}>
+                             {isActive && viewTarget === 'me' && (
+                               <motion.div
+                                 initial={{ height: 0, opacity: 0 }}
+                                 animate={{ height: 'auto', opacity: 1 }}
+                                 exit={{ height: 0, opacity: 0 }}
+                                 transition={{ duration: 0.2 }}
+                                 className="overflow-hidden"
+                               >
+                                 <div className="mx-1 mt-1 flex items-center justify-between rounded-xl bg-primary px-4 py-2 text-white">
+                                   <button
+                                     className="cursor-pointer p-1 transition-opacity hover:opacity-70"
+                                     title="Удалить"
+                                     onClick={(e) => {
+                                       e.stopPropagation();
+                                       setRecToDelete(rec);
+                                     }}
+                                   >
+                                     <Trash size={18} weight="bold" />
+                                   </button>
+                                   <div className="flex gap-4">
+                                     <button
+                                       className="cursor-pointer p-1 transition-opacity hover:opacity-70"
+                                       onClick={(e) => {
+                                         e.stopPropagation();
+                                         setRecToRename(rec);
+                                         setNewName(rec.name);
+                                       }}
+                                     >
+                                       <PencilSimple size={18} weight="bold" />
+                                     </button>
+                                     <button
+                                       className="cursor-pointer p-1 transition-opacity hover:opacity-70"
+                                       onClick={(e) => {
+                                         e.stopPropagation();
+                                         downloadRec(rec);
+                                       }}
+                                     >
+                                       <DownloadSimple size={18} weight="bold" />
+                                     </button>
+                                   </div>
+                                 </div>
+                               </motion.div>
+                             )}
+                           </AnimatePresence>
+                         </motion.div>
+                       )}
+                     </AnimatePresence>
+                   </motion.div>
+                 );
+               })}
+             </AnimatePresence>
+           </motion.div>
+         )}
+       </AnimatePresence>
+     </div>
+   </div>
+ );
 
   return (
     <div className="flex h-screen w-full overflow-hidden font-sans text-text">
@@ -400,6 +397,7 @@ export function VocalTunerPage() {
       </MobileSidebarPortal>
 
       <main className="relative flex flex-1 flex-col">
+        {/* Гамбургер-меню для мобилок (уже было) */}
         <div className="absolute top-6 left-5 z-10 md:hidden">
           <button
             onClick={() => {
@@ -411,6 +409,23 @@ export function VocalTunerPage() {
             <SidebarIcon />
           </button>
         </div>
+
+        {/* НОВОЕ: Кнопка облака, вынесенная за левую колонку! */}
+        {hasLoaded && (
+          <div className="absolute top-6 right-5 z-10 md:right-auto md:left-6">
+            <button
+              onClick={() => setIsModeInfoOpen(true)}
+              className="flex cursor-pointer items-center justify-center p-2 text-text/40 transition-colors outline-none hover:text-text"
+              title={isCloudMode ? 'Облачный режим' : 'Локальный режим'}
+            >
+              {isCloudMode ? (
+                <Cloud size={20} weight="fill" />
+              ) : (
+                <HardDrives size={20} weight="fill" />
+              )}
+            </button>
+          </div>
+        )}
 
         <AnimatePresence>
           {activeRecording && (
@@ -457,7 +472,8 @@ export function VocalTunerPage() {
                   'flex cursor-pointer items-center justify-center bg-primary text-white transition-all duration-300 hover:scale-105 active:scale-95',
                   'h-[64px] w-[64px] rounded-[24px] md:h-[72px] md:w-[72px] md:rounded-[28px]',
                   isRecording && 'animate-pulse bg-text text-primary',
-                  viewTarget === 'friend' && 'opacity-30 cursor-not-allowed pointer-events-none bg-text/10 text-text/30'
+                  viewTarget === 'friend' &&
+                    'pointer-events-none cursor-not-allowed bg-text/10 text-text/30 opacity-30',
                 )}
               >
                 {isRecording ? (
@@ -482,8 +498,8 @@ export function VocalTunerPage() {
         title={isCloudMode ? 'Облачный режим' : 'Локальный режим'}
         description={
           isCloudMode
-            ? 'Ваши аудиозаписи автоматически синхронизируются с облаком. Они надежно защищены и доступны с любого устройства при входе в аккаунт.'
-            : 'Ваши аудиозаписи сохраняются только на этом устройстве в этом браузере. Если вы очистите кэш браузера или поменяете устройство, они не перенесутся.'
+            ? 'Записи надежно сохраняются в облаке и доступны всем участникам этого дерева (если вы находитесь в совместном режиме).'
+            : 'Ваши аудиозаписи сохраняются только на этом устройстве в этом браузере. Выйти в облако можно, получив соответствующий доступ.'
         }
         icon={
           isCloudMode ? <Cloud size={32} weight="fill" /> : <HardDrives size={32} weight="fill" />

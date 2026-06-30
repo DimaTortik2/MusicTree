@@ -113,7 +113,7 @@ export const NoteCard: React.FC<Props> = ({ note, hideHeader = false }) => {
           onClick={handleDelete}
           className={cn(
             'absolute top-2 right-2 z-40 rounded-md p-1.5 transition-opacity duration-200',
-            'opacity-100 lg:opacity-0 lg:group-hover:opacity-100',
+            'opacity-100 lg:opacity-0 lg:group-hover:opacity-100 cursor-pointer',
             isLight ? 'hover:bg-black/10' : 'hover:bg-white/20',
           )}
           title="Удалить заметку"

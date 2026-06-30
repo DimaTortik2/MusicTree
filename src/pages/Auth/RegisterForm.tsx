@@ -78,10 +78,21 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onOpenQrScanner }) =
     setIsResetEmailSent(false);
     setFullName('');
     setShowPassword(false);
+
+    // Принудительно сбрасываем виджет капчи, чтобы он выдал новый токен
+    // для новой вкладки (Вход/Регистрация)
+    if (turnstileRef.current) {
+      turnstileRef.current.reset();
+    }
   }, [isLogin]);
 
   useEffect(() => {
     setCaptchaToken(null);
+
+    // Принудительно сбрасываем капчу при переходе к "Забыли пароль"
+    if (turnstileRef.current) {
+      turnstileRef.current.reset();
+    }
   }, [isForgotPassword]);
 
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);

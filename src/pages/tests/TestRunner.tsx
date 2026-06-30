@@ -1,37 +1,38 @@
-// src/app/pages/tests/TestRunner.tsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, X, ExclamationMark } from '@phosphor-icons/react';
 import { Button } from '@/shared/buttons/Button';
 import { cn } from '@/app/utils/cn';
-import { useProgressStore } from '@/app/store/useProgressStore';
 import { Modal } from '@/shared/Modal';
 import confetti from 'canvas-confetti';
 import type { MappedTest } from './useTestsData';
+
+import { useAppModeStore } from '@/app/store/useAppModeStore';
+import { useAuthStore } from '@/app/store/authStore';
+import { useCurrentProgress } from '@/app/hooks/useCurrentProgress';
 
 interface TestRunnerProps {
   test: MappedTest;
   onDirtyStateChange: (isDirty: boolean) => void;
   isReadOnly?: boolean;
-  friendPassedTests?: Record<string, any>;
 }
 
 export const TestRunner: React.FC<TestRunnerProps> = ({
   test,
   onDirtyStateChange,
   isReadOnly = false,
-  friendPassedTests,
 }) => {
-  const { passTest, clearTestResult } = useProgressStore();
-  const myPassedTests = useProgressStore((s) => s.passedTests);
-  const hasPassedSelf = !!myPassedTests[test.id];
+  const { passTest, clearTestResult, passedTests: allPassedTests } = useCurrentProgress();
+
+  const isSharedMode = !!useAppModeStore((s) => s.sharedTreeId);
+  const myId = useAuthStore((s) => s.user?.id);
+  const activeFriend = useAppModeStore((s) => s.activeSharedFriend);
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedOptions, setSelectedOptions] = useState<number[]>([]);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [userAnswers, setUserAnswers] = useState<number[][]>([]);
   const [isFinished, setIsFinished] = useState(false);
-
   const [showClearModal, setShowClearModal] = useState(false);
 
   const question = test.questions[currentIndex];
@@ -103,14 +104,12 @@ export const TestRunner: React.FC<TestRunnerProps> = ({
     clearTestResult(test.id);
     setShowClearModal(false);
 
-    // Сбрасываем локальные стейты, чтобы экран результатов пропал
     setIsFinished(false);
     setCurrentIndex(0);
     setSelectedOptions([]);
     setIsSubmitted(false);
     setUserAnswers([]);
 
-    // Скролл после извлечения из архива
     setTimeout(() => {
       document
         .getElementById(`test-item-${test.id}`)
@@ -118,13 +117,25 @@ export const TestRunner: React.FC<TestRunnerProps> = ({
     }, 100);
   };
 
-  // Блокируем прохождение теста, если режим read-only и друг его еще не прошел
+  // --- ОПРЕДЕЛЯЕМ ЧЕЙ РЕЗУЛЬТАТ ПОКАЗЫВАТЬ ---
+  let myResult = null;
+  let displayResultData = null;
+
+  if (isSharedMode && myId && activeFriend) {
+    myResult = (allPassedTests[test.id] as any)?.[myId];
+    displayResultData = isReadOnly ? (allPassedTests[test.id] as any)?.[activeFriend.id] : myResult;
+  } else {
+    myResult = allPassedTests[test.id];
+    displayResultData = myResult;
+  }
+
+  const hasPassedSelf = !!myResult;
+
+  // Блокируем, если режим read-only и друг тест еще не прошел
   if (isReadOnly && !test.isPassed) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center p-8 text-center font-sans">
-        <p className="text-lg font-medium text-text/60">
-          Друг еще не проходил этот тест.
-        </p>
+        <p className="text-lg font-medium text-text/60">Друг еще не проходил этот тест.</p>
         <p className="mt-1 text-sm text-text/40">
           Результаты появятся здесь, как только он завершит его.
         </p>
@@ -147,7 +158,7 @@ export const TestRunner: React.FC<TestRunnerProps> = ({
       : {
           score: test.score!,
           max: test.maxScore!,
-          answers: (friendPassedTests || useProgressStore.getState().passedTests)[test.id]?.userAnswers || [],
+          answers: displayResultData?.userAnswers || [],
         };
 
     const percentage = (displayResult.score / displayResult.max) * 100;
@@ -223,10 +234,8 @@ export const TestRunner: React.FC<TestRunnerProps> = ({
                 })}
               </div>
             ) : (
-              <div className="rounded-2xl bg-surface/50 border border-line/20 p-6 text-center font-sans">
-                <p className="text-base font-medium text-text/60">
-                  Детальный анализ скрыт
-                </p>
+              <div className="rounded-2xl border border-line/20 bg-surface/50 p-6 text-center font-sans">
+                <p className="text-base font-medium text-text/60">Детальный анализ скрыт</p>
                 <p className="mt-1 text-sm text-text/40">
                   Пройдите этот тест самостоятельно, чтобы увидеть ошибки и подробные ответы друга.
                 </p>

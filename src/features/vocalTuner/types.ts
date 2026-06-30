@@ -6,11 +6,12 @@ export interface NoteInfo {
 }
 
 export interface Recording {
-  id: string; 
+  id: string;
   name: string;
   time: string;
   url: string;
   dur: number;
   blob: Blob;
-  createdAt: number; 
+  createdAt: number;
+  userId?: string;
 }

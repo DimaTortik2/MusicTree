@@ -23,7 +23,6 @@ export const ViewToggle: React.FC<ViewToggleProps> = ({
   const user = useAuthStore((s) => s.user);
   const activeSharedFriend = useAppModeStore((s) => s.activeSharedFriend);
 
-  // made by technocat
   const clicksRef = useRef<number[]>([]);
   const [showEasterEgg, setShowEasterEgg] = useState(false);
 
@@ -136,22 +135,6 @@ export const ViewToggle: React.FC<ViewToggleProps> = ({
           </span>
         </div>
       </button>
-
-      {/* Easter Egg Toast */}
-      <AnimatePresence>
-        {showEasterEgg && (
-          <motion.div
-            initial={{ opacity: 0, y: 50, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.9 }}
-            className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-2xl border-2 border-primary bg-surface/80 px-4 py-3 text-xs font-semibold text-text shadow-xl backdrop-blur-md pointer-events-none"
-            style={{ boxShadow: '0 10px 30px rgba(var(--primary-rgb), 0.2)' }}
-          >
-            <span className="flex h-2 w-2 rounded-full bg-primary animate-pulse" />
-            <span>hello from gemini | by technocat</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </>
   );
 };

@@ -29,7 +29,7 @@ import { MobileSidebarPortal } from '@/shared/MobileSidebarPortal';
 import { SidebarIcon } from '@/shared/icons/sidebarIcon';
 import { ViewToggle } from '@/shared/buttons/ViewToggle';
 import { useAppModeStore } from '@/app/store/useAppModeStore';
-import { useFriendAudio } from '@/features/vocalTuner/hooks/useFriendAudio';
+import { useAuthStore } from '@/app/store/authStore';
 
 const RecordingSkeleton = () => (
   <div className="flex items-center justify-between rounded-2xl border-3 border-text/5 bg-transparent p-3 [.light_&]:border-line/60 [.light_&]:bg-surface/40">
@@ -56,7 +56,7 @@ const RecordingSkeleton = () => (
 export function VocalTunerPage() {
   const {
     phase,
-    recordings: myRecordings,
+    recordings: allWorkspaceRecordings,
     playingId,
     isPlaying,
     micError,
@@ -81,16 +81,17 @@ export function VocalTunerPage() {
   } = useVocalTuner();
 
   const isCloudMode = useVocalGlobalStore((s) => s.isCloudMode);
-  const myHasLoaded = useVocalGlobalStore((s) => s.hasLoaded);
+  const hasLoaded = useVocalGlobalStore((s) => s.hasLoaded);
 
   const activeSharedFriend = useAppModeStore((s) => s.activeSharedFriend);
+  const myId = useAuthStore((s) => s.user?.id);
   const [viewTarget, setViewTarget] = useState<'me' | 'friend'>('me');
-  const { recordings: friendRecordings, isLoading: isFriendLoading } = useFriendAudio(
-    activeSharedFriend?.id
-  );
 
-  const recordings = viewTarget === 'friend' ? friendRecordings : myRecordings;
-  const hasLoaded = viewTarget === 'me' ? myHasLoaded : !isFriendLoading;
+  // МАГИЯ: Записи уже загружены все для текущего дерева, мы просто фильтруем их локально!
+  const recordings =
+    viewTarget === 'friend'
+      ? allWorkspaceRecordings.filter((r) => r.userId === activeSharedFriend?.id)
+      : allWorkspaceRecordings.filter((r) => r.userId === myId);
 
   const [recToDelete, setRecToDelete] = useState<Recording | null>(null);
   const [recToRename, setRecToRename] = useState<Recording | null>(null);
@@ -145,16 +146,14 @@ export function VocalTunerPage() {
   }
 
   const sidebarContent = (
-    // ВАЖНО: Добавлен min-h-0 для фикса бага с флексбоксами!
     <div className="flex min-h-0 w-full flex-1 flex-col p-4 pb-0 md:h-full md:w-80 md:flex-none md:border-r md:border-line">
       <div className="mb-5 flex h-auto shrink-0 items-center justify-between pl-1">
         {activeSharedFriend ? (
-          /* made by gemini with antigravity */
           <ViewToggle
             viewTarget={viewTarget}
             onChange={setViewTarget}
             color="primary"
-            className="flex-1 mr-3"
+            className="mr-3 flex-1"
           />
         ) : (
           <div />
@@ -204,18 +203,34 @@ export function VocalTunerPage() {
               transition={{ duration: 0.3 }}
               className="flex flex-col gap-3"
             >
-              {recordings.length === 0 && !(isSaving && isCloudMode) && (
+              {recordings.length === 0 && !(isSaving && isCloudMode && viewTarget === 'me') && (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="mt-10 text-center text-sm text-text/40"
+                  className="mt-10 flex flex-col items-center justify-center px-4 text-center"
                 >
-                  Записей пока нет
+                  {viewTarget === 'friend' &&
+                  activeSharedFriend &&
+                  !activeSharedFriend.can_cloud_audio ? (
+                    <div className="flex flex-col items-center gap-2 rounded-2xl border border-line bg-surface/50 p-4">
+                      <HardDrives size={28} weight="fill" className="text-text/30" />
+                      <span className="text-sm font-medium text-text/80">
+                        У пользователя {activeSharedFriend.full_name || activeSharedFriend.username}{' '}
+                        нет доступа к облаку
+                      </span>
+                      <span className="text-xs text-text/50">
+                        Его записи сохраняются только локально на его устройстве, поэтому вы не
+                        можете их послушать.
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-sm text-text/40">Записей пока нет</span>
+                  )}
                 </motion.div>
               )}
 
               <AnimatePresence mode="popLayout" initial={false}>
-                {isSaving && isCloudMode && (
+                {isSaving && isCloudMode && viewTarget === 'me' && (
                   <motion.div
                     key="saving-skeleton"
                     layout="position"
@@ -457,7 +472,8 @@ export function VocalTunerPage() {
                   'flex cursor-pointer items-center justify-center bg-primary text-white transition-all duration-300 hover:scale-105 active:scale-95',
                   'h-[64px] w-[64px] rounded-[24px] md:h-[72px] md:w-[72px] md:rounded-[28px]',
                   isRecording && 'animate-pulse bg-text text-primary',
-                  viewTarget === 'friend' && 'opacity-30 cursor-not-allowed pointer-events-none bg-text/10 text-text/30'
+                  viewTarget === 'friend' &&
+                    'pointer-events-none cursor-not-allowed bg-text/10 text-text/30 opacity-30',
                 )}
               >
                 {isRecording ? (
@@ -482,8 +498,8 @@ export function VocalTunerPage() {
         title={isCloudMode ? 'Облачный режим' : 'Локальный режим'}
         description={
           isCloudMode
-            ? 'Ваши аудиозаписи автоматически синхронизируются с облаком. Они надежно защищены и доступны с любого устройства при входе в аккаунт.'
-            : 'Ваши аудиозаписи сохраняются только на этом устройстве в этом браузере. Если вы очистите кэш браузера или поменяете устройство, они не перенесутся.'
+            ? 'Записи надежно сохраняются в облаке и доступны всем участникам этого дерева (если вы находитесь в совместном режиме).'
+            : 'Ваши аудиозаписи сохраняются только на этом устройстве в этом браузере. Выйти в облако можно, получив соответствующий доступ.'
         }
         icon={
           isCloudMode ? <Cloud size={32} weight="fill" /> : <HardDrives size={32} weight="fill" />

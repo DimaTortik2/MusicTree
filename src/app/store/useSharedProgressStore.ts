@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { type AppState } from "./useProgressStore";
+import { useAuthStore } from "@/app/store/authStore";
 
 // Указываем <AppState>, чтобы TypeScript строго типизировал все параметры (id, state и т.д.)
 export const useSharedProgressStore = create<AppState>()(
@@ -41,15 +42,40 @@ export const useSharedProgressStore = create<AppState>()(
         })),
 
       passTest: (testId, result) =>
-        set((state) => ({
-          passedTests: { ...state.passedTests, [testId]: result },
-        })),
+        set((state) => {
+          // Берем userId безопасно из нашего стора
+          const userId = useAuthStore.getState().user?.id;
+          if (!userId) return state;
+
+          // Обходим строгую типизацию AppState для вложенного объекта
+          const currentTestState = (state.passedTests as any)[testId] || {};
+
+          return {
+            passedTests: {
+              ...state.passedTests,
+              [testId]: {
+                ...currentTestState,
+                [userId]: result, // Записываем результат только для себя
+              } as any, // 🛡️ TS обход
+            },
+          };
+        }),
 
       clearTestResult: (testId) =>
         set((state) => {
-          const newTests = { ...state.passedTests };
-          delete newTests[testId];
-          return { passedTests: newTests };
+          const userId = useAuthStore.getState().user?.id;
+          if (!userId || !(state.passedTests as any)[testId]) return state;
+
+          // Обходим строгую типизацию AppState
+          const newTestState = { ...(state.passedTests as any)[testId] };
+          delete newTestState[userId]; // Удаляем только свой результат
+
+          return {
+            passedTests: {
+              ...state.passedTests,
+              [testId]: newTestState as any, // 🛡️ TS обход
+            },
+          };
         }),
 
       passHomework: (id) =>
@@ -109,14 +135,13 @@ export const useSharedProgressStore = create<AppState>()(
     {
       name: "music-tree-shared-mode-local",
       storage: createJSONStorage(() => localStorage),
-      // Сохраняем в браузере только навигацию. 
-      // Явно приводим к Partial<AppState>, чтобы TS не ругался на то, что мы сохраняем не весь стейт
+      // Сохраняем в браузере только навигацию.
       partialize: (state) =>
         ({
           currentLesson: state.currentLesson,
           lastUncompletedLesson: state.lastUncompletedLesson,
           lessonScrollPositions: state.lessonScrollPositions,
-        } as Partial<AppState>),
-    }
-  )
+        }) as Partial<AppState>,
+    },
+  ),
 );

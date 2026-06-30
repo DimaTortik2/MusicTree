@@ -214,7 +214,7 @@ export const Avatar: React.FC<AvatarProps> = React.memo(
         )}
         {/* СЛОЙ 5: Индикатор онлайна */}
         {isOnline && (
-          <div className="absolute top-0 right-0 z-40 size-2.5 rounded-full border-2 border-background bg-access shadow-sm sm:size-3" />
+          <div className="absolute top-0 right-0 z-40 size-3.5 rounded-full border-[2.5px] border-background bg-access shadow-sm sm:size-4" />
         )}
       </div>
     );

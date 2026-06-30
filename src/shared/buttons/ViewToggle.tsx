@@ -82,6 +82,7 @@ export const ViewToggle: React.FC<ViewToggleProps> = ({
             src={profile?.avatar_url}
             lqip={profile?.avatar_lqip}
             forceGradient={profile?.use_gradient}
+            isOnline={false}
             className="size-[38px] shrink-0 md:size-[42px]"
           />
           <span className="ml-1 flex-1 truncate text-center text-sm md:text-base">Вы</span>

@@ -15,6 +15,7 @@ import { useCurrentProgress } from '@/app/hooks/useCurrentProgress';
 
 // Импортируем наш новый хук! Укажи правильный путь
 import { useLecturePageLogic } from '@/features/notes/hooks/useLecturePageLogic';
+import { useNotesStore } from '@/features/notes/store/useNotesStore';
 
 const mdxLectures = import.meta.glob('/src/content/**/*.mdx');
 const mdxLecturesCache: Record<string, React.LazyExoticComponent<React.ComponentType<any>>> = {};
@@ -122,7 +123,7 @@ const MdxContentWrapper = ({
 
 export const CurrentLecturePage = () => {
   const navigate = useNavigate();
-
+  const pendingDeletionIds = useNotesStore((s) => s.pendingDeletionIds);
   const {
     refs: { pageRef, contentRef, asideRef, notesRef },
     state: {
@@ -167,7 +168,15 @@ export const CurrentLecturePage = () => {
     }, 1000); // 1 секунды достаточно, чтобы весь макет лекции полностью загрузился и встал на свои места
     return () => clearTimeout(timer);
   }, []);
-
+  useEffect(() => {
+    if (mobilePopover) {
+      const exists = notes.some((n) => n.id === mobilePopover.noteId);
+      const isPending = pendingDeletionIds.includes(mobilePopover.noteId);
+      if (!exists || isPending) {
+        setMobilePopover(null);
+      }
+    }
+  }, [notes, pendingDeletionIds, mobilePopover, setMobilePopover]);
   return (
     <div
       ref={pageRef}
@@ -356,8 +365,10 @@ export const CurrentLecturePage = () => {
 
       {createPortal(
         <AnimatePresence>
-          {mobilePopover && (
+          {/* ИСПРАВЛЕНИЕ: Рендерим поповер только если заметка физически существует в notes */}
+          {mobilePopover && notes.some((n) => n.id === mobilePopover.noteId) && (
             <motion.div
+              key={`mobile-popover-${mobilePopover.noteId}`} // <-- ВАЖНО: Уникальный ключ для AnimatePresence
               initial={{ opacity: 0, y: 10, x: '-50%' }}
               animate={{ opacity: 1, y: 0, x: '-50%' }}
               exit={{ opacity: 0, scale: 0.95, x: '-50%' }}
@@ -370,7 +381,6 @@ export const CurrentLecturePage = () => {
                 left: '50%',
               }}
             >
-              {/* ИСПРАВЛЕНИЕ: Невидимый слой-перехватчик удален, скролл работает свободно */}
               <NoteCard
                 note={notes.find((n) => n.id === mobilePopover.noteId)!}
                 hideHeader={false}

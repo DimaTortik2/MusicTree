@@ -11,6 +11,8 @@ export interface TooltipProps {
   shortcutAction?: ShortcutAction;
   position?: 'top' | 'bottom' | 'left' | 'right';
   delay?: number;
+  trigger?: 'hover' | 'click';
+  hideAfter?: number;
   className?: string;
 }
 
@@ -27,13 +29,13 @@ export const Tooltip: React.FC<TooltipProps> = ({
   shortcutAction,
   position = 'top',
   delay = 300,
+  trigger = 'hover',
+  hideAfter,
   className,
 }) => {
   const [renderState, setRenderState] = useState<'hidden' | 'measuring' | 'visible'>('hidden');
   const [coords, setCoords] = useState({ x: 0, y: 0 });
   const [placement, setPlacement] = useState(position);
-
-  // Состояние мобильного устройства, аналогичное AppLayout
   const [isMobile, setIsMobile] = useState(false);
 
   const triggerRef = useRef<HTMLSpanElement | null>(null);
@@ -43,49 +45,82 @@ export const Tooltip: React.FC<TooltipProps> = ({
   const rawShortcut = useShortcutStore((state) =>
     shortcutAction ? state.shortcuts[shortcutAction] : null,
   );
-
   const formattedShortcut = rawShortcut ? formatShortcut(rawShortcut) : null;
 
-  // Отслеживаем размер экрана
+  // Отслеживаем мобилку
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
-    handleResize(); // Инициализация при маунте
+    handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // --- ОБРАБОТЧИКИ СОБЫТИЙ ---
   const handleMouseEnter = () => {
-    if (isMobile) return; // Игнорируем на мобилках
+    if (trigger === 'click' || isMobile) return;
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
     timeoutRef.current = setTimeout(() => setRenderState('measuring'), delay);
   };
 
   const handleMouseLeave = () => {
+    if (trigger === 'click' || isMobile) return;
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     setRenderState('hidden');
   };
 
-  // Прячем тултип при скролле и ресайзе, чтобы он не отрывался
+  const handleClick = () => {
+    if (trigger !== 'click') return;
+
+    if (renderState === 'visible' || renderState === 'measuring') {
+      setRenderState('hidden');
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    } else {
+      setRenderState('measuring');
+      if (hideAfter) {
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        timeoutRef.current = setTimeout(() => {
+          setRenderState('hidden');
+        }, hideAfter);
+      }
+    }
+  };
+
+  // Закрытие при клике ВНЕ тултипа (если это click-поповер)
+  useEffect(() => {
+    if (renderState !== 'visible' || trigger !== 'click') return;
+    const handleDocClick = (e: MouseEvent | TouchEvent) => {
+      if (
+        !triggerRef.current?.contains(e.target as Node) &&
+        !tooltipRef.current?.contains(e.target as Node)
+      ) {
+        setRenderState('hidden');
+      }
+    };
+    document.addEventListener('touchstart', handleDocClick);
+    document.addEventListener('mousedown', handleDocClick);
+    return () => {
+      document.removeEventListener('touchstart', handleDocClick);
+      document.removeEventListener('mousedown', handleDocClick);
+    };
+  }, [renderState, trigger]);
+
+  // Скрытие при скролле (чтобы тултип не "отрывался")
   useEffect(() => {
     if (renderState === 'hidden') return;
-
     const handleScrollOrResize = () => setRenderState('hidden');
-
     window.addEventListener('scroll', handleScrollOrResize, true);
     window.addEventListener('resize', handleScrollOrResize);
-
     return () => {
       window.removeEventListener('scroll', handleScrollOrResize, true);
       window.removeEventListener('resize', handleScrollOrResize);
     };
   }, [renderState]);
 
-  // УМНОЕ ПОЗИЦИОНИРОВАНИЕ
+  // --- УМНОЕ ПОЗИЦИОНИРОВАНИЕ ---
   useLayoutEffect(() => {
-    if (isMobile) return; // На мобилке расчеты не требуются
-
     if (renderState === 'measuring' && tooltipRef.current && triggerRef.current) {
-      const trigger = triggerRef.current.getBoundingClientRect();
-      const tooltip = tooltipRef.current.getBoundingClientRect();
+      const triggerRect = triggerRef.current.getBoundingClientRect();
+      const tooltipRect = tooltipRef.current.getBoundingClientRect();
 
       const viewportWidth = document.documentElement.clientWidth;
       const viewportHeight = document.documentElement.clientHeight;
@@ -97,56 +132,54 @@ export const Tooltip: React.FC<TooltipProps> = ({
       let y = 0;
       let finalPlacement = position;
 
-      // 1. Считаем идеальную позицию и отзеркаливаем при перекрытии
       switch (position) {
         case 'top':
-          x = trigger.left + trigger.width / 2 - tooltip.width / 2;
-          y = trigger.top - tooltip.height - gap;
+          x = triggerRect.left + triggerRect.width / 2 - tooltipRect.width / 2;
+          y = triggerRect.top - tooltipRect.height - gap;
           if (y < padding) {
             finalPlacement = 'bottom';
-            y = trigger.bottom + gap;
+            y = triggerRect.bottom + gap;
           }
           break;
         case 'bottom':
-          x = trigger.left + trigger.width / 2 - tooltip.width / 2;
-          y = trigger.bottom + gap;
-          if (y + tooltip.height > viewportHeight - padding) {
+          x = triggerRect.left + triggerRect.width / 2 - tooltipRect.width / 2;
+          y = triggerRect.bottom + gap;
+          if (y + tooltipRect.height > viewportHeight - padding) {
             finalPlacement = 'top';
-            y = trigger.top - tooltip.height - gap;
+            y = triggerRect.top - tooltipRect.height - gap;
           }
           break;
         case 'left':
-          x = trigger.left - tooltip.width - gap;
-          y = trigger.top + trigger.height / 2 - tooltip.height / 2;
+          x = triggerRect.left - tooltipRect.width - gap;
+          y = triggerRect.top + triggerRect.height / 2 - tooltipRect.height / 2;
           if (x < padding) {
             finalPlacement = 'right';
-            x = trigger.right + gap;
+            x = triggerRect.right + gap;
           }
           break;
         case 'right':
-          x = trigger.right + gap;
-          y = trigger.top + trigger.height / 2 - tooltip.height / 2;
-          if (x + tooltip.width > viewportWidth - padding) {
+          x = triggerRect.right + gap;
+          y = triggerRect.top + triggerRect.height / 2 - tooltipRect.height / 2;
+          if (x + tooltipRect.width > viewportWidth - padding) {
             finalPlacement = 'left';
-            x = trigger.left - tooltip.width - gap;
+            x = triggerRect.left - tooltipRect.width - gap;
           }
           break;
       }
 
-      // 2. Жестко привязываем (клемпим) по вторичной оси к границам вьюпорта
+      // Клемпим (жестко привязываем) по вторичной оси к границам экрана
       if (finalPlacement === 'top' || finalPlacement === 'bottom') {
-        x = Math.max(padding, Math.min(x, viewportWidth - tooltip.width - padding));
+        x = Math.max(padding, Math.min(x, viewportWidth - tooltipRect.width - padding));
       } else {
-        y = Math.max(padding, Math.min(y, viewportHeight - tooltip.height - padding));
+        y = Math.max(padding, Math.min(y, viewportHeight - tooltipRect.height - padding));
       }
 
       setCoords({ x, y });
       setPlacement(finalPlacement);
       setRenderState('visible');
     }
-  }, [renderState, position, isMobile]);
+  }, [renderState, position]);
 
-  // Единая верстка внутренностей
   const innerContent = (
     <>
       {content}
@@ -168,13 +201,14 @@ export const Tooltip: React.FC<TooltipProps> = ({
         ref={triggerRef}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
+        onClick={handleClick}
         className="inline-block"
       >
         {children}
       </span>
 
+      {/* Теперь рендерим Portal на любых устройствах, если юзер активировал тултип */}
       {typeof document !== 'undefined' &&
-        !isMobile &&
         createPortal(
           <>
             {renderState === 'measuring' && (

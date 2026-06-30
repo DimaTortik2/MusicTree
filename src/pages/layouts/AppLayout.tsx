@@ -34,41 +34,10 @@ const TAB_ROUTES: Record<string, string> = {
   friends: '/app/friends',
 };
 
-const DESKTOP_NAV_ITEMS = [
-  'tree',
-  'lesson',
-  'chat',
-  'homeworks',
-  'chains',
-  'vocal',
-  'tests',
-  'friends',
-  'debug',
-  'settings',
-];
-
-// ✨ Элегантное затухание через темный фон
 const pageTransitionVariants: Variants = {
-  initial: {
-    opacity: 0,
-    scale: 0.98, // Слегка уменьшено при появлении
-  },
-  animate: {
-    opacity: 1,
-    scale: 1,
-    transition: {
-      duration: 0.3,
-      ease: [0.25, 1, 0.5, 1], // Мягкий ease-out
-    },
-  },
-  exit: {
-    opacity: 0,
-    scale: 0.98, // Слегка проваливается вглубь при исчезновении
-    transition: {
-      duration: 0.2,
-      ease: [0.25, 0, 0.5, 1], // Ускоренный ease-in для быстрого исчезновения
-    },
-  },
+  initial: { opacity: 0, scale: 0.98 },
+  animate: { opacity: 1, scale: 1, transition: { duration: 0.3, ease: [0.25, 1, 0.5, 1] } },
+  exit: { opacity: 0, scale: 0.98, transition: { duration: 0.2, ease: [0.25, 0, 0.5, 1] } },
 };
 
 export const AppLayout = () => {
@@ -91,7 +60,6 @@ export const AppLayout = () => {
   useGlobalPiano();
   useAppPresence();
 
-  // ✨ Слушаем ресайз окна для переключения типа анимации
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener('resize', handleResize);
@@ -104,37 +72,54 @@ export const AppLayout = () => {
     togglePiano: () => setIsPianoActive((prev) => !prev),
   });
 
-  // Базовый ключ анимации (чтобы не анимировать внутри одной вкладки, например /app/homeworks/123)
   const transitionKey = useMemo(() => {
     const segments = location.pathname.split('/');
     return segments.slice(0, 3).join('/');
   }, [location.pathname]);
 
-  // Вычисляем ID текущей вкладки по роуту
   const currentTabId = useMemo(() => {
     const entry = Object.entries(TAB_ROUTES).find(([_, route]) => transitionKey.startsWith(route));
     return entry ? entry[0] : null;
   }, [transitionKey]);
 
-  // ✨ Логика вычисления направления (вперед = 1, назад = -1)
+  // ✨ УМНОЕ ФОРМИРОВАНИЕ ДЕСКТОПНОГО САЙДБАРА
+  const desktopNavItems = useMemo(() => {
+    if (activeSharedFriend) {
+      // Режим друга (Чат второй сверху)
+      return [
+        'friends',
+        'chat',
+        'tree',
+        'lesson',
+        'homeworks',
+        'chains',
+        'vocal',
+        'tests',
+        'debug',
+        'settings',
+      ];
+    }
+    // Соло-режим (Чата нет)
+    return [
+      'tree',
+      'lesson',
+      'homeworks',
+      'chains',
+      'vocal',
+      'tests',
+      'friends',
+      'debug',
+      'settings',
+    ];
+  }, [activeSharedFriend]);
+
   const prevTabIdRef = useRef<string | null>(currentTabId);
   const directionRef = useRef(1);
 
-  const desktopNavItems = useMemo(() => {
-    if (activeSharedFriend) {
-      const others = DESKTOP_NAV_ITEMS.filter((i) => i !== 'friends' && i !== 'chat');
-      return ['friends', 'chat', ...others];
-    }
-    return DESKTOP_NAV_ITEMS;
-  }, [activeSharedFriend]);
-
   if (currentTabId && currentTabId !== prevTabIdRef.current) {
-    // В зависимости от платформы берем нужный порядок вкладок
-    const tabOrder = isMobile ? [...activeTabs, ...inactiveTabs] : DESKTOP_NAV_ITEMS;
-
+    const tabOrder = isMobile ? [...activeTabs, ...inactiveTabs] : desktopNavItems;
     const currIdx = tabOrder.indexOf(currentTabId);
     const prevIdx = prevTabIdRef.current ? tabOrder.indexOf(prevTabIdRef.current) : -1;
-
     if (currIdx !== -1 && prevIdx !== -1) {
       directionRef.current = currIdx > prevIdx ? 1 : -1;
     }
@@ -165,9 +150,7 @@ export const AppLayout = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOverflowOpen]);
 
-  if (isSyncing) {
-    return <AuthLoader />;
-  }
+  if (isSyncing) return <AuthLoader />;
 
   const renderTabIcon = (id: string, isMobileView: boolean) => {
     const info = TABS_INFO[id];
@@ -247,14 +230,32 @@ export const AppLayout = () => {
     const isChat = id === 'chat';
     const isChatDisabled = isChat && !activeSharedFriend;
 
+    // Защита: на десктопе не рендерим выключенный чат вообще (на случай если он проскочит)
+    if (!isMobileView && isChatDisabled) return null;
+
+    // ✨ Логика Тултипа/Поповера для отключенного чата на мобилках
+    const isClickTrigger = isMobileView && isChatDisabled;
+    const tooltipTrigger = isClickTrigger ? 'click' : 'hover';
+    const tooltipContent = isClickTrigger ? 'Чат доступен только при изучении с другом' : label;
+    const hideAfterTime = isClickTrigger ? 2500 : undefined;
+
     return (
-      <Tooltip key={id} content={label} shortcutAction={shortcutAction} position={tooltipPosition}>
+      <Tooltip
+        key={id}
+        content={tooltipContent}
+        shortcutAction={shortcutAction}
+        position={tooltipPosition}
+        trigger={tooltipTrigger}
+        hideAfter={hideAfterTime}
+      >
         <NavLink
           to={route}
           onClick={(e) => {
-            if (isChatDisabled)
-              e.preventDefault(); // Запрещаем переход
-            else setIsOverflowOpen(false);
+            if (isChatDisabled) {
+              e.preventDefault(); // Запрещаем переход, работает только вызов Tooltip
+            } else {
+              setIsOverflowOpen(false);
+            }
           }}
           className={({ isActive }) =>
             cn(
@@ -266,7 +267,7 @@ export const AppLayout = () => {
                 !isMobileView &&
                 !isActive &&
                 'hover:bg-surface/40 hover:text-text',
-              isChatDisabled && 'pointer-events-none cursor-not-allowed opacity-30', // Делаем серым и некликабельным
+              isChatDisabled && 'cursor-pointer opacity-20 transition-opacity active:opacity-40', // Серая иконка для отключенного чата
             )
           }
         >
@@ -297,7 +298,7 @@ export const AppLayout = () => {
 
   return (
     <div className="relative flex h-screen w-full overflow-hidden bg-background font-sans text-text antialiased selection:bg-primary/20">
-      {/* 1. Десктопный Сайдбар (z-20) */}
+      {/* ДЕСКТОПНЫЙ САЙДБАР */}
       <aside className="z-20 hidden h-full w-16 flex-col items-center justify-between border-r-[3px] border-text/18 bg-background py-4 select-none md:flex">
         <nav className="flex w-full flex-col items-center gap-5">
           {desktopNavItems.map((id) => renderTabIcon(id, false))}
@@ -308,14 +309,10 @@ export const AppLayout = () => {
       <AmbientGlow />
       <RouteWallpaper />
 
-      {/* 2. Основная рабочая область */}
       <main className="relative z-10 flex-1 overflow-hidden bg-transparent transition-all duration-300">
-        {/* Обертка теперь relative для абсолютного позиционирования страниц */}
         <div className="relative h-full w-full">
           <SharedTreeBanner />
           <AudioUnlockOverlay />
-
-          {/* ✨ mode="wait" заставляет старую страницу исчезнуть до появления новой */}
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
               key={transitionKey}
@@ -323,7 +320,6 @@ export const AppLayout = () => {
               animate="animate"
               exit="exit"
               variants={pageTransitionVariants}
-              // ✨ Скролл-контейнером теперь является сама анимированная страница
               className="absolute inset-0 overflow-x-hidden overflow-y-auto"
             >
               {outlet}
@@ -332,9 +328,8 @@ export const AppLayout = () => {
         </div>
       </main>
 
-      {/* 3. ОБЩИЙ КОНТЕЙНЕР (z-[101]) */}
       <div className="pointer-events-none fixed right-0 bottom-0 left-0 z-[101] flex flex-col justify-end md:left-16">
-        {/* --- Мобильный Таббар --- */}
+        {/* МОБИЛЬНЫЙ ТАББАР */}
         <motion.div
           layout
           className="pointer-events-none z-10 flex w-full flex-col items-center px-4 md:hidden"
@@ -368,7 +363,6 @@ export const AppLayout = () => {
                     {renderTabIcon(id, true)}
                   </div>
                 ))}
-
                 <div className="flex flex-1 justify-center">
                   <Tooltip content="Дополнительно" position="top">
                     <button
@@ -387,7 +381,7 @@ export const AppLayout = () => {
           </div>
         </motion.div>
 
-        {/* --- Визуальное Пианино --- */}
+        {/* ПИАНИНО */}
         <AnimatePresence>
           {isPianoActive && (
             <motion.div
@@ -411,7 +405,6 @@ export const AppLayout = () => {
         </AnimatePresence>
       </div>
 
-      {/* 4. Оверлей кастомизации на мобильном */}
       {isCustomizing && (
         <div className="fixed inset-0 z-[100] animate-[slideIn_0.2s_ease-out]">
           <TabBarCustomization onClose={() => setIsCustomizing(false)} />

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useLayoutEffect } from 'react';
 import { useNotesStore } from '../store/useNotesStore';
-import { Quotes, NoteBlank } from '@phosphor-icons/react';
+import { NoteBlank } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { isColorLight } from '@/features/notes/utils/notesUtils';
 
@@ -264,51 +264,74 @@ export const NotesHighlighterEngine: React.FC<Props> = ({
       }
     });
   }, [pendingDeletionIds, containerRef]);
-  
-  return (
-    <AnimatePresence>
-      {selectionRect && selectionData && (
-        <motion.div
-          initial={{ opacity: 0, y: 10, scale: 0.95 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.95 }}
-          className="fixed z-[2000] flex items-center gap-2 rounded-xl bg-primary px-3 py-2 shadow-lg"
-          style={{
-            top: Math.max(10, selectionRect.top - 60),
-            left: Math.max(
-              10,
-              Math.min(window.innerWidth - 110, selectionRect.left + selectionRect.width / 2 - 50),
-            ),
-          }}
-        >
-          <button
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => {
-              console.log(`Перенос в чат: "${selectionData.text}"`);
-              setSelectionRect(null);
-              window.getSelection()?.removeAllRanges();
+
+return (
+  <AnimatePresence>
+    {selectionRect &&
+      selectionData &&
+      (() => {
+        // Оцениваем позицию динамически при каждом выделении
+        const isMobile = window.innerWidth < 1024;
+        const tooltipHeight = 44;
+        const tooltipWidth = 50; // Примерная ширина с 1 кнопкой
+        const gap = 10; // Отступ от текста
+
+        // Проверяем, хватает ли места до нижнего края экрана
+        const spaceBelow = window.innerHeight - selectionRect.bottom;
+
+        // Размещаем снизу только на телефонах И если хватает места до края экрана
+        const isBelow = isMobile && spaceBelow > tooltipHeight + gap;
+
+        // Расчет позиции по оси Y
+        const topPos = isBelow
+          ? selectionRect.bottom + gap
+          : Math.max(10, selectionRect.top - tooltipHeight - gap);
+
+        // Центрируем относительно выделения по оси X (с защитой от вылета за боковые края)
+        const leftPos = Math.max(
+          10,
+          Math.min(
+            window.innerWidth - tooltipWidth - 10,
+            selectionRect.left + selectionRect.width / 2 - tooltipWidth / 2,
+          ),
+        );
+
+        // Направление анимации (чтобы всегда вылетал "из текста")
+        const initialY = isBelow ? -10 : 10;
+
+        return (
+          <motion.div
+            initial={{ opacity: 0, y: initialY, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="fixed z-[2000] flex items-center justify-center rounded-xl bg-primary px-2 py-1.5 shadow-lg"
+            style={{
+              top: topPos,
+              left: leftPos,
             }}
-            className="cursor-pointer rounded-lg p-1.5 text-white transition-colors hover:bg-white/20"
-            title="Цитата"
           >
-            <Quotes size={22} weight="fill" />
-          </button>
-          <div className="h-6 w-px bg-white/30" />
-          <button
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => {
-              handlers.current.onOpenCreateModal(selectionData);
-              setSelectionRect(null);
-              window.getSelection()?.removeAllRanges();
-            }}
-            className="cursor-pointer rounded-lg p-1.5 text-white transition-colors hover:bg-white/20"
-            title="Создать заметку"
-          >
-            <NoteBlank size={22} weight="fill" />
-          </button>
-          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 border-4 border-transparent border-t-primary" />
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                handlers.current.onOpenCreateModal(selectionData);
+                setSelectionRect(null);
+                window.getSelection()?.removeAllRanges();
+              }}
+              className="flex cursor-pointer items-center justify-center rounded-lg p-1.5 text-white transition-colors hover:bg-white/20"
+              title="Создать заметку"
+            >
+              <NoteBlank size={22} weight="fill" />
+            </button>
+
+            {/* Динамический хвостик: если поповер под текстом — хвостик смотрит вверх, если над — вниз */}
+            {isBelow ? (
+              <div className="absolute -top-2 left-1/2 -translate-x-1/2 border-4 border-transparent border-b-primary" />
+            ) : (
+              <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 border-4 border-transparent border-t-primary" />
+            )}
+          </motion.div>
+        );
+      })()}
+  </AnimatePresence>
+);
 };

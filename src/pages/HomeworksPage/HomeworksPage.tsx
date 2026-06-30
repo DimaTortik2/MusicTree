@@ -1,6 +1,6 @@
 import React, { useState, useEffect, Suspense, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Check, GitFork } from '@phosphor-icons/react';
+import { Check, GitFork, HourglassHigh } from '@phosphor-icons/react';
 import { Button } from '@/shared/buttons/Button';
 import { cn } from '@/app/utils/cn';
 import confetti from 'canvas-confetti';
@@ -9,7 +9,6 @@ import { DetailLayout } from '@/shared/layouts/DetailLayout';
 import { MdxSkeleton } from '@/shared/MdxSkeleton';
 import { Modal } from '@/shared/Modal';
 import { useRememberSelection } from '@/shared/hooks/useRememberSelection';
-// ✨ Добавляем импорты framer-motion
 import { AnimatePresence, motion, type Variants } from 'framer-motion';
 import { SharedNotesContainer } from '@/features/notes/ui/SharedNotesContainer';
 import { useCurrentProgress } from '@/app/hooks/useCurrentProgress';
@@ -18,34 +17,24 @@ import { useAuthStore } from '@/app/store/authStore';
 
 const mdxFiles = import.meta.glob('/src/content/**/*.mdx');
 
-const mdxComponentsCache: Record<string, React.LazyExoticComponent<React.ComponentType<any>>> = {};
+const mdxComponentsCache: Record<string, React.LazyExoticComponent<React.ComponentType>> = {};
 for (const path in mdxFiles) {
   mdxComponentsCache[path] = React.lazy(
-    mdxFiles[path] as () => Promise<{ default: React.ComponentType<any> }>,
+    mdxFiles[path] as () => Promise<{ default: React.ComponentType }>,
   );
 }
 
-// ✨ Варианты анимации затухания (как в AppLayout)
 const contentTransitionVariants: Variants = {
-  initial: {
-    opacity: 0,
-    scale: 0.98,
-  },
+  initial: { opacity: 0, scale: 0.98 },
   animate: {
     opacity: 1,
     scale: 1,
-    transition: {
-      duration: 0.3,
-      ease: [0.25, 1, 0.5, 1],
-    },
+    transition: { duration: 0.3, ease: [0.25, 1, 0.5, 1] },
   },
   exit: {
     opacity: 0,
     scale: 0.98,
-    transition: {
-      duration: 0.2,
-      ease: [0.25, 0, 0.5, 1],
-    },
+    transition: { duration: 0.2, ease: [0.25, 0, 0.5, 1] },
   },
 };
 
@@ -60,6 +49,7 @@ export const HomeworksPage = () => {
     passedHomeworks,
     halfPassedHomeworks,
   } = useCurrentProgress();
+
   const user = useAuthStore((s) => s.user);
   const { activeSharedFriend } = useAppModeStore();
 
@@ -188,7 +178,7 @@ export const HomeworksPage = () => {
       layout="horizontal"
       title="После прохождения первого урока эта страница пополнится первыми домашними заданиями"
       description="Они будут накапливаться здесь"
-      icon={<GitFork className="size-8 sm:size-10" weight="regular" />}
+      icon={<GitFork size={32} />}
       onIconClick={() => navigate('/app/tree', { replace: true })}
       iconContainerClassName="bg-primary"
     />
@@ -198,36 +188,40 @@ export const HomeworksPage = () => {
     <>
       {data.activeGroups.map((group, i) => (
         <div key={`active-${group.lessonId}`} className="mb-2">
-          <div className="space-y-2">
-            {group.items.map((hw) => (
-              <Button
-                id={`hw-item-${hw.id}`}
-                key={hw.id}
-                variant={homeworkId === hw.id ? 'solid' : 'outline'}
-                color="homework"
-                className="h-auto w-full scale-90 flex-col items-start justify-start gap-1 p-5 shadow-lg hover:scale-92"
-                onClick={() => handleSelect(hw.id)}
-                size="md"
+          {group.items.map((hw) => (
+            <Button
+              id={`hw-item-${hw.id}`}
+              key={hw.id}
+              variant={homeworkId === hw.id ? 'solid' : 'outline'}
+              color="homework"
+              className="relative h-auto w-full scale-90 flex-col items-start justify-start gap-1 p-5 shadow-lg hover:scale-92"
+              onClick={() => handleSelect(hw.id)}
+              size="md"
+            >
+              <span
+                className={cn(
+                  'text-[22px] leading-tight font-normal tracking-wide',
+                  homeworkId === hw.id ? 'text-white' : 'text-text',
+                )}
               >
-                <span
-                  className={cn(
-                    'text-[22px] leading-tight font-normal tracking-wide',
-                    homeworkId === hw.id ? 'text-white' : 'text-text',
-                  )}
-                >
-                  {hw.title}
-                </span>
-                <span
-                  className={cn(
-                    'text-[15px] font-light',
-                    homeworkId === hw.id ? 'text-white/70' : 'text-text/40',
-                  )}
-                >
-                  {hw.lessonTitle}
-                </span>
-              </Button>
-            ))}
-          </div>
+                {hw.title}
+              </span>
+              <span
+                className={cn(
+                  'text-[15px] font-light',
+                  homeworkId === hw.id ? 'text-white/70' : 'text-text/40',
+                )}
+              >
+                {hw.lessonTitle}
+              </span>
+
+              {isSharedMode && halfPassedHomeworks?.[hw.id] && (
+                <div className="absolute -right-1.5 -bottom-1.5 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-surface shadow-md ring-2 ring-homework">
+                  <HourglassHigh weight="bold" className="text-homework" size={14} />
+                </div>
+              )}
+            </Button>
+          ))}
           {(i < data.activeGroups.length - 1 || data.archivedGroups.length > 0) && (
             <div className="mx-auto my-8 h-[3px] w-24 rounded-full bg-text/10" />
           )}
@@ -248,7 +242,7 @@ export const HomeworksPage = () => {
                   variant={isSelected ? 'solid' : 'outline'}
                   color="homework"
                   className={cn(
-                    'h-auto w-full scale-90 flex-col items-start justify-start gap-1 p-5 transition-opacity duration-300 hover:scale-92',
+                    'relative h-auto w-full scale-90 flex-col items-start justify-start gap-1 p-5 transition-opacity duration-300 hover:scale-92',
                     isArchived && 'opacity-40 hover:opacity-70',
                   )}
                   onClick={() => handleSelect(hw.id)}
@@ -269,6 +263,12 @@ export const HomeworksPage = () => {
                   >
                     {hw.lessonTitle}
                   </span>
+
+                  {isSharedMode && halfPassedHomeworks?.[hw.id] && (
+                    <div className="absolute -right-1.5 -bottom-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-surface shadow-md ring-2 ring-homework">
+                      <HourglassHigh weight="bold" className="text-homework" size={14} />
+                    </div>
+                  )}
                 </Button>
               );
             })}
@@ -291,10 +291,7 @@ export const HomeworksPage = () => {
         variants={contentTransitionVariants}
         className="flex flex-1 flex-col"
       >
-        <SharedNotesContainer
-          contentId={homeworkId}
-          className="prose max-w-none flex-1 text-[17px] leading-relaxed text-text prose-invert"
-        >
+        <SharedNotesContainer>
           {LazyMdxContent ? (
             <Suspense fallback={<MdxSkeleton />}>
               <motion.div
@@ -306,13 +303,11 @@ export const HomeworksPage = () => {
               </motion.div>
             </Suspense>
           ) : selectedHw ? (
-            <div className="h-full py-4 font-medium text-primary">
+            <div className="mt-10 text-center text-text/70">
               Файл не найден. Пожалуйста, добавьте файл по пути: {selectedHw.mdxPath}
             </div>
           ) : null}
 
-          {/* Кнопки теперь тоже внутри контейнера, они будут аккуратно находиться под текстом */}
-          {/* Кнопки теперь тоже внутри контейнера, они будут аккуратно находиться под текстом */}
           <div className="mt-16 flex shrink-0 justify-center">
             {isSelectedArchived ? (
               <Button

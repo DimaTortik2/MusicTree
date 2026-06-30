@@ -45,6 +45,7 @@ export const useSharedTreeSync = () => {
           passedTests: {},
           halfPassedLessons: {},
           unlockedChains: [],
+          halfPassedHomeworks: {},
 
           ...data.progress_state,
           currentLesson: localState.currentLesson,
@@ -118,9 +119,18 @@ export const useSharedTreeSync = () => {
                   ...(dbState.halfPassedLessons || {}),
                 };
 
-                // Если урок пройден полностью - вычищаем его из "половинок"
+                const mergedHalfPassedHw = {
+                  ...(localState.halfPassedHomeworks || {}),
+                  ...(dbState.halfPassedHomeworks || {}),
+                };
+
+                // Если урок/дз пройдено полностью - вычищаем из "половинок"
                 mergedPassedLessons.forEach((id) => {
                   delete mergedHalfPassed[id];
+                });
+
+                mergedPassedHomeworks.forEach((id) => {
+                  delete mergedHalfPassedHw[id];
                 });
 
                 useSharedProgressStore.setState({
@@ -128,6 +138,7 @@ export const useSharedTreeSync = () => {
                   passedLessons: mergedPassedLessons,
                   passedHomeworks: mergedPassedHomeworks,
                   halfPassedLessons: mergedHalfPassed,
+                  halfPassedHomeworks: mergedHalfPassedHw,
                   // Сохраняем локальные данные скролла и навигации
                   currentLesson: localState.currentLesson,
                   lastUncompletedLesson: localState.lastUncompletedLesson,

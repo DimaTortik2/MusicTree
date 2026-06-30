@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { persist, createJSONStorage } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
 import { type AppState } from "./useProgressStore";
 import { useAuthStore } from "@/app/store/authStore";
 
@@ -16,6 +16,7 @@ export const useSharedProgressStore = create<AppState>()(
       audioRecordIds: [],
       lessonScrollPositions: {},
       halfPassedLessons: {}, // 🔥 НОВОЕ
+      halfPassedHomeworks: {},
 
       // Методы прогресса (теперь TS сам знает, что id - это string, а state - это AppState)
       passLesson: (id) =>
@@ -78,9 +79,19 @@ export const useSharedProgressStore = create<AppState>()(
           };
         }),
 
-      passHomework: (id) =>
+    passHomework: (id) =>
+        set((state) => {
+          const newHalf = { ...state.halfPassedHomeworks };
+          delete newHalf[id];
+          return {
+            passedHomeworks: [...new Set([...state.passedHomeworks, id])],
+            halfPassedHomeworks: newHalf,
+          };
+        }),
+
+      halfPassHomework: (id, userId) =>
         set((state) => ({
-          passedHomeworks: [...new Set([...state.passedHomeworks, id])],
+          halfPassedHomeworks: { ...state.halfPassedHomeworks, [id]: userId },
         })),
 
       returnHomeworkFromArchive: (id) =>

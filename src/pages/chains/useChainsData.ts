@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
-import { useProgressStore } from '@/app/store/useProgressStore';
-import { contentConfig, chainsConfig, type ChainConfig } from '@/contentConfig';
+import { useMemo } from "react";
+import { type ChainConfig, chainsConfig, contentConfig } from "@/contentConfig";
+import { useCurrentProgress } from "@/app/hooks/useCurrentProgress";
 
 export interface MappedChain extends ChainConfig {
   lessonId: string;
@@ -8,12 +8,15 @@ export interface MappedChain extends ChainConfig {
 }
 
 export const useChainsData = () => {
-  const passedLessons = useProgressStore((s) => s.passedLessons);
+  const { passedLessons } = useCurrentProgress();
 
   return useMemo(() => {
     // 1. Быстро собираем ID всех разблокированных звеньев и информацию об их уроках.
     const unlockedChainIds = new Set<string>();
-    const chainToLessonMap = new Map<string, { lessonId: string; lessonTitle: string }>();
+    const chainToLessonMap = new Map<
+      string,
+      { lessonId: string; lessonTitle: string }
+    >();
 
     contentConfig.forEach((lesson) => {
       if (passedLessons.includes(lesson.id) && lesson.linkedChains) {
@@ -36,8 +39,8 @@ export const useChainsData = () => {
         const lessonInfo = chainToLessonMap.get(chain.id);
         return {
           ...chain,
-          lessonId: lessonInfo?.lessonId ?? '',
-          lessonTitle: lessonInfo?.lessonTitle ?? '',
+          lessonId: lessonInfo?.lessonId ?? "",
+          lessonTitle: lessonInfo?.lessonTitle ?? "",
         };
       });
 

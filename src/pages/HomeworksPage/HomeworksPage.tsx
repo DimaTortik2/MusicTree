@@ -1,7 +1,6 @@
 import React, { useState, useEffect, Suspense, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useProgressStore } from '@/app/store/useProgressStore';
-import { GitFork } from '@phosphor-icons/react';
+import { Check, GitFork } from '@phosphor-icons/react';
 import { Button } from '@/shared/buttons/Button';
 import { cn } from '@/app/utils/cn';
 import confetti from 'canvas-confetti';
@@ -13,6 +12,9 @@ import { useRememberSelection } from '@/shared/hooks/useRememberSelection';
 // ✨ Добавляем импорты framer-motion
 import { AnimatePresence, motion, type Variants } from 'framer-motion';
 import { SharedNotesContainer } from '@/features/notes/ui/SharedNotesContainer';
+import { useCurrentProgress } from '@/app/hooks/useCurrentProgress';
+import { useAppModeStore } from '@/app/store/useAppModeStore';
+import { useAuthStore } from '@/app/store/authStore';
 
 const mdxFiles = import.meta.glob('/src/content/**/*.mdx');
 
@@ -51,8 +53,22 @@ export const HomeworksPage = () => {
   const navigate = useNavigate();
   const { homeworkId } = useParams();
 
-  const { passHomework, returnHomeworkFromArchive, passedHomeworks } = useProgressStore();
+  const {
+    passHomework,
+    halfPassHomework,
+    returnHomeworkFromArchive,
+    passedHomeworks,
+    halfPassedHomeworks,
+  } = useCurrentProgress();
+  const user = useAuthStore((s) => s.user);
+  const { activeSharedFriend } = useAppModeStore();
+
   const data = useHomeworksData();
+
+  const isSharedMode = !!activeSharedFriend;
+  const whoFinishedFirst = halfPassedHomeworks?.[homeworkId || ''];
+  const iFinishedFirst = isSharedMode && whoFinishedFirst === user?.id;
+  const friendFinishedFirst = isSharedMode && !!whoFinishedFirst && whoFinishedFirst !== user?.id;
 
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
@@ -135,7 +151,13 @@ export const HomeworksPage = () => {
     if (!homeworkId) return;
 
     fireConfetti();
-    passHomework(homeworkId);
+
+    if (isSharedMode && !friendFinishedFirst && !iFinishedFirst && user) {
+      halfPassHomework(homeworkId, user.id);
+    } else {
+      passHomework(homeworkId);
+    }
+
     setIsMobileOpen(false);
 
     setTimeout(() => {
@@ -259,52 +281,93 @@ export const HomeworksPage = () => {
     </>
   );
 
-const DetailContent = (
-  <AnimatePresence mode="wait">
-    <motion.div
-      key={homeworkId || 'empty'}
-      initial="initial"
-      animate="animate"
-      exit="exit"
-      variants={contentTransitionVariants}
-      className="flex flex-1 flex-col"
-    >
-      <SharedNotesContainer
-        contentId={homeworkId}
-        className="prose max-w-none flex-1 text-[17px] leading-relaxed text-text prose-invert"
+  const DetailContent = (
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={homeworkId || 'empty'}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        variants={contentTransitionVariants}
+        className="flex flex-1 flex-col"
       >
-        {LazyMdxContent ? (
-          <Suspense fallback={<MdxSkeleton />}>
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, ease: 'easeOut' }}
-            >
-              <LazyMdxContent />
-            </motion.div>
-          </Suspense>
-        ) : selectedHw ? (
-          <div className="h-full py-4 font-medium text-primary">
-            Файл не найден. Пожалуйста, добавьте файл по пути: {selectedHw.mdxPath}
-          </div>
-        ) : null}
+        <SharedNotesContainer
+          contentId={homeworkId}
+          className="prose max-w-none flex-1 text-[17px] leading-relaxed text-text prose-invert"
+        >
+          {LazyMdxContent ? (
+            <Suspense fallback={<MdxSkeleton />}>
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, ease: 'easeOut' }}
+              >
+                <LazyMdxContent />
+              </motion.div>
+            </Suspense>
+          ) : selectedHw ? (
+            <div className="h-full py-4 font-medium text-primary">
+              Файл не найден. Пожалуйста, добавьте файл по пути: {selectedHw.mdxPath}
+            </div>
+          ) : null}
 
-        {/* Кнопки теперь тоже внутри контейнера, они будут аккуратно находиться под текстом */}
-        <div className="mt-16 flex shrink-0 justify-center">
-          {isSelectedArchived ? (
-            <Button variant="outline" color="homework" size="md" onClick={handleReturnFromArchive}>
-              Вернуть из архива
-            </Button>
-          ) : (
-            <Button variant="outline" color="homework" size="md" onClick={handleComplete}>
-              Выполнить
-            </Button>
-          )}
-        </div>
-      </SharedNotesContainer>
-    </motion.div>
-  </AnimatePresence>
-);
+          {/* Кнопки теперь тоже внутри контейнера, они будут аккуратно находиться под текстом */}
+          {/* Кнопки теперь тоже внутри контейнера, они будут аккуратно находиться под текстом */}
+          <div className="mt-16 flex shrink-0 justify-center">
+            {isSelectedArchived ? (
+              <Button
+                variant="outline"
+                color="homework"
+                size="md"
+                onClick={handleReturnFromArchive}
+              >
+                Вернуть из архива
+              </Button>
+            ) : iFinishedFirst ? (
+              <Button
+                variant="outline"
+                color="homework"
+                size="md"
+                className="pointer-events-none flex items-center gap-2 opacity-70"
+              >
+                <span>Я выполнил</span>
+                <div className="relative ml-1 flex h-5 w-5 items-center justify-center">
+                  <Check
+                    size={18}
+                    weight="bold"
+                    className="absolute left-0 text-current opacity-40"
+                  />
+                  <Check size={18} weight="bold" className="absolute left-1.5 text-current" />
+                </div>
+              </Button>
+            ) : friendFinishedFirst ? (
+              <Button
+                variant="outline"
+                color="homework"
+                size="md"
+                onClick={handleComplete}
+                className="flex items-center gap-2"
+              >
+                <span>Выполнить</span>
+                <div className="relative ml-1 flex h-5 w-5 items-center justify-center">
+                  <Check
+                    size={18}
+                    weight="bold"
+                    className="absolute left-0 text-current opacity-40"
+                  />
+                  <Check size={18} weight="bold" className="absolute left-1.5 text-current" />
+                </div>
+              </Button>
+            ) : (
+              <Button variant="outline" color="homework" size="md" onClick={handleComplete}>
+                Выполнить
+              </Button>
+            )}
+          </div>
+        </SharedNotesContainer>
+      </motion.div>
+    </AnimatePresence>
+  );
 
   return (
     <DetailLayout

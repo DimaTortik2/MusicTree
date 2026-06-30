@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import { useProgressStore } from '@/app/store/useProgressStore';
 import { contentConfig, homeworksConfig, type HomeworkConfig } from '@/contentConfig';
+import { useCurrentProgress } from '@/app/hooks/useCurrentProgress';
 
 export interface MappedHomework extends HomeworkConfig {
   lessonId: string;
@@ -14,8 +14,7 @@ export interface HomeworkGroup {
 }
 
 export const useHomeworksData = () => {
-  const passedLessons = useProgressStore((s) => s.passedLessons);
-  const passedHomeworks = useProgressStore((s) => s.passedHomeworks);
+  const { passedLessons, passedHomeworks } = useCurrentProgress();
 
   return useMemo(() => {
     const activeMap = new Map<string, HomeworkGroup>();

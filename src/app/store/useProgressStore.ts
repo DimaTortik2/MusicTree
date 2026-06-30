@@ -19,6 +19,7 @@ export interface AppState {
   currentLesson: string | null;
   lastUncompletedLesson: string | null; // <-- НОВОЕ ПОЛЕ
   halfPassedLessons: Record<string, string>;
+  halfPassedHomeworks: Record<string, string>;
   // Настройки
   theme: "dark" | "light";
   mediaVolume: number;
@@ -55,6 +56,7 @@ export interface AppState {
   // Экшены
   passLesson: (id: string) => void;
   halfPassLesson: (id: string, userId: string) => void;
+  halfPassHomework: (id: string, userId: string) => void;
   setCurrentLesson: (id: string) => void;
   passTest: (testId: string, result: TestResult) => void;
   clearTestResult: (testId: string) => void;
@@ -124,7 +126,9 @@ export const useProgressStore = create<AppState>()(
       passedTests: {},
       currentLesson: "lesson_1", // Начинаем с Введения
       lastUncompletedLesson: "lesson_1", // <-- Инициализируем первым уроком
+
       halfPassedLessons: {},
+      halfPassedHomeworks: {},
 
       theme: "dark", // Жесткий старт с темной темы по ТЗ
       mediaVolume: 50,
@@ -142,7 +146,7 @@ export const useProgressStore = create<AppState>()(
         "debug",
         "settings",
         "customize",
-        "chat"
+        "chat",
       ],
       audioRecordIds: [],
 
@@ -207,9 +211,19 @@ export const useProgressStore = create<AppState>()(
         }),
       setActiveTabs: (tabs) => set({ activeTabs: tabs }),
       setInactiveTabs: (tabs) => set({ inactiveTabs: tabs }),
-      passHomework: (id) =>
+   passHomework: (id) =>
+        set((state) => {
+          const newHalf = { ...state.halfPassedHomeworks };
+          delete newHalf[id];
+          return {
+            passedHomeworks: [...new Set([...state.passedHomeworks, id])],
+            halfPassedHomeworks: newHalf,
+          };
+        }),
+
+      halfPassHomework: (id, userId) =>
         set((state) => ({
-          passedHomeworks: [...new Set([...state.passedHomeworks, id])],
+          halfPassedHomeworks: { ...state.halfPassedHomeworks, [id]: userId },
         })),
 
       returnHomeworkFromArchive: (id) =>

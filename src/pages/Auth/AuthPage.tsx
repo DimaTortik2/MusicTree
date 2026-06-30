@@ -7,7 +7,6 @@ import { supabase } from '@/shared/lib/supabase';
 import { GradientQrCode } from '@/shared/GradientQrCode';
 import { QrScannerModal } from '@/shared/QrScannerModal';
 import { useBlobTransition } from '@/app/store/useBlobTransition';
-import { useNavigate } from 'react-router';
 
 const DITHER_NOISE =
   "data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='4' numOctaves='1' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E";
@@ -32,7 +31,6 @@ const SCRIM_MASK = `radial-gradient(
 export const AuthPage = () => {
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
-  const navigate = useNavigate();
   const { startTransition } = useBlobTransition();
   const translateX = useTransform(mouseX, [-1, 1], [20, -20]);
   const translateY = useTransform(mouseY, [-1, 1], [20, -20]);
@@ -61,17 +59,12 @@ export const AuthPage = () => {
 
   useEffect(() => {
     const handleQrRedirect = (link: string) => {
-      try {
-        const url = new URL(link);
-        // Запускаем нашу анимацию волн и переходим через Router
-        startTransition(() => {
-          navigate(url.pathname + url.search);
-        });
-      } catch (e) {
-        // Фолбек, если URL какой-то нестандартный
+      // Запускаем нашу анимацию волн, а затем жестко переходим по ссылке Supabase
+      startTransition(() => {
         window.location.href = link;
-      }
+      });
     };
+
     // 🔥 БОНУС: Если отсканировали штатной камерой телефона, он сам откроет этот URL
     // Мы ловим его и автоматически перенаправляем на авторизацию
     const params = new URLSearchParams(window.location.search);
@@ -124,7 +117,7 @@ export const AuthPage = () => {
       channel.unsubscribe();
       clearInterval(fallbackInterval);
     };
-  }, [navigate, startTransition]);
+  }, [startTransition]);
 
   return (
     <div className="relative flex min-h-dvh w-full overflow-hidden bg-background font-sans text-text">

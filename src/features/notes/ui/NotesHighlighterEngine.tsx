@@ -80,13 +80,13 @@ export const NotesHighlighterEngine: React.FC<Props> = ({
       }
     };
 
+    document.addEventListener('selectionchange', handleSelection);
     document.addEventListener('mouseup', handleSelection);
-    document.addEventListener('touchend', handleSelection);
     window.addEventListener('scroll', handleScroll, { passive: true, capture: true });
 
     return () => {
+      document.removeEventListener('selectionchange', handleSelection);
       document.removeEventListener('mouseup', handleSelection);
-      document.removeEventListener('touchend', handleSelection);
       window.removeEventListener('scroll', handleScroll, { capture: true });
     };
   }, [containerRef]);
@@ -239,25 +239,32 @@ export const NotesHighlighterEngine: React.FC<Props> = ({
   useEffect(() => {
     if (!containerRef.current) return;
 
-    // Находим все маркеры
     const allMarks = containerRef.current.querySelectorAll<HTMLElement>('mark.mt-shared-note');
 
     allMarks.forEach((mark) => {
       const noteId = mark.dataset.noteId;
       if (!noteId) return;
 
-      // Если заметка в процессе удаления - делаем маркер прозрачным
       if (pendingDeletionIds.includes(noteId)) {
-        mark.style.opacity = '0';
-        mark.style.pointerEvents = 'none'; // Чтобы нельзя было случайно кликнуть
+        // Убираем фон и тени, а цвет текста возвращаем к дефолтному
+        mark.style.backgroundColor = 'transparent';
+        mark.style.color = 'inherit';
+        mark.style.boxShadow = 'none';
+        mark.style.pointerEvents = 'none';
       } else {
-        // Если нажали "Отмена" - возвращаем видимость
-        mark.style.opacity = '1';
+        // Если отменили удаление - восстанавливаем цвета из стора Zustand
+        // Получаем актуальный стейт через getState, чтобы не ререндерить этот компонент при добавлении новых заметок
+        const note = useNotesStore.getState().notes.find((n) => n.id === noteId);
+        if (note) {
+          mark.style.backgroundColor = note.color;
+          mark.style.color = isColorLight(note.color) ? '#0f0510' : '#ffffff';
+        }
+        mark.style.boxShadow = ''; // Пустая строка вернет тень от tailwind-классов
         mark.style.pointerEvents = 'auto';
       }
     });
   }, [pendingDeletionIds, containerRef]);
-
+  
   return (
     <AnimatePresence>
       {selectionRect && selectionData && (

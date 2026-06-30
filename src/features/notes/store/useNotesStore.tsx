@@ -143,7 +143,7 @@ export const useNotesStore = create<NotesState>((set, get) => ({
       <div className="flex w-full items-center justify-between gap-3">
         <span>Заметка удалена</span>
         <button
-          className="rounded-md bg-primary/10 px-2 py-1 font-medium text-primary transition-colors hover:bg-primary/20"
+          className="rounded-md bg-primary/10 px-2 py-1 font-medium text-primary transition-colors hover:bg-primary/20 cursor-pointer"
           onClick={(e) => {
             e.stopPropagation();
             isUndone = true;

@@ -1,4 +1,4 @@
-import React, { useRef, useState, useId } from 'react';
+import React, { useId } from 'react';
 import { motion, AnimatePresence } from 'framer-motion'; // <-- Добавили AnimatePresence
 import { cn } from '@/app/utils/cn';
 import { UserAvatar } from '@/shared/UserAvatar';
@@ -22,9 +22,6 @@ export const ViewToggle: React.FC<ViewToggleProps> = ({
   const user = useAuthStore((s) => s.user);
   const activeSharedFriend = useAppModeStore((s) => s.activeSharedFriend);
 
-  const clicksRef = useRef<number[]>([]);
-  const [showEasterEgg, setShowEasterEgg] = useState(false);
-
   const uniqueId = useId();
 
   if (!activeSharedFriend) return null;
@@ -36,17 +33,6 @@ export const ViewToggle: React.FC<ViewToggleProps> = ({
 
   const handleToggle = () => {
     onChange(viewTarget === 'me' ? 'friend' : 'me');
-
-    const now = Date.now();
-    const recentClicks = clicksRef.current.filter((t) => now - t <= 2000);
-    recentClicks.push(now);
-    clicksRef.current = recentClicks;
-
-    if (recentClicks.length >= 5) {
-      setShowEasterEgg(true);
-      clicksRef.current = [];
-      setTimeout(() => setShowEasterEgg(false), 3000);
-    }
   };
 
   return (

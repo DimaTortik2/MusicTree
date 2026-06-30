@@ -152,9 +152,9 @@ export function VocalTunerPage() {
      {activeSharedFriend && (
        <div
          className={cn(
-           'sticky top-0 z-10 border-b-[3px] px-4 py-4 backdrop-blur-lg transition-colors duration-300 md:px-8',
+           'sticky top-0 z-10 border-b-[3px] px-4 py-4 transition-colors duration-300 md:px-8 md:backdrop-blur-lg',
            isSidebarScrolled
-             ? 'border-text/10 bg-background/30'
+             ? 'border-text/10 bg-background md:bg-background/30'
              : 'border-transparent bg-transparent',
          )}
        >

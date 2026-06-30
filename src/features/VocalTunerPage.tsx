@@ -144,221 +144,221 @@ export function VocalTunerPage() {
       </div>
     );
   }
-  const sidebarContent = (
-    <div
-      className="custom-scroll relative flex min-h-0 w-full flex-1 flex-col overflow-y-auto border-text/10 md:h-full md:w-[360px] md:flex-none md:border-r-[3px] lg:w-[420px]"
-      onScroll={(e) => setIsSidebarScrolled(e.currentTarget.scrollTop > 5)}
-    >
-      {activeSharedFriend && (
-        <div
-          className={cn(
-            'sticky top-0 z-10 border-b-[3px] px-4 py-4 backdrop-blur-lg transition-colors duration-300 md:px-8',
-            isSidebarScrolled
-              ? 'border-text/10 bg-background/30'
-              : 'border-transparent bg-transparent',
-          )}
-        >
-          <ViewToggle viewTarget={viewTarget} onChange={setViewTarget} color="primary" />
-        </div>
-      )}
+ const sidebarContent = (
+   <div
+     className="custom-scroll relative flex min-h-0 w-full flex-1 flex-col overflow-y-auto border-text/10 md:h-full md:w-[320px] md:flex-none md:border-r-[3px] lg:w-[380px]"
+     onScroll={(e) => setIsSidebarScrolled(e.currentTarget.scrollTop > 5)}
+   >
+     {activeSharedFriend && (
+       <div
+         className={cn(
+           'sticky top-0 z-10 border-b-[3px] px-4 py-4 backdrop-blur-lg transition-colors duration-300 md:px-8',
+           isSidebarScrolled
+             ? 'border-text/10 bg-background/30'
+             : 'border-transparent bg-transparent',
+         )}
+       >
+         <ViewToggle viewTarget={viewTarget} onChange={setViewTarget} color="primary" />
+       </div>
+     )}
 
-      <div className={cn('flex-1 px-4 pb-24 md:px-8', !activeSharedFriend && 'pt-6')}>
-        <AnimatePresence mode="wait">
-          {!hasLoaded ? (
-            <motion.div
-              key="loading-skeletons"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0, scale: 0.98, filter: 'blur(4px)' }}
-              transition={{ duration: 0.3, ease: 'easeOut' }}
-              className="flex flex-col gap-3"
-            >
-              {[1, 2, 3, 4].map((i) => (
-                <RecordingSkeleton key={`load-${i}`} />
-              ))}
-            </motion.div>
-          ) : (
-            <motion.div
-              key="recordings-list"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.3 }}
-              className="flex flex-col gap-3"
-            >
-              {recordings.length === 0 && !(isSaving && isCloudMode && viewTarget === 'me') && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mt-10 flex flex-col items-center justify-center px-4 text-center"
-                >
-                  {viewTarget === 'friend' &&
-                  activeSharedFriend &&
-                  !activeSharedFriend.can_cloud_audio ? (
-                    <div className="flex flex-col items-center gap-2 rounded-2xl border border-line bg-surface/50 p-4">
-                      <HardDrives size={28} weight="fill" className="text-text/30" />
-                      <span className="text-sm font-medium text-text/80">
-                        У пользователя {activeSharedFriend.full_name || activeSharedFriend.username}{' '}
-                        нет доступа к облаку
-                      </span>
-                      <span className="text-xs text-text/50">
-                        Его записи сохраняются только локально на его устройстве, поэтому вы не
-                        можете их послушать.
-                      </span>
-                    </div>
-                  ) : (
-                    <span className="text-sm text-text/40">Записей пока нет</span>
-                  )}
-                </motion.div>
-              )}
+     <div className={cn('flex-1 px-4 pb-24 md:px-8', !activeSharedFriend && 'pt-6')}>
+       <AnimatePresence mode="wait">
+         {!hasLoaded ? (
+           <motion.div
+             key="loading-skeletons"
+             initial={{ opacity: 0 }}
+             animate={{ opacity: 1 }}
+             exit={{ opacity: 0, scale: 0.98, filter: 'blur(4px)' }}
+             transition={{ duration: 0.3, ease: 'easeOut' }}
+             className="flex flex-col gap-3"
+           >
+             {[1, 2, 3, 4].map((i) => (
+               <RecordingSkeleton key={`load-${i}`} />
+             ))}
+           </motion.div>
+         ) : (
+           <motion.div
+             key="recordings-list"
+             initial={{ opacity: 0 }}
+             animate={{ opacity: 1 }}
+             transition={{ duration: 0.3 }}
+             className="flex flex-col gap-3"
+           >
+             {recordings.length === 0 && !(isSaving && isCloudMode && viewTarget === 'me') && (
+               <motion.div
+                 initial={{ opacity: 0, y: 10 }}
+                 animate={{ opacity: 1, y: 0 }}
+                 className="mt-10 flex flex-col items-center justify-center px-4 text-center"
+               >
+                 {viewTarget === 'friend' &&
+                 activeSharedFriend &&
+                 !activeSharedFriend.can_cloud_audio ? (
+                   <div className="flex flex-col items-center gap-2 rounded-2xl border border-line bg-surface/50 p-4">
+                     <HardDrives size={28} weight="fill" className="text-text/30" />
+                     <span className="text-sm font-medium text-text/80">
+                       У пользователя {activeSharedFriend.full_name || activeSharedFriend.username}{' '}
+                       нет доступа к облаку
+                     </span>
+                     <span className="text-xs text-text/50">
+                       Его записи сохраняются только локально на его устройстве, поэтому вы не
+                       можете их послушать.
+                     </span>
+                   </div>
+                 ) : (
+                   <span className="text-sm text-text/40">Записей пока нет</span>
+                 )}
+               </motion.div>
+             )}
 
-              <AnimatePresence mode="popLayout" initial={false}>
-                {isSaving && isCloudMode && viewTarget === 'me' && (
-                  <motion.div
-                    key="saving-skeleton"
-                    layout="position"
-                    initial={{ opacity: 0, y: -15, scale: 0.96 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.96, y: -15 }}
-                    transition={{ type: 'spring', stiffness: 450, damping: 35 }}
-                  >
-                    <RecordingSkeleton />
-                  </motion.div>
-                )}
+             <AnimatePresence mode="popLayout" initial={false}>
+               {isSaving && isCloudMode && viewTarget === 'me' && (
+                 <motion.div
+                   key="saving-skeleton"
+                   layout="position"
+                   initial={{ opacity: 0, y: -15, scale: 0.96 }}
+                   animate={{ opacity: 1, y: 0, scale: 1 }}
+                   exit={{ opacity: 0, scale: 0.96, y: -15 }}
+                   transition={{ type: 'spring', stiffness: 450, damping: 35 }}
+                 >
+                   <RecordingSkeleton />
+                 </motion.div>
+               )}
 
-                {recordings.map((rec) => {
-                  const isActive = playingId === rec.id;
-                  const isCurrentlyPlaying = isActive && isPlaying;
-                  const showDeletingSkeleton = deletingIds.includes(rec.id) && isCloudMode;
+               {recordings.map((rec) => {
+                 const isActive = playingId === rec.id;
+                 const isCurrentlyPlaying = isActive && isPlaying;
+                 const showDeletingSkeleton = deletingIds.includes(rec.id) && isCloudMode;
 
-                  return (
-                    <motion.div
-                      key={rec.id}
-                      layout="position"
-                      initial={{ opacity: 0, y: 15, scale: 0.96 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.96, y: -15, transition: { duration: 0.15 } }}
-                      transition={{ type: 'spring', stiffness: 450, damping: 35 }}
-                    >
-                      <AnimatePresence mode="popLayout" initial={false}>
-                        {showDeletingSkeleton ? (
-                          <motion.div
-                            key="skeleton"
-                            initial={{ opacity: 0, filter: 'blur(4px)' }}
-                            animate={{ opacity: 0.5, filter: 'blur(0px)' }}
-                            exit={{ opacity: 0, filter: 'blur(4px)' }}
-                            transition={{ duration: 0.2 }}
-                            className="pointer-events-none grayscale"
-                          >
-                            <RecordingSkeleton />
-                          </motion.div>
-                        ) : (
-                          <motion.div
-                            key="content"
-                            initial={{ opacity: 0, filter: 'blur(4px)' }}
-                            animate={{ opacity: 1, filter: 'blur(0px)' }}
-                            exit={{ opacity: 0, filter: 'blur(4px)' }}
-                            transition={{ duration: 0.2 }}
-                            className="flex flex-col gap-1"
-                          >
-                            <div
-                              className={cn(
-                                'group flex cursor-pointer items-center justify-between rounded-2xl border-3 p-3 transition-all duration-300',
-                                isActive
-                                  ? 'border-primary bg-primary text-white shadow-md'
-                                  : 'border-primary bg-transparent text-text hover:bg-primary/10 [.light_&]:border-line [.light_&]:bg-surface [.light_&]:hover:border-primary/40 [.light_&]:hover:bg-primary/5',
-                              )}
-                              onClick={() => togglePlay(rec)}
-                            >
-                              <div
-                                className={cn(
-                                  'flex shrink-0 items-center justify-center p-1 transition-colors',
-                                  isActive
-                                    ? 'text-white hover:text-white/70'
-                                    : 'text-text group-hover:text-primary',
-                                )}
-                              >
-                                {isCurrentlyPlaying ? (
-                                  <Pause weight="fill" size={20} />
-                                ) : (
-                                  <Play weight="fill" size={20} />
-                                )}
-                              </div>
+                 return (
+                   <motion.div
+                     key={rec.id}
+                     layout="position"
+                     initial={{ opacity: 0, y: 15, scale: 0.96 }}
+                     animate={{ opacity: 1, y: 0, scale: 1 }}
+                     exit={{ opacity: 0, scale: 0.96, y: -15, transition: { duration: 0.15 } }}
+                     transition={{ type: 'spring', stiffness: 450, damping: 35 }}
+                   >
+                     <AnimatePresence mode="popLayout" initial={false}>
+                       {showDeletingSkeleton ? (
+                         <motion.div
+                           key="skeleton"
+                           initial={{ opacity: 0, filter: 'blur(4px)' }}
+                           animate={{ opacity: 0.5, filter: 'blur(0px)' }}
+                           exit={{ opacity: 0, filter: 'blur(4px)' }}
+                           transition={{ duration: 0.2 }}
+                           className="pointer-events-none grayscale"
+                         >
+                           <RecordingSkeleton />
+                         </motion.div>
+                       ) : (
+                         <motion.div
+                           key="content"
+                           initial={{ opacity: 0, filter: 'blur(4px)' }}
+                           animate={{ opacity: 1, filter: 'blur(0px)' }}
+                           exit={{ opacity: 0, filter: 'blur(4px)' }}
+                           transition={{ duration: 0.2 }}
+                           className="flex flex-col gap-1"
+                         >
+                           <div
+                             className={cn(
+                               'group flex cursor-pointer items-center justify-between rounded-2xl border-3 p-3 transition-all duration-300',
+                               isActive
+                                 ? 'border-primary bg-primary text-white shadow-md'
+                                 : 'border-primary bg-transparent text-text hover:bg-primary/10 [.light_&]:border-line [.light_&]:bg-surface [.light_&]:hover:border-primary/40 [.light_&]:hover:bg-primary/5',
+                             )}
+                             onClick={() => togglePlay(rec)}
+                           >
+                             <div
+                               className={cn(
+                                 'flex shrink-0 items-center justify-center p-1 transition-colors',
+                                 isActive
+                                   ? 'text-white hover:text-white/70'
+                                   : 'text-text group-hover:text-primary',
+                               )}
+                             >
+                               {isCurrentlyPlaying ? (
+                                 <Pause weight="fill" size={20} />
+                               ) : (
+                                 <Play weight="fill" size={20} />
+                               )}
+                             </div>
 
-                              <MiniWaveform active={isActive} />
+                             <MiniWaveform active={isActive} />
 
-                              {viewTarget === 'me' && (
-                                <button
-                                  className={cn(
-                                    'shrink-0 cursor-pointer p-1 transition-colors outline-none',
-                                    isActive
-                                      ? 'text-white hover:opacity-70'
-                                      : 'text-text group-hover:text-primary',
-                                  )}
-                                  onClick={(e) => handleThreeDotsClick(e, rec)}
-                                >
-                                  <DotsThreeVertical weight="bold" size={24} />
-                                </button>
-                              )}
-                            </div>
+                             {viewTarget === 'me' && (
+                               <button
+                                 className={cn(
+                                   'shrink-0 cursor-pointer p-1 transition-colors outline-none',
+                                   isActive
+                                     ? 'text-white hover:opacity-70'
+                                     : 'text-text group-hover:text-primary',
+                                 )}
+                                 onClick={(e) => handleThreeDotsClick(e, rec)}
+                               >
+                                 <DotsThreeVertical weight="bold" size={24} />
+                               </button>
+                             )}
+                           </div>
 
-                            <AnimatePresence initial={false}>
-                              {isActive && viewTarget === 'me' && (
-                                <motion.div
-                                  initial={{ height: 0, opacity: 0 }}
-                                  animate={{ height: 'auto', opacity: 1 }}
-                                  exit={{ height: 0, opacity: 0 }}
-                                  transition={{ duration: 0.2 }}
-                                  className="overflow-hidden"
-                                >
-                                  <div className="mx-1 mt-1 flex items-center justify-between rounded-xl bg-primary px-4 py-2 text-white">
-                                    <button
-                                      className="cursor-pointer p-1 transition-opacity hover:opacity-70"
-                                      title="Удалить"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setRecToDelete(rec);
-                                      }}
-                                    >
-                                      <Trash size={18} weight="bold" />
-                                    </button>
-                                    <div className="flex gap-4">
-                                      <button
-                                        className="cursor-pointer p-1 transition-opacity hover:opacity-70"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setRecToRename(rec);
-                                          setNewName(rec.name);
-                                        }}
-                                      >
-                                        <PencilSimple size={18} weight="bold" />
-                                      </button>
-                                      <button
-                                        className="cursor-pointer p-1 transition-opacity hover:opacity-70"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          downloadRec(rec);
-                                        }}
-                                      >
-                                        <DownloadSimple size={18} weight="bold" />
-                                      </button>
-                                    </div>
-                                  </div>
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </motion.div>
-                  );
-                })}
-              </AnimatePresence>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    </div>
-  );
+                           <AnimatePresence initial={false}>
+                             {isActive && viewTarget === 'me' && (
+                               <motion.div
+                                 initial={{ height: 0, opacity: 0 }}
+                                 animate={{ height: 'auto', opacity: 1 }}
+                                 exit={{ height: 0, opacity: 0 }}
+                                 transition={{ duration: 0.2 }}
+                                 className="overflow-hidden"
+                               >
+                                 <div className="mx-1 mt-1 flex items-center justify-between rounded-xl bg-primary px-4 py-2 text-white">
+                                   <button
+                                     className="cursor-pointer p-1 transition-opacity hover:opacity-70"
+                                     title="Удалить"
+                                     onClick={(e) => {
+                                       e.stopPropagation();
+                                       setRecToDelete(rec);
+                                     }}
+                                   >
+                                     <Trash size={18} weight="bold" />
+                                   </button>
+                                   <div className="flex gap-4">
+                                     <button
+                                       className="cursor-pointer p-1 transition-opacity hover:opacity-70"
+                                       onClick={(e) => {
+                                         e.stopPropagation();
+                                         setRecToRename(rec);
+                                         setNewName(rec.name);
+                                       }}
+                                     >
+                                       <PencilSimple size={18} weight="bold" />
+                                     </button>
+                                     <button
+                                       className="cursor-pointer p-1 transition-opacity hover:opacity-70"
+                                       onClick={(e) => {
+                                         e.stopPropagation();
+                                         downloadRec(rec);
+                                       }}
+                                     >
+                                       <DownloadSimple size={18} weight="bold" />
+                                     </button>
+                                   </div>
+                                 </div>
+                               </motion.div>
+                             )}
+                           </AnimatePresence>
+                         </motion.div>
+                       )}
+                     </AnimatePresence>
+                   </motion.div>
+                 );
+               })}
+             </AnimatePresence>
+           </motion.div>
+         )}
+       </AnimatePresence>
+     </div>
+   </div>
+ );
 
   return (
     <div className="flex h-screen w-full overflow-hidden font-sans text-text">

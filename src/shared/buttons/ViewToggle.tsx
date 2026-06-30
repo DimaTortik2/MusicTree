@@ -1,5 +1,5 @@
-import React, { useRef, useState } from 'react';
-import { motion } from 'framer-motion';
+import React, { useRef, useState, useId } from 'react';
+import { motion, AnimatePresence } from 'framer-motion'; // <-- Добавили AnimatePresence
 import { cn } from '@/app/utils/cn';
 import { UserAvatar } from '@/shared/UserAvatar';
 import { useAuthStore } from '@/app/store/authStore';
@@ -24,6 +24,8 @@ export const ViewToggle: React.FC<ViewToggleProps> = ({
 
   const clicksRef = useRef<number[]>([]);
   const [showEasterEgg, setShowEasterEgg] = useState(false);
+
+  const uniqueId = useId();
 
   if (!activeSharedFriend) return null;
 
@@ -51,6 +53,7 @@ export const ViewToggle: React.FC<ViewToggleProps> = ({
     <button
       type="button"
       onClick={handleToggle}
+      style={{ transform: 'translateZ(0)' }} // <-- 1. Форсируем отрисовку на GPU, убивает лаги
       className={cn(
         'relative mx-auto flex h-[52px] w-full max-w-[280px] cursor-pointer items-center rounded-full border-2 bg-surface/30 p-0 backdrop-blur-md transition-colors duration-300 outline-none select-none md:h-[56px]',
         activeColorClass,
@@ -64,23 +67,29 @@ export const ViewToggle: React.FC<ViewToggleProps> = ({
           viewTarget === 'me' ? 'font-semibold text-white' : 'text-text/60',
         )}
       >
-        {viewTarget === 'me' && (
-          <motion.div
-            layoutId="active-toggle-bg"
-            className={cn(
-              'absolute inset-y-[-2px] right-[-1px] left-[-2px] z-0 shadow-sm',
-              color === 'primary' ? 'bg-primary' : 'bg-accent',
-            )}
-            style={{
-              borderTopLeftRadius: '9999px',
-              borderBottomLeftRadius: '9999px',
-              borderTopRightRadius: '0px',
-              borderBottomRightRadius: '9999px',
-            }}
-            transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-          />
-        )}
-        <div className="relative z-10 flex h-full w-full items-center pr-2 pl-[2px] md:pl-[4px]">
+        {/* 2. AnimatePresence initial={false} жестко убивает баг с заползанием при загрузке */}
+        <AnimatePresence initial={false}>
+          {viewTarget === 'me' && (
+            <motion.div
+              layoutId={`active-toggle-bg-${uniqueId}`}
+              layout="position" // <-- 3. Запрещаем грузить проц, анимируем только позицию
+              className={cn(
+                'absolute inset-y-[-2px] right-[-1px] left-[-2px] z-0 shadow-sm',
+                color === 'primary' ? 'bg-primary' : 'bg-accent',
+              )}
+              style={{
+                borderTopLeftRadius: '9999px',
+                borderBottomLeftRadius: '9999px',
+                borderTopRightRadius: '0px',
+                borderBottomRightRadius: '9999px',
+              }}
+              transition={{ type: 'tween', ease: 'easeOut', duration: 0.2 }}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Красивый отступ pl-1.5 / md:pl-2 на месте */}
+        <div className="relative z-10 flex h-full w-full items-center pr-2 pl-1.5 md:pl-2">
           <UserAvatar
             userId={user?.id}
             name={userAvatarName}
@@ -100,23 +109,28 @@ export const ViewToggle: React.FC<ViewToggleProps> = ({
           viewTarget === 'friend' ? 'font-semibold text-white' : 'text-text/60',
         )}
       >
-        {viewTarget === 'friend' && (
-          <motion.div
-            layoutId="active-toggle-bg"
-            className={cn(
-              'absolute inset-y-[-2px] right-[-2px] left-[-1px] z-0 shadow-sm',
-              color === 'primary' ? 'bg-primary' : 'bg-accent',
-            )}
-            style={{
-              borderTopRightRadius: '9999px',
-              borderBottomRightRadius: '9999px',
-              borderTopLeftRadius: '9999px',
-              borderBottomLeftRadius: '0px',
-            }}
-            transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-          />
-        )}
-        <div className="relative z-10 flex h-full w-full items-center pr-[2px] pl-2 md:pr-[4px]">
+        <AnimatePresence initial={false}>
+          {viewTarget === 'friend' && (
+            <motion.div
+              layoutId={`active-toggle-bg-${uniqueId}`}
+              layout="position" // <-- 3. Запрещаем грузить проц
+              className={cn(
+                'absolute inset-y-[-2px] right-[-2px] left-[-1px] z-0 shadow-sm',
+                color === 'primary' ? 'bg-primary' : 'bg-accent',
+              )}
+              style={{
+                borderTopRightRadius: '9999px',
+                borderBottomRightRadius: '9999px',
+                borderTopLeftRadius: '9999px',
+                borderBottomLeftRadius: '0px',
+              }}
+              transition={{ type: 'tween', ease: 'easeOut', duration: 0.2 }}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Красивый отступ pr-1.5 / md:pr-2 на месте */}
+        <div className="relative z-10 flex h-full w-full items-center pr-1.5 pl-2 md:pr-2">
           <span className="mr-1 flex-1 truncate text-center text-sm md:text-base">
             {friendAvatarName}
           </span>

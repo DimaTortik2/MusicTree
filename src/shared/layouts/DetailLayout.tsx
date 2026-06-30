@@ -41,7 +41,7 @@ export const DetailLayout: React.FC<DetailLayoutProps> = ({
       {/* ЛЕВАЯ КОЛОНКА (СПИСОК) */}
       <div
         className={cn(
-          'flex h-full w-full flex-col border-text/10 md:w-[360px] md:border-r-[3px] lg:w-[420px]',
+          'flex h-full w-full flex-col border-text/10 md:w-[320px] md:border-r-[3px] lg:w-[380px]',
           isMobileDetailOpen ? 'hidden md:flex' : 'flex',
         )}
       >
@@ -55,7 +55,7 @@ export const DetailLayout: React.FC<DetailLayoutProps> = ({
               className={cn(
                 'sticky top-0 z-10 border-b-[3px] px-4 py-4 transition-all duration-300',
                 isScrolled
-                  ? 'border-text/10 backdrop-blur-2xl bg-background/30'
+                  ? 'border-text/10 bg-background/30 backdrop-blur-2xl'
                   : 'border-transparent bg-transparent',
               )}
             >

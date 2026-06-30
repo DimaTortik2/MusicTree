@@ -91,11 +91,13 @@ export const CreateNoteModal: React.FC<Props> = ({ isOpen, onClose, onApply }) =
           <Drop size={24} weight="fill" className="absolute right-0 bottom-5" style={{ color }} />
         </div>
         <ColorPickerSlider color={color} onChange={setColor} />
-        <div className="mt-8 flex gap-4">
+        {/* Добавлены классы flex-col-reverse и sm:flex-row */}
+        <div className="mt-8 flex flex-col-reverse gap-4 sm:flex-row">
           <Button
             variant="outline"
             color="text"
-            className="flex-1 border-2 !bg-transparent text-text opacity-80 hover:bg-text/10 hover:text-text hover:opacity-100"
+            /* Для надежности можно добавить w-full, чтобы кнопка точно тянулась на 100% на мобилках */
+            className="w-full flex-1 border-2 !bg-transparent text-text opacity-80 hover:bg-text/10 hover:text-text hover:opacity-100"
             style={{ borderColor: color }}
             onClick={onClose}
           >
@@ -104,7 +106,7 @@ export const CreateNoteModal: React.FC<Props> = ({ isOpen, onClose, onApply }) =
 
           <Button
             variant="solid"
-            className="flex-1 !border-transparent transition-all disabled:opacity-50"
+            className="w-full flex-1 !border-transparent transition-all disabled:opacity-50"
             disabled={!text.trim()}
             style={
               text.trim()

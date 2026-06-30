@@ -25,6 +25,9 @@ export const NotesHighlighterEngine: React.FC<Props> = ({
   const notes = useNotesStore((s) => s.notes);
   const setActiveNoteId = useNotesStore((s) => s.setActiveNoteId);
 
+  // ИСПРАВЛЕНИЕ: Перенесли хук на самый верх ДО любых useEffect
+  const pendingDeletionIds = useNotesStore((s) => s.pendingDeletionIds);
+
   const [selectionRect, setSelectionRect] = useState<DOMRect | null>(null);
   const [selectionData, setSelectionData] = useState<{
     text: string;
@@ -232,9 +235,6 @@ export const NotesHighlighterEngine: React.FC<Props> = ({
       setTimeout(handlers.current.onMarksRendered, 50);
     }
   }, [notes, containerRef]); // В зависимостях оставили только notes. Никаких лишних ререндеров!
-
-  // ОПТИМИЗАЦИЯ УРОВНЯ БОГ: Мягкое скрытие маркеров без перерисовки DOM
-  const pendingDeletionIds = useNotesStore((s) => s.pendingDeletionIds);
 
   useEffect(() => {
     if (!containerRef.current) return;

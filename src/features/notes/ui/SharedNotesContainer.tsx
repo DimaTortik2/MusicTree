@@ -318,8 +318,10 @@ export const SharedNotesContainer: React.FC<Props> = ({ contentId, children, cla
 
       {createPortal(
         <AnimatePresence>
-          {mobilePopover && (
+          {/* ИСПРАВЛЕНИЕ: Убеждаемся, что заметка всё ещё существует в массиве */}
+          {mobilePopover && notes.some((n) => n.id === mobilePopover.noteId) && (
             <motion.div
+              key={`mobile-popover-${mobilePopover.noteId}`} // <-- ВАЖНО: Добавлен обязательный key
               initial={{ opacity: 0, y: 10, x: '-50%' }}
               animate={{ opacity: 1, y: 0, x: '-50%' }}
               exit={{ opacity: 0, scale: 0.95, x: '-50%' }}

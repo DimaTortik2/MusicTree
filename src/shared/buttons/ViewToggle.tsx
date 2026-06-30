@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { cn } from '@/app/utils/cn';
 import { UserAvatar } from '@/shared/UserAvatar';
 import { useAuthStore } from '@/app/store/authStore';
@@ -12,7 +12,6 @@ interface ViewToggleProps {
   className?: string;
 }
 
-// made by gemini with antigravity
 export const ViewToggle: React.FC<ViewToggleProps> = ({
   viewTarget,
   onChange,
@@ -36,7 +35,6 @@ export const ViewToggle: React.FC<ViewToggleProps> = ({
   const handleToggle = () => {
     onChange(viewTarget === 'me' ? 'friend' : 'me');
 
-    // Отслеживаем 5 кликов за 2 секунды для пасхалки
     const now = Date.now();
     const recentClicks = clicksRef.current.filter((t) => now - t <= 2000);
     recentClicks.push(now);
@@ -44,97 +42,94 @@ export const ViewToggle: React.FC<ViewToggleProps> = ({
 
     if (recentClicks.length >= 5) {
       setShowEasterEgg(true);
-      clicksRef.current = []; // сброс счетчика после активации
-      setTimeout(() => {
-        setShowEasterEgg(false);
-      }, 3000);
+      clicksRef.current = [];
+      setTimeout(() => setShowEasterEgg(false), 3000);
     }
   };
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={handleToggle}
+    <button
+      type="button"
+      onClick={handleToggle}
+      className={cn(
+        'relative mx-auto flex h-[52px] w-full max-w-[280px] cursor-pointer items-center rounded-full border-2 bg-surface/30 p-0 backdrop-blur-md transition-colors duration-300 outline-none select-none md:h-[56px]',
+        activeColorClass,
+        className,
+      )}
+    >
+      {/* Me Option */}
+      <div
         className={cn(
-          'relative flex items-center w-full h-[58px] md:h-[62px] rounded-full p-0 bg-surface/30 border-2 backdrop-blur-md select-none transition-colors duration-300 outline-none cursor-pointer',
-          activeColorClass,
-          className
+          'relative flex h-full w-1/2 items-center justify-center overflow-hidden rounded-l-full py-1.5 transition-colors duration-200',
+          viewTarget === 'me' ? 'font-semibold text-white' : 'text-text/60',
         )}
       >
-        {/* Me Option */}
-        <div
-          className={cn(
-            'relative w-1/2 h-full flex items-center justify-center rounded-l-full py-1.5 text-xs sm:text-sm font-medium transition-colors duration-200',
-            viewTarget === 'me' ? 'text-white font-semibold' : 'text-text/60'
-          )}
-        >
-          {viewTarget === 'me' && (
-            <motion.div
-              layoutId="active-toggle-bg"
-              className={cn(
-                'absolute -top-[2px] -bottom-[2px] -left-[2px] -right-[1px] z-0 shadow-sm',
-                color === 'primary' ? 'bg-primary' : 'bg-accent'
-              )}
-              style={{
-                borderTopLeftRadius: '9999px',
-                borderBottomLeftRadius: '9999px',
-                borderTopRightRadius: '0px',
-                borderBottomRightRadius: '9999px',
-              }}
-              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-            />
-          )}
-          <span className="absolute left-[7px] top-1/2 -translate-y-1/2 z-10">
-            <UserAvatar
-              userId={user?.id}
-              name={userAvatarName}
-              src={profile?.avatar_url}
-              lqip={profile?.avatar_lqip}
-              forceGradient={profile?.use_gradient}
-              className="size-10 md:size-[44px] shrink-0"
-            />
-          </span>
-          <span className="absolute left-[47px] md:left-[51px] right-0 top-0 bottom-0 flex items-center justify-center z-10">
-            <span>Вы</span>
-          </span>
+        {viewTarget === 'me' && (
+          <motion.div
+            layoutId="active-toggle-bg"
+            className={cn(
+              'absolute inset-y-[-2px] right-[-1px] left-[-2px] z-0 shadow-sm',
+              color === 'primary' ? 'bg-primary' : 'bg-accent',
+            )}
+            style={{
+              borderTopLeftRadius: '9999px',
+              borderBottomLeftRadius: '9999px',
+              borderTopRightRadius: '0px',
+              borderBottomRightRadius: '9999px',
+            }}
+            transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+          />
+        )}
+        <div className="relative z-10 flex h-full w-full items-center pr-2 pl-[2px] md:pl-[4px]">
+          <UserAvatar
+            userId={user?.id}
+            name={userAvatarName}
+            src={profile?.avatar_url}
+            lqip={profile?.avatar_lqip}
+            forceGradient={profile?.use_gradient}
+            className="size-[38px] shrink-0 md:size-[42px]"
+          />
+          <span className="ml-1 flex-1 truncate text-center text-sm md:text-base">Вы</span>
         </div>
+      </div>
 
-        {/* Friend Option */}
-        <div
-          className={cn(
-            'relative w-1/2 h-full flex items-center justify-center rounded-r-full py-1.5 transition-colors duration-200',
-            viewTarget === 'friend' ? 'text-white font-semibold' : 'text-text/60'
-          )}
-        >
-          {viewTarget === 'friend' && (
-            <motion.div
-              layoutId="active-toggle-bg"
-              className={cn(
-                'absolute -top-[2px] -bottom-[2px] -right-[2px] -left-[1px] z-0 shadow-sm',
-                color === 'primary' ? 'bg-primary' : 'bg-accent'
-              )}
-              style={{
-                borderTopRightRadius: '9999px',
-                borderBottomRightRadius: '9999px',
-                borderTopLeftRadius: '9999px',
-                borderBottomLeftRadius: '0px',
-              }}
-              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-            />
-          )}
-          <span className="absolute right-[7px] top-1/2 -translate-y-1/2 z-10">
-            <UserAvatar
-              userId={activeSharedFriend.id}
-              name={friendAvatarName}
-              src={activeSharedFriend.avatar_url}
-              lqip={activeSharedFriend.avatar_lqip}
-              forceGradient={activeSharedFriend.use_gradient}
-              className="size-10 md:size-[44px] shrink-0"
-            />
+      {/* Friend Option */}
+      <div
+        className={cn(
+          'relative flex h-full w-1/2 items-center justify-center overflow-hidden rounded-r-full py-1.5 transition-colors duration-200',
+          viewTarget === 'friend' ? 'font-semibold text-white' : 'text-text/60',
+        )}
+      >
+        {viewTarget === 'friend' && (
+          <motion.div
+            layoutId="active-toggle-bg"
+            className={cn(
+              'absolute inset-y-[-2px] right-[-2px] left-[-1px] z-0 shadow-sm',
+              color === 'primary' ? 'bg-primary' : 'bg-accent',
+            )}
+            style={{
+              borderTopRightRadius: '9999px',
+              borderBottomRightRadius: '9999px',
+              borderTopLeftRadius: '9999px',
+              borderBottomLeftRadius: '0px',
+            }}
+            transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+          />
+        )}
+        <div className="relative z-10 flex h-full w-full items-center pr-[2px] pl-2 md:pr-[4px]">
+          <span className="mr-1 flex-1 truncate text-center text-sm md:text-base">
+            {friendAvatarName}
           </span>
+          <UserAvatar
+            userId={activeSharedFriend.id}
+            name={friendAvatarName}
+            src={activeSharedFriend.avatar_url}
+            lqip={activeSharedFriend.avatar_lqip}
+            forceGradient={activeSharedFriend.use_gradient}
+            className="size-[38px] shrink-0 md:size-[42px]"
+          />
         </div>
-      </button>
-    </>
+      </div>
+    </button>
   );
 };

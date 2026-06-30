@@ -163,15 +163,14 @@ export const TestsPage = () => {
       />
     );
 
+  const ListHeader = activeSharedFriend ? (
+    <div className="flex w-full justify-center">
+      <ViewToggle viewTarget={viewTarget} onChange={setViewTarget} color="accent" />
+    </div>
+  ) : undefined;
+
   const ListContent = (
     <>
-      {activeSharedFriend && (
-        <div className="mb-6 flex w-full justify-center">
-          <div className="w-full scale-90">
-            <ViewToggle viewTarget={viewTarget} onChange={setViewTarget} color="accent" />
-          </div>
-        </div>
-      )}
 
       {viewTarget === 'me' &&
         data.activeGroups.map((group, i) => (
@@ -227,7 +226,7 @@ export const TestsPage = () => {
                   variant={isSelected ? 'solid' : 'outline'}
                   color="accent"
                   className={cn(
-                    '!h-auto w-full scale-90 flex-col !items-start !justify-start gap-1 p-5 shadow-lg',
+                    '!h-auto w-full scale-90 flex-col !items-start !justify-start gap-1 p-5 shadow-lg hover:scale-92',
                     viewTarget === 'friend'
                       ? isSelected
                         ? 'border-accent/60 bg-surface/50 text-text/60 shadow-md'
@@ -350,6 +349,7 @@ export const TestsPage = () => {
   return (
     <DetailLayout
       isEmpty={data.isEmpty}
+      listHeader={ListHeader}
       emptyState={EmptyState}
       isMobileDetailOpen={isMobileOpen}
       onBackClick={() => {

@@ -86,7 +86,7 @@ export function VocalTunerPage() {
   const activeSharedFriend = useAppModeStore((s) => s.activeSharedFriend);
   const myId = useAuthStore((s) => s.user?.id);
   const [viewTarget, setViewTarget] = useState<'me' | 'friend'>('me');
-
+  const [isSidebarScrolled, setIsSidebarScrolled] = useState(false);
   // МАГИЯ: Записи уже загружены все для текущего дерева, мы просто фильтруем их локально!
   const recordings =
     viewTarget === 'friend'
@@ -144,43 +144,25 @@ export function VocalTunerPage() {
       </div>
     );
   }
-
   const sidebarContent = (
-    <div className="flex min-h-0 w-full flex-1 flex-col p-4 pb-0 md:h-full md:w-80 md:flex-none md:border-r md:border-line">
-      <div className="mb-5 flex h-auto shrink-0 items-center justify-between pl-1">
-        {activeSharedFriend ? (
-          <ViewToggle
-            viewTarget={viewTarget}
-            onChange={setViewTarget}
-            color="primary"
-            className="mr-3 flex-1"
-          />
-        ) : (
-          <div />
-        )}
-        {hasLoaded && (
-          <button
-            onClick={() => setIsModeInfoOpen(true)}
-            className="flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-medium text-text transition-colors"
-          >
-            {isCloudMode ? (
-              <Cloud
-                size={16}
-                weight="fill"
-                className="text-text/40 transition-colors hover:text-primary"
-              />
-            ) : (
-              <HardDrives
-                size={16}
-                weight="fill"
-                className="text-text/40 transition-colors hover:text-primary"
-              />
-            )}
-          </button>
-        )}
-      </div>
+    <div
+      className="custom-scroll relative flex min-h-0 w-full flex-1 flex-col overflow-y-auto border-text/10 md:h-full md:w-[360px] md:flex-none md:border-r-[3px] lg:w-[420px]"
+      onScroll={(e) => setIsSidebarScrolled(e.currentTarget.scrollTop > 5)}
+    >
+      {activeSharedFriend && (
+        <div
+          className={cn(
+            'sticky top-0 z-10 border-b-[3px] px-4 py-4 backdrop-blur-lg transition-colors duration-300 md:px-8',
+            isSidebarScrolled
+              ? 'border-text/10 bg-background/30'
+              : 'border-transparent bg-transparent',
+          )}
+        >
+          <ViewToggle viewTarget={viewTarget} onChange={setViewTarget} color="primary" />
+        </div>
+      )}
 
-      <div className="custom-scroll flex-1 overflow-y-auto pr-2 pb-24">
+      <div className={cn('flex-1 px-4 pb-24 md:px-8', !activeSharedFriend && 'pt-6')}>
         <AnimatePresence mode="wait">
           {!hasLoaded ? (
             <motion.div
@@ -415,6 +397,7 @@ export function VocalTunerPage() {
       </MobileSidebarPortal>
 
       <main className="relative flex flex-1 flex-col">
+        {/* Гамбургер-меню для мобилок (уже было) */}
         <div className="absolute top-6 left-5 z-10 md:hidden">
           <button
             onClick={() => {
@@ -426,6 +409,23 @@ export function VocalTunerPage() {
             <SidebarIcon />
           </button>
         </div>
+
+        {/* НОВОЕ: Кнопка облака, вынесенная за левую колонку! */}
+        {hasLoaded && (
+          <div className="absolute top-6 right-5 z-10 md:right-auto md:left-6">
+            <button
+              onClick={() => setIsModeInfoOpen(true)}
+              className="flex cursor-pointer items-center justify-center p-2 text-text/40 transition-colors outline-none hover:text-text"
+              title={isCloudMode ? 'Облачный режим' : 'Локальный режим'}
+            >
+              {isCloudMode ? (
+                <Cloud size={20} weight="fill" />
+              ) : (
+                <HardDrives size={20} weight="fill" />
+              )}
+            </button>
+          </div>
+        )}
 
         <AnimatePresence>
           {activeRecording && (

@@ -1,8 +1,10 @@
+import React, { useState } from 'react';
 import { ArrowUUpLeft } from '@phosphor-icons/react';
 import { cn } from '@/app/utils/cn';
 import type { ReactNode, Ref } from 'react';
 
 export interface DetailLayoutProps {
+  listHeader?: ReactNode;
   listContent: ReactNode;
   detailContent: ReactNode;
   isMobileDetailOpen: boolean;
@@ -10,10 +12,11 @@ export interface DetailLayoutProps {
   isEmpty?: boolean;
   emptyState?: ReactNode;
   listRef?: Ref<HTMLDivElement>;
-  detailRef?: Ref<HTMLDivElement>; 
+  detailRef?: Ref<HTMLDivElement>;
 }
 
 export const DetailLayout: React.FC<DetailLayoutProps> = ({
+  listHeader,
   listContent,
   detailContent,
   isMobileDetailOpen,
@@ -21,8 +24,10 @@ export const DetailLayout: React.FC<DetailLayoutProps> = ({
   isEmpty,
   emptyState,
   listRef,
-  detailRef, 
+  detailRef,
 }) => {
+  const [isScrolled, setIsScrolled] = useState(false);
+
   if (isEmpty && emptyState) {
     return (
       <div className="flex h-full w-full flex-col items-center justify-center p-6 text-center">
@@ -40,8 +45,24 @@ export const DetailLayout: React.FC<DetailLayoutProps> = ({
           isMobileDetailOpen ? 'hidden md:flex' : 'flex',
         )}
       >
-        <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-8 pb-[50vh] ">
-          {listContent}
+        <div
+          ref={listRef}
+          className="custom-scroll relative flex-1 overflow-y-auto pb-[50vh]"
+          onScroll={(e) => setIsScrolled(e.currentTarget.scrollTop > 5)}
+        >
+          {listHeader && (
+            <div
+              className={cn(
+                'sticky top-0 z-10 border-b-[3px] px-4 py-4 transition-all duration-300',
+                isScrolled
+                  ? 'border-text/10 backdrop-blur-2xl bg-background/30'
+                  : 'border-transparent bg-transparent',
+              )}
+            >
+              {listHeader}
+            </div>
+          )}
+          <div className={cn('px-4', !listHeader && 'pt-8')}>{listContent}</div>
         </div>
       </div>
 
@@ -55,7 +76,7 @@ export const DetailLayout: React.FC<DetailLayoutProps> = ({
         )}
       >
         <div
-          className="flex shrink-0 items-center bg-transparent px-4 pb-2 md:hidden "
+          className="flex shrink-0 items-center bg-transparent px-4 pb-2 md:hidden"
           style={{ paddingTop: 'calc(env(safe-area-inset-top) + 20px)' }}
         >
           <button

@@ -10,6 +10,7 @@ import { useChainsData } from './useChainsData';
 import { useRememberSelection } from '@/shared/hooks/useRememberSelection';
 // ✨ Добавляем framer-motion
 import { AnimatePresence, motion, type Variants } from 'framer-motion';
+import { SharedNotesContainer } from '@/features/notes/ui/SharedNotesContainer';
 
 const mdxFiles = import.meta.glob('/src/content/**/*.mdx');
 
@@ -150,37 +151,40 @@ export const ChainsPage = () => {
     </div>
   );
 
-  // ✨ Оборачиваем в AnimatePresence и добавляем анимацию Suspense
-  const DetailContent = (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={chainId || 'empty'}
-        initial="initial"
-        animate="animate"
-        exit="exit"
-        variants={contentTransitionVariants}
-        className="flex flex-1 flex-col" // Убрали h-full (как и на странице домашек), чтобы скролл работал корректно
-      >
-        <div className="prose prose-invert max-w-none flex-1 text-[17px] leading-relaxed text-text">
-          {LazyMdxContent ? (
-            <Suspense fallback={<MdxSkeleton />}>
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, ease: 'easeOut' }}
-              >
-                <LazyMdxContent />
-              </motion.div>
-            </Suspense>
-          ) : selectedChain ? (
-            <div className="h-full py-4 font-medium text-primary">
-              Файл не найден. Пожалуйста, создайте файл MDX по пути: {selectedChain.mdxPath}
-            </div>
-          ) : null}
-        </div>
-      </motion.div>
-    </AnimatePresence>
-  );
+ const DetailContent = (
+   <AnimatePresence mode="wait">
+     <motion.div
+       key={chainId || 'empty'}
+       initial="initial"
+       animate="animate"
+       exit="exit"
+       variants={contentTransitionVariants}
+       className="flex flex-1 flex-col"
+     >
+       {/* Обертка заметок берет на себя все стили текста */}
+       <SharedNotesContainer
+         contentId={chainId}
+         className="prose max-w-none flex-1 text-[17px] leading-relaxed text-text prose-invert"
+       >
+         {LazyMdxContent ? (
+           <Suspense fallback={<MdxSkeleton />}>
+             <motion.div
+               initial={{ opacity: 0, y: 10 }}
+               animate={{ opacity: 1, y: 0 }}
+               transition={{ duration: 0.4, ease: 'easeOut' }}
+             >
+               <LazyMdxContent />
+             </motion.div>
+           </Suspense>
+         ) : selectedChain ? (
+           <div className="h-full py-4 font-medium text-primary">
+             Файл не найден. Пожалуйста, создайте файл MDX по пути: {selectedChain.mdxPath}
+           </div>
+         ) : null}
+       </SharedNotesContainer>
+     </motion.div>
+   </AnimatePresence>
+ );
 
   return (
     <DetailLayout

@@ -89,7 +89,7 @@ export const DetailLayout: React.FC<DetailLayoutProps> = ({
 
         <div
           ref={detailRef}
-          className="flex flex-1 flex-col overflow-y-auto px-6 pt-4 pb-[50vh] md:px-16 md:pt-16"
+          className="flex flex-1 flex-col overflow-y-auto px-6 pb-[50vh] md:px-16"
         >
           {detailContent}
         </div>

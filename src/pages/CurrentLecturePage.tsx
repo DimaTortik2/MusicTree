@@ -277,7 +277,7 @@ export const CurrentLecturePage = () => {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.4, delay: 0.1, ease: 'easeOut' }}
-              className="relative hidden w-[280px] shrink-0 border-l-[3px] border-text/10 lg:block"
+              className="relative hidden w-[280px] shrink-0 lg:block"
             >
               {notes.map((note) => {
                 const layout = noteLayout[note.id];

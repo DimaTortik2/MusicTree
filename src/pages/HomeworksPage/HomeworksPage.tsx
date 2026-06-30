@@ -12,6 +12,7 @@ import { Modal } from '@/shared/Modal';
 import { useRememberSelection } from '@/shared/hooks/useRememberSelection';
 // ✨ Добавляем импорты framer-motion
 import { AnimatePresence, motion, type Variants } from 'framer-motion';
+import { SharedNotesContainer } from '@/features/notes/ui/SharedNotesContainer';
 
 const mdxFiles = import.meta.glob('/src/content/**/*.mdx');
 
@@ -258,35 +259,37 @@ export const HomeworksPage = () => {
     </>
   );
 
-  // ✨ Оборачиваем в AnimatePresence и motion.div с ключом homeworkId
-  const DetailContent = (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={homeworkId || 'empty'}
-        initial="initial"
-        animate="animate"
-        exit="exit"
-        variants={contentTransitionVariants}
-        className="flex flex-1 flex-col"
+const DetailContent = (
+  <AnimatePresence mode="wait">
+    <motion.div
+      key={homeworkId || 'empty'}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      variants={contentTransitionVariants}
+      className="flex flex-1 flex-col"
+    >
+      <SharedNotesContainer
+        contentId={homeworkId}
+        className="prose max-w-none flex-1 text-[17px] leading-relaxed text-text prose-invert"
       >
-        <div className="prose prose-invert max-w-none flex-1 text-[17px] leading-relaxed text-text">
-          {LazyMdxContent ? (
-            <Suspense fallback={<MdxSkeleton />}>
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, ease: 'easeOut' }}
-              >
-                <LazyMdxContent />
-              </motion.div>
-            </Suspense>
-          ) : selectedHw ? (
-            <div className="h-full py-4 font-medium text-primary">
-              Файл не найден. Пожалуйста, добавьте файл по пути: {selectedHw.mdxPath}
-            </div>
-          ) : null}
-        </div>
+        {LazyMdxContent ? (
+          <Suspense fallback={<MdxSkeleton />}>
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, ease: 'easeOut' }}
+            >
+              <LazyMdxContent />
+            </motion.div>
+          </Suspense>
+        ) : selectedHw ? (
+          <div className="h-full py-4 font-medium text-primary">
+            Файл не найден. Пожалуйста, добавьте файл по пути: {selectedHw.mdxPath}
+          </div>
+        ) : null}
 
+        {/* Кнопки теперь тоже внутри контейнера, они будут аккуратно находиться под текстом */}
         <div className="mt-16 flex shrink-0 justify-center">
           {isSelectedArchived ? (
             <Button variant="outline" color="homework" size="md" onClick={handleReturnFromArchive}>
@@ -298,9 +301,10 @@ export const HomeworksPage = () => {
             </Button>
           )}
         </div>
-      </motion.div>
-    </AnimatePresence>
-  );
+      </SharedNotesContainer>
+    </motion.div>
+  </AnimatePresence>
+);
 
   return (
     <DetailLayout

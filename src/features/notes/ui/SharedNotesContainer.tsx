@@ -348,6 +348,7 @@ export const SharedNotesContainer: React.FC<Props> = ({ contentId, children, cla
           content: ""; position: absolute; inset: -20px;
           background-color: var(--background, #0f0510);
           opacity: 0; pointer-events: none; transition: opacity 0.3s ease-out; z-index: 10;
+          border-radius: 24px;
         }
         .prose-content-transition img, .prose-content-transition pre,
         .prose-content-transition hr, .prose-content-transition table, .prose-content-transition mark {

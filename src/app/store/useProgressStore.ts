@@ -143,7 +143,6 @@ export const useProgressStore = create<AppState>()(
         "chains",
         "tests",
         "friends",
-        "debug",
         "settings",
         "customize",
         "chat",

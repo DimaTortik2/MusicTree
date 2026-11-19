@@ -144,9 +144,6 @@ export function LandingPage() {
       />
 
       <header className="absolute top-0 z-20 flex w-full justify-center px-4 pt-6 sm:pt-8">
-        <p className="max-w-70 text-center text-[10px] leading-tight font-light tracking-wide text-text/40 sm:max-w-none sm:text-sm">
-          Сервис является выполнением практической работы по программированию
-        </p>
       </header>
 
       {/* Розовая волна */}

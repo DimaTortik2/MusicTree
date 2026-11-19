@@ -29,7 +29,6 @@ const TAB_ROUTES: Record<string, string> = {
   chains: '/app/chains',
   vocal: '/app/mic',
   tests: '/app/tests',
-  debug: '/app/debug',
   settings: '/app/settings',
   friends: '/app/friends',
 };
@@ -95,7 +94,6 @@ export const AppLayout = () => {
         'chains',
         'vocal',
         'tests',
-        'debug',
         'settings',
       ];
     }
@@ -108,7 +106,6 @@ export const AppLayout = () => {
       'vocal',
       'tests',
       'friends',
-      'debug',
       'settings',
     ];
   }, [activeSharedFriend]);
@@ -167,7 +164,6 @@ export const AppLayout = () => {
       vocal: 'Вокальный тренажер',
       tests: 'Тесты',
       friends: 'Друзья',
-      debug: 'Дебаг',
       settings: 'Настройки',
       customize: 'Настроить вкладки',
     };

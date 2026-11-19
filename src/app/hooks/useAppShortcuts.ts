@@ -11,7 +11,6 @@ const TAB_ROUTES: Record<string, string> = {
   vocal: '/app/mic',
   tests: '/app/tests',
   friends: '/app/friends',
-  debug: '/app/debug',
   settings: '/app/settings',
 };
 

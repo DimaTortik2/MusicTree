@@ -10,7 +10,6 @@ import {
   PianoKeys,
   TextAlignCenter,
   Users,
-  Wrench,
 } from "@phosphor-icons/react";
 
 export const TABS_INFO: Record<
@@ -58,11 +57,6 @@ export const TABS_INFO: Record<
     desc: "Ваши друзья и заявки",
   },
   chat: { icon: ChatCircle, title: "Чат", desc: "Общение с другом" },
-  debug: {
-    icon: Wrench,
-    title: "Для разработчиков",
-    desc: "Симуляция любой ситуации",
-  },
 settings: {
     icon: Gear,
     title: "Настройки",

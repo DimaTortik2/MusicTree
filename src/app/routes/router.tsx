@@ -6,7 +6,6 @@ import { TreePage } from '@/pages/TreePage';
 import { CurrentLecturePage } from '@/pages/CurrentLecturePage';
 import SettingsPage from '@/pages/settings/SettingsPage';
 import { HomeworksPage } from '@/pages/HomeworksPage/HomeworksPage';
-import { DebugPage } from '@/pages/debug/DebugPage';
 import { ChainsPage } from '@/pages/chains/ChainsPage';
 import { TestsPage } from '@/pages/tests/TestsPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
@@ -100,10 +99,6 @@ export const router = createBrowserRouter([
       {
         path: 'chat',
         element: <ChatsPage />,
-      },
-      {
-        path: 'debug',
-        element: <DebugPage />,
       },
       {
         path: '*',
